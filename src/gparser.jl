@@ -1,12 +1,24 @@
+# ?? @everywhere using KUnet
+
 # The greedy transition parser parses the sentence using the
-# following: (n::Net, p::Parser, s::Sentence)
-#
-# while any(v = valid(p))
-#   f = features(p, s)
-#   y = forw(n, f)
-#   y[~v] = -inf
-#   move(p, findmax(y)[2])
-#
+# following:
+
+function gparse(s::Sentence, n::Net, f::Fmat)
+    p = ArcHybrid(size(s.wvec,2))
+    while (v = valid(p); any(v))
+        x = features(p, s, f)
+        #y = predict(n, x)[:]
+        y = rand(eltype(x), NMOVE)
+        y[!v] = -Inf
+        move!(p, indmax(y))
+    end
+    p.head
+end
+
+function gparse(c::Corpus, n::Net, f::Fmat)
+    map(s->gparse(s,n,f), c)
+end
+
 # There are two opportunities for parallelism:
 # 1. We process multiple sentences to minibatch net input.
 #    This speeds up forw.
@@ -15,20 +27,17 @@
 #
 # nworkers() gives the number of processes available
 
-using KUnet  # ?? @everywhere using KUnet
-typealias Corpus Vector{Sentence}
+# function gparse(corpus::Corpus, net::Net; batch=128)
+#     p = @parallel (vcat) for b=1:batch:length(corpus)
+#         e = b + batch - 1
+#         e > length(corpus) && (e = length(corpus))
+#         gparse(corpus, net, b, e)
+#     end
+# end
 
-function gparse(corpus::Corpus, net::Net; batch=128)
-    p = @parallel (vcat) for b=1:batch:length(corpus)
-        e = b + batch - 1
-        e > length(corpus) && (e = length(corpus))
-        gparse(corpus, net, b, e)
-    end
-end
-
-function gparse(corpus::Corpus, net::Net, b::Integer, e::Integer)
+# function gparse(corpus::Corpus, net::Net, b::Integer, e::Integer)
     
-end
+# end
 
 
 # what if net does not get copied?
