@@ -1,6 +1,7 @@
 *~
 *.jld
 *.h5
+*.mat
 foo*
 
 # Object files
