@@ -1,6 +1,7 @@
 *~
 *.jld
 *.h5
+foo*
 
 # Object files
 *.o
