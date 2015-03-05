@@ -110,7 +110,11 @@ end
 #
 # nworkers() gives the number of processes available
 
-# what if net does not get copied?
-# we may overwrite fields?
-# ideal would be cpu/net copied, gpu left alone
-# what if net does get copied and we run out of memory
+function gparse(corpus::Corpus, net::Net, fmat::Fmat, batch::Integer, ncpu::Integer)
+    (nworkers() < ncpu) && error("Please run addprocs($(ncpu - nprocs() + 1)) and @everywhere using KUparser, KUnet.")
+    d = distribute(corpus)
+    n = copy(net, :cpu)
+    p = pmap(procs(d)) do x
+        gparse(localpart(d), copy(n, :gpu), fmat, batch)
+    end
+end
