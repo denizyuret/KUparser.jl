@@ -21,23 +21,23 @@ typealias Move UInt8
 const SHIFT=Move(1)
 const RIGHT=Move(2)
 const LEFT=Move(3)
-const NMOVE=3
 
 abstract Parser
 
 type ArcHybrid <: Parser
     nword::Pval   # number of words in sentence
-    head::Pvec    # 1xn vector of heads
-    stack::Pvec   # 1xn vector for stack of indices
-    ldep::Pmat    # nxn matrix for left dependents
-    rdep::Pmat    # nxn matrix for right dependents
+    nmove::Pval   # number of legal moves
     wptr::Pval    # index of first word in buffer
     sptr::Pval    # index of last word (top) of stack
+    head::Pvec    # 1xn vector of heads
+    stack::Pvec   # 1xn vector for stack of indices
     lcnt::Pvec    # lcnt(h): number of left deps for h
     rcnt::Pvec    # rcnt(h): number of right deps for h
+    ldep::Pmat    # nxn matrix for left dependents
+    rdep::Pmat    # nxn matrix for right dependents
     
     function ArcHybrid(n::Integer)
-        p = new(n, pzeros(n), pzeros(n), pzeros(n,n), pzeros(n,n), 1, 0, pzeros(n), pzeros(n))
+        p = new(n, 3, 1, 0, pzeros(n), pzeros(n), pzeros(n), pzeros(n), pzeros(n,n), pzeros(n,n))
         move!(p, SHIFT)
         return p
     end
@@ -67,6 +67,8 @@ function move!(p::ArcHybrid, op::Move)
     end
 end
 
+move!(p::ArcHybrid, op::Integer)=move!(p, convert(Move, op))
+
 # Oracle cost counts gold arcs that become impossible after possible
 # transitions.  Tokens start their lifecycle in the buffer without
 # links.  They move to the top of the buffer (n0) with SHIFT moves.
@@ -89,9 +91,10 @@ end
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function cost(p::ArcHybrid, gold::Pvec)
+function cost(p::ArcHybrid, gold::Pvec, c::Pvec)
     @assert (length(gold) == p.nword)
-    c = fill(Pinf, NMOVE)
+    @assert (length(c) == p.nmove)
+    fill!(c, Pinf)
     n0 = p.wptr
     if (n0 <= p.nword)      # shift is legal
         n0h = gold[n0]
@@ -121,11 +124,17 @@ function cost(p::ArcHybrid, gold::Pvec)
     return c
 end # cost
 
-function valid(p::ArcHybrid)
-    [(p.wptr <= p.nword), # SHIFT
-     (p.sptr >= 2), # RIGHT
-     ((p.sptr >= 1) && (p.wptr <= p.nword))] # LEFT
+cost(p::ArcHybrid, gold::Pvec)=cost(p,gold,Array(Pval,p.nmove))
+cost(p::ArcHybrid, gold::Vector)=cost(p,convert(Pvec,gold))
+
+function valid(p::ArcHybrid, v::AbstractVector{Bool})
+    v[SHIFT] = (p.wptr <= p.nword)
+    v[RIGHT] = (p.sptr >= 2)
+    v[LEFT]  = ((p.sptr >= 1) && (p.wptr <= p.nword))
+    return v
 end # valid
+
+valid(p::ArcHybrid)=valid(p,Array(Bool, p.nmove))
 
 function arc!(p::ArcHybrid, h::Pval, d::Pval)
     p.head[d] = h;
