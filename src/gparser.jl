@@ -1,7 +1,5 @@
-# ?? @everywhere using KUnet
-
-# The greedy transition parser parses the sentence using the
-# following:
+# The greedy transition based parser parses the sentence using the
+# following steps:
 
 function gparse(s::Sentence, n::Net, f::Fmat, pred::Bool=true)
     (ndims, nword) = size(s.wvec)
@@ -17,17 +15,16 @@ function gparse(s::Sentence, n::Net, f::Fmat, pred::Bool=true)
     p.head
 end
 
+# We parse a corpus using a for loop or map:
+
 function gparse(c::Corpus, n::Net, f::Fmat, pred::Bool=true)
     map(s->gparse(s,n,f,pred), c)
     # for s in c; gparse(s,n,f); end # not faster than map
 end
 
-wdim(s)=size(s.wvec,1)
-wcnt(s)=size(s.wvec,2)
-
 # There are two opportunities for parallelism:
 # 1. We process multiple sentences to minibatch net input.
-#    This speeds up forw.
+#    This speeds up predict.
 
 function gparse(corpus::Corpus, net::Net, fmat::Fmat, batch::Integer)
     # determine dimensions
@@ -105,7 +102,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Fmat, batch::Integer)
     KUnet.free(xx)
     h = Array(Pvec, nsent) 	# predicted heads
     for s=1:nsent; h[s] = p[s].head; end
-    return h
+    return (h, x, y, z)
 end
 
 # 2. We do multiple batches in parallel to utilize CPU cores.
@@ -113,23 +110,7 @@ end
 #
 # nworkers() gives the number of processes available
 
-# function gparse(corpus::Corpus, net::Net; batch=128)
-#     p = @parallel (vcat) for b=1:batch:length(corpus)
-#         e = b + batch - 1
-#         e > length(corpus) && (e = length(corpus))
-#         gparse(corpus, net, b, e)
-#     end
-# end
-
-# function gparse(corpus::Corpus, net::Net, b::Integer, e::Integer)
-    
-# end
-
-
 # what if net does not get copied?
 # we may overwrite fields?
 # ideal would be cpu/net copied, gpu left alone
 # what if net does get copied and we run out of memory
-
-
-# maybe first debug the simple parser, then parallelize...
