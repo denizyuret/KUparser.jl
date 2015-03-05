@@ -1,0 +1,70 @@
+2015-03-05  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/gparser.jl: gpu minibatch version:
+
+	# dev has 1700 sentences and 40117 words
+	# fastest matlab test speed was 26 sents/sec = 1.6298 ms/word
+	# fastest matlab dump speed was 30 sents/sec = 1.4125 ms/word
+	# fastest julia test speed is 80 sents/sec = 0.5286 ms/word
+	# fastest julia dump speed is 116 sents/sec = 0.3652 ms/word
+
+	# 3.6986 ms/word: parsing sentences one at a time
+	include("fooparser.jl")
+	julia> @time h2=KUparser.gparse(dev, n, Feats.fv021a);
+	elapsed time: 148.37933571 seconds (4145 MB allocated, 0.83% gc time in 190 pauses with 0 full sweep)
+
+	# 0.5286 ms/word: parsing sentences in minibatches
+	julia> @time h1=KUparser.gparse(dev, n, Feats.fv021a, 1700);
+	elapsed time: 21.206189373 seconds (6355 MB allocated, 8.16% gc time in 273 pauses with 1 full sweep)
+
+	# 0.3652 ms/word: everything except KUnet prediction
+	julia> @time h0=KUparser.gparse(dev, n, Feats.fv021a, false);
+	elapsed time: 14.648858577 seconds (3488 MB allocated, 5.64% gc time in 160 pauses with 0 full sweep)
+
+
+2015-03-04  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/features.jl:
+	> @time foo=KUparser.gparse(dev[1:100], n, Feats.fv021a); # with rand!
+	> elapsed time: 0.899239837 seconds (212 MB allocated, 4.95% gc time in 9 pauses with 0 full sweep)
+
+	- Better but still allocating, why?
+
+	> @time foo=KUparser.gparse(dev[1:100], n, Feats.fv021a); # with predict
+	> elapsed time: 9.124658661 seconds (254 MB allocated, 0.79% gc time in 11 pauses with 0 full sweep)
+
+	* features.jl: get rid of avec allocation.
+	* net.jl: find what allocates 6kb?
+
+2015-03-03  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	- get rid of allocation
+	- optimize feature extraction
+	- cuda parser?
+	- solve pmap problem (shared arrays, pointers?)
+
+	* timing: dev is the 1700 sentences:
+	sent_pct: 0.5888
+	head_pct: 0.0894
+	word_pct: 0.0785
+	move_pct: 0.0340
+
+	We are doing about 11 sentences/second: (90ms/sent)
+
+	julia> @time foo=KUparser.gparse(dev[1:10], net, Fmats.fv021a)
+	elapsed time: 1.078577283 seconds (65 MB allocated, 0.85% gc time in 3 pauses with 0 full sweep)
+	julia> @time foo=KUparser.gparse(dev[1:100], net, Fmats.fv021a);
+	elapsed time: 9.161665507 seconds (557 MB allocated, 0.80% gc time in 25 pauses with 0 full sweep)
+	julia> @time foo=KUparser.gparse(dev, net, Fmats.fv021a);
+	elapsed time: 152.361663243 seconds (9084 MB allocated, 1.26% gc time in 415 pauses with 0 full sweep)
+
+	The feature construction is actually pretty fast: (10ms/sent)
+
+	After replacing "predict" with "rand":
+	julia> @time foo=KUparser.gparse(dev[1:100], net, Fmats.fv021a);
+	elapsed time: 1.007098236 seconds (510 MB allocated, 11.25% gc time in 23 pauses with 0 full sweep)
+
+	However there is too much allocation and speed can be improved.
+
+	More impact would be to batch sentences first.
