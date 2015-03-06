@@ -1,4 +1,4 @@
-# f::Fmat is a nx3 matrix whose rows determine which features to extract
+# f::Features is a nx3 matrix whose rows determine which features to extract
 # Each row of f consists of the following three values:
 # 1. anchor word: 0:n0, 1:n1, 2:n2, ..., -1:s0, -2:s1, -3:s2, ...
 # 2. target word: 0:self, 1:rightmost child, 2:second rightmost, -1:leftmost, -2:second leftmost ...
@@ -20,7 +20,7 @@
 const flength = Int[1, -1, 8, 4, 4, -1, -2, 4, 1, -2, 1, 4, 4, -1, 4, 4, 8, -1, 1]
 const foffset = 10
 
-function flen(ndim::Int, f::Fmat)
+function flen(ndim::Int, f::Features)
     nfeat = size(f, 1)
     ndim2 = ndim>>1
     len = 0;
@@ -33,7 +33,7 @@ end
 
 # fidx[ifeat]: end of feature f[ifeat,:] in x
 
-function fidx(ndim::Int, f::Fmat)
+function fidx(ndim::Int, f::Features)
     nfeat = size(f, 1)
     ndim2 = ndim>>1
     idx = Array(Int, nfeat)
@@ -44,12 +44,12 @@ function fidx(ndim::Int, f::Fmat)
     return idx
 end
 
-function features(p::Parser, s::Sentence, f::Fmat)
+function features(p::Parser, s::Sentence, f::Features)
     x = Array(eltype(s.wvec), flen(size(s.wvec,1), f), 1)
     features(p, s, f, x)
 end
 
-function features(p::Parser, s::Sentence, f::Fmat, x)
+function features(p::Parser, s::Sentence, f::Features, x)
 
     # Given a parser state p, a sentence s, and a feature matrix f, fills and
     # returns a feature vector x, which should be preallocated to have

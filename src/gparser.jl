@@ -1,14 +1,14 @@
 # The greedy transition based parser parses the sentence using the
 # following steps:
 
-function gparse(s::Sentence, n::Net, f::Fmat, pred::Bool=true)
+function gparse(s::Sentence, n::Net, f::Features; pred::Bool=true, feat::Bool=true)
     (ndims, nword) = size(s.wvec)
     p = ArcHybrid(nword)
     x = Array(eltype(s.wvec), flen(ndims, f), 1)
     y = Array(eltype(x), p.nmove, 1)
     while (v = valid(p); any(v))
-        features(p, s, f, x)
-        pred ? predict(n, x, y) : rand!(y)  # for testing and timing
+        feat ? features(p, s, f, x) : rand!(x)
+        pred ? predict(n, x, y) : rand!(y)
         y[!v,:] = -Inf
         move!(p, indmax(y))
     end
@@ -17,8 +17,8 @@ end
 
 # We parse a corpus using a for loop or map:
 
-function gparse(c::Corpus, n::Net, f::Fmat, pred::Bool=true)
-    map(s->gparse(s,n,f,pred), c)
+function gparse(c::Corpus, n::Net, f::Features; args...)
+    map(s->gparse(s,n,f;args...), c)
     # for s in c; gparse(s,n,f); end # not faster than map
 end
 
@@ -26,7 +26,7 @@ end
 # 1. We process multiple sentences to minibatch net input.
 #    This speeds up predict.
 
-function gparse(corpus::Corpus, net::Net, fmat::Fmat, batch::Integer)
+function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::Bool=true)
     # determine dimensions
     nsent = length(corpus)
     nword = 0; for s in corpus; nword += wcnt(s); end
@@ -75,7 +75,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Fmat, batch::Integer)
             # First calculate features x[:,idx+1:idx+nvalid]
             for i=1:nvalid
                 s = svalid[i]
-                features(p[s], corpus[s], fmat, sub(x, :, idx + i))
+                feat ? features(p[s], corpus[s], fmat, sub(x, :, idx + i)) : rand!(sub(x,:,idx+i))
             end
 
             # Next predict y in bulk
@@ -110,7 +110,7 @@ end
 #
 # nworkers() gives the number of processes available
 
-function gparse(corpus::Corpus, net::Net, fmat::Fmat, batch::Integer, ncpu::Integer)
+function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::Integer)
     (nworkers() < ncpu) && error("Please run addprocs($(ncpu - nprocs() + 1)) and @everywhere using KUparser, KUnet.")
     d = distribute(corpus)
     n = copy(net, :cpu)

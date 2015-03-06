@@ -1,5 +1,13 @@
 2015-03-05  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* TODO:
+	- write bparser
+	- can we use rnn's to learn parser-action sequences?
+	- real use of rnn's is to map text to meaning!
+
+	- should we try parallel for?
+	- see how SharedArray is implemented and use it for net weights.
+	
 	* src/gparser.jl: gpu minibatch version:
 
 	# dev has 1700 sentences and 40117 words
@@ -21,6 +29,8 @@
 	julia> @time h0=KUparser.gparse(dev, n, Feats.fv021a, false);
 	elapsed time: 14.648858577 seconds (3488 MB allocated, 5.64% gc time in 160 pauses with 0 full sweep)
 
+	# For training with Julia I expect 8 mins to parse, 2 mins to
+	update, 10 mins per epoch.
 
 2015-03-04  Deniz Yuret  <dyuret@ku.edu.tr>
 
