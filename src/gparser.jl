@@ -109,6 +109,11 @@ end
 #    This speeds up features.
 #
 # nworkers() gives the number of processes available
+# distribute() splits the array based on number of workers
+#
+# TODO: find a way to share a CudaArray among processes.
+# TODO: figure out distribute() to less than nworkers() so ncpu is meaningful
+# TODO: figure out how to load KUnet/KUparser on all workers from within this function
 
 function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::Integer)
     (nworkers() < ncpu) && error("Please run addprocs($(ncpu - nprocs() + 1)) and @everywhere using KUparser, KUnet.")
@@ -117,4 +122,17 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::
     p = pmap(procs(d)) do x
         gparse(localpart(d), copy(n, :gpu), fmat, batch)
     end
+    pmerge(p)
+end
+
+function pmerge(p)
+    (h, x, y, z) = p[1]
+    for i=2:length(p)
+        (h2,x2,y2,z2) = p[i]
+        h = append!(h, h2)
+        x = [x x2]
+        y = [y y2]
+        z = [z z2]
+    end
+    (h, x, y, z)
 end
