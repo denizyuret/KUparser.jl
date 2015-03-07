@@ -112,15 +112,18 @@ end
 # distribute() splits the array based on number of workers
 #
 # TODO: find a way to share a CudaArray among processes.
+# TODO: find a way to make this work inside gparse:
+#   (nworkers() < ncpu) && (addprocs(ncpu - nprocs() + 1))
+#   require("CUDArt")
+#   @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
+#   require("KUparser")
 
 function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::Integer)
-    (nworkers() < ncpu) && addprocs(ncpu - nprocs() + 1)
-    require("KUnet", "KUparser")
-    @everywhere gc()
+    assert(nworkers() >= ncpu)
     d = distribute(corpus, workers()[1:ncpu])
     n = copy(net, :cpu)
+    @everywhere gc()
     @time p = pmap(procs(d)) do x
-        CUDArt.device(myid() % CUDArt.devcount())
         gparse(localpart(d), copy(n, :gpu), fmat, batch)
     end
     pmerge(p)
