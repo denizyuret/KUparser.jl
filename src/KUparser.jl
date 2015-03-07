@@ -3,6 +3,7 @@ module KUparser
 using InplaceOps
 using KUnet
 using Compat
+using DistributedArrays
 
 typealias Features Matrix{Int8}
 type Sentence form; lemma; cpostag; postag; head; deprel; wvec; Sentence()=new(); end

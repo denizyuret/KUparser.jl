@@ -141,7 +141,7 @@ function pmerge(p)
     (h, x, y, z)
 end
 
-import Base.distribute
+import DistributedArrays.distribute
 
 function distribute(a::AbstractArray, procs)
     owner = myid()
