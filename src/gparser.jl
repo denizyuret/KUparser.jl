@@ -112,14 +112,14 @@ end
 # distribute() splits the array based on number of workers
 #
 # TODO: find a way to share a CudaArray among processes.
-# TODO: figure out distribute() to less than nworkers() so ncpu is meaningful
-# TODO: figure out how to load KUnet/KUparser on all workers from within this function
 
 function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::Integer)
-    (nworkers() < ncpu) && error("Please run addprocs($(ncpu - nprocs() + 1)) and @everywhere using KUparser, KUnet.")
-    d = distribute(corpus)
+    (nworkers() < ncpu) && addprocs(ncpu - nprocs() + 1)
+    require("KUnet", "KUparser")
+    @everywhere gc()
+    d = distribute(corpus, workers()[1:ncpu])
     n = copy(net, :cpu)
-    p = pmap(procs(d)) do x
+    @time p = pmap(procs(d)) do x
         gparse(localpart(d), copy(n, :gpu), fmat, batch)
     end
     pmerge(p)
@@ -135,4 +135,21 @@ function pmerge(p)
         z = [z z2]
     end
     (h, x, y, z)
+end
+
+import Base.distribute
+
+function distribute(a::AbstractArray, procs)
+    owner = myid()
+    rr = RemoteRef()
+    put!(rr, a)
+    d = DArray(size(a), procs) do I
+        remotecall_fetch(owner, ()->fetch(rr)[I...])
+    end
+    # Ensure that all workers have fetched their localparts.
+    # Else a gc in between can recover the RemoteRef rr
+    for chunk in d.chunks
+        wait(chunk)
+    end
+    d
 end
