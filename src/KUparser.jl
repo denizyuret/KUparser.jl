@@ -9,6 +9,9 @@ typealias Corpus AbstractVector{Sentence}
 wdim(s)=size(s.wvec,1)
 wcnt(s)=size(s.wvec,2)
 
+isdefined(:UInt16) || typealias UInt16 Uint16
+isdefined(:UInt8) || typealias UInt16 Uint8
+
 include("archybrid.jl")
 include("features.jl")
 include("gparser.jl")
