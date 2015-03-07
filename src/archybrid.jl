@@ -18,9 +18,9 @@ pzeros(n::Integer...)=zeros(Pval, n...)
 # also think of arceasy.
 
 @compat typealias Move UInt8
-const SHIFT=Move(1)
-const RIGHT=Move(2)
-const LEFT=Move(3)
+const SHIFT=convert(Move,1)
+const RIGHT=convert(Move,2)
+const LEFT=convert(Move,3)
 
 abstract Parser
 
