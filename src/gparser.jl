@@ -120,6 +120,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::
     d = distribute(corpus, workers()[1:ncpu])
     n = copy(net, :cpu)
     @time p = pmap(procs(d)) do x
+        CUDArt.device(myid() % CUDArt.devcount())
         gparse(localpart(d), copy(n, :gpu), fmat, batch)
     end
     pmerge(p)
