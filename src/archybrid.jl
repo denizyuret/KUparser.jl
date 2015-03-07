@@ -3,7 +3,7 @@
 # Goldberg, Yoav; Nivre, Joakim. Training Deterministic Parsers with Non-Deterministic Oracles. TACL 2013.
 # Modified valid_moves to output a single root-child.
 
-typealias Pval UInt16
+@compat typealias Pval UInt16
 typealias Pvec Vector{Pval}
 typealias Pmat Matrix{Pval}
 const Pinf=typemax(Pval)
@@ -17,7 +17,7 @@ pzeros(n::Integer...)=zeros(Pval, n...)
 # how to use that?
 # also think of arceasy.
 
-typealias Move UInt8
+@compat typealias Move UInt8
 const SHIFT=Move(1)
 const RIGHT=Move(2)
 const LEFT=Move(3)
