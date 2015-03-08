@@ -1,3 +1,19 @@
+2015-03-08  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Speed-test:
+
+	julia@iui> @time KUparser.gparse(trn, net, feats, 2000, 20);
+	elapsed time: 40.50693341 seconds (9502 MB allocated, 8.38% gc time in 14 pauses with 11 full sweep)
+	elapsed time: 86.205662824 seconds (107430 MB allocated, 6.12% gc time in 86 pauses with 14 full sweep)
+
+	julia@bio> @time KUparser.gparse(trn, net, feats, 500, 20);
+	elapsed time: 75.61331844 seconds (9476 MB allocated, 3.19% gc time in 8 pauses with 6 full sweep)
+	elapsed time: 112.552530706 seconds (107352 MB allocated, 4.21% gc time in 75 pauses with 9 full sweep)
+
+	julia3@ilac> @time KUparser.gparse(trn, net, feats, 1700, 12);
+	elapsed time: 86.231203 seconds (11419169336 bytes allocated, 7.88% gc time)
+	elapsed time: 123.933778 seconds (75581738656 bytes allocated, 16.60% gc time)
+
 2015-03-05  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
