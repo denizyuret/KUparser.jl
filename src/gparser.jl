@@ -28,6 +28,7 @@ end
 
 function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::Bool=true)
     # determine dimensions
+    (batch > length(corpus)) && (batch = length(corpus))
     nsent = length(corpus)
     nword = 0; for s in corpus; nword += wcnt(s); end
     xcols = 2 * (nword - nsent)
@@ -120,7 +121,7 @@ end
 
 function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::Integer)
     assert(nworkers() >= ncpu)
-    d = distribute(corpus, workers()[1:ncpu])
+    d = distproc(corpus, workers()[1:ncpu])
     n = copy(net, :cpu)
     @everywhere gc()
     @time p = pmap(procs(d)) do x
@@ -141,9 +142,7 @@ function pmerge(p)
     (h, x, y, z)
 end
 
-import DistributedArrays.distribute
-
-function distribute(a::AbstractArray, procs)
+function distproc(a::AbstractArray, procs)
     owner = myid()
     rr = RemoteRef()
     put!(rr, a)
