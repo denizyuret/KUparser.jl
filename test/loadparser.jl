@@ -22,6 +22,7 @@ s=dev[1]
 p=KUparser.ArcHybrid(size(s.wvec,2))
 v=KUparser.valid(p)
 feats=Flist.fv021a
+KUnet.gpu(false)
 net = [KUnet.Layer("m11.h5"), KUnet.Layer("m12.h5")]
 x=KUparser.features(p,s,feats)
 y=KUnet.predict(net,x)
