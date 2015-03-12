@@ -3,7 +3,7 @@
 # Goldberg, Yoav; Nivre, Joakim. Training Deterministic Parsers with Non-Deterministic Oracles. TACL 2013.
 # Modified valid_moves to output a single root-child.
 
-@compat typealias Pval UInt16
+@compat typealias Pval UInt16   # Type representing sentence position
 typealias Pvec Vector{Pval}
 typealias Pmat Matrix{Pval}
 const Pinf=typemax(Pval)
