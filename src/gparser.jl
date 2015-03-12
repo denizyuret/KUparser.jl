@@ -19,7 +19,6 @@ end
 
 function gparse(c::Corpus, n::Net, f::Features; args...)
     map(s->gparse(s,n,f;args...), c)
-    # for s in c; gparse(s,n,f); end # not faster than map
 end
 
 # There are two opportunities for parallelism:
@@ -79,11 +78,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::
                 feat ? features(p[s], corpus[s], fmat, sub(x, :, idx + i)) : rand!(sub(x,:,idx+i))
             end
 
-            # Next predict y in bulk
-            (xxcols != nvalid) && (xxcols = nvalid; KUnet.free(xx); xx = similar(net[1].w, (xrows, xxcols)))
-            copy!(xx, (1:xrows, 1:nvalid), x, (1:xrows, idx+1:idx+nvalid))
-            yy = KUnet.forw(net, xx, false)
-            copy!(y, (1:yrows, idx+1:idx+nvalid), yy, (1:yrows, 1:nvalid))
+            KUnet.predict(net, sub(x, 1:xrows, idx+1:idx+nvalid), sub(y, 1:yrows, idx+1:idx+nvalid))
 
             # Finally find best moves and execute max score valid moves
             for i=1:nvalid
