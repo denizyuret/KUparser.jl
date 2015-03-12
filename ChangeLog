@@ -1,3 +1,14 @@
+2015-03-12  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/bparser.jl:
+	- early stop?  could implement by copying into big x
+	-- mincost may not be 0 for non-planar sentences
+	- sortperm! suggest AbstractArray to julia
+	- Now we sort the nc candidates and copy top np back to the beam
+	- softperm! may not be necessary when nc <= beam (unless we care about the first candidate being the best)
+	- do we need features when we have 0 or 1 valid move?
+	- do not return y from gparser, return x,z consistently from each method
+
 2015-03-08  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* Speed-test:
