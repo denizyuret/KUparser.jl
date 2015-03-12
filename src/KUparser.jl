@@ -13,8 +13,14 @@ typealias Corpus AbstractVector{Sentence}
 wdim(s)=size(s.wvec,1)
 wcnt(s)=size(s.wvec,2)
 
+# Type representing feature values
+typealias Fval Float32
+typealias Fvec Vector{Fval}
+typealias Fmat Matrix{Fval}
+
 include("archybrid.jl")
 include("features.jl")
 include("gparser.jl")
+include("bparser.jl")
 
 end
