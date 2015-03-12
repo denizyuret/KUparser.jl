@@ -103,7 +103,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::
     KUnet.free(xx)
     h = Array(Pvec, nsent) 	# predicted heads
     for s=1:nsent; h[s] = p[s].head; end
-    return (h, x, y, z)
+    return (h, x, y, z)         # TODO: do not need to alloc or return y
 end
 
 # 2. We do multiple batches in parallel to utilize CPU cores.
