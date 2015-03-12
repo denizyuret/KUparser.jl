@@ -4,8 +4,8 @@
 # Modified valid_moves to output a single root-child.
 
 @compat typealias Pval UInt16   # Type representing sentence position
-typealias Pvec Vector{Pval}
-typealias Pmat Matrix{Pval}
+typealias Pvec AbstractVector{Pval}
+typealias Pmat AbstractMatrix{Pval}
 const Pinf=typemax(Pval)
 pzeros(n::Integer...)=zeros(Pval, n...)
 
@@ -91,7 +91,7 @@ move!(p::ArcHybrid, op::Integer)=move!(p, convert(Move, op))
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function cost(p::ArcHybrid, gold::Pvec, c::Pvec)
+function cost(p::ArcHybrid, gold::Pvec, c::Pvec=Array(Pval,p.nmove))
     @assert (length(gold) == p.nword)
     @assert (length(c) == p.nmove)
     fill!(c, Pinf)
@@ -119,22 +119,18 @@ function cost(p::ArcHybrid, gold::Pvec, c::Pvec)
             c[RIGHT] = s0b + (s0h >= n0)
         end
     end
-    v = valid(p)
-    @assert (all(c[v] .< Pinf) && all(c[!v] .== Pinf))
+    @assert (valid(p) == (c .< Pinf))
     return c
 end # cost
 
-cost(p::ArcHybrid, gold::Pvec)=cost(p,gold,Array(Pval,p.nmove))
-cost(p::ArcHybrid, gold::Vector)=cost(p,convert(Pvec,gold))
+cost(p::ArcHybrid, gold::AbstractArray, c::Pvec)=cost(p,convert(Pvec,gold),c)
 
-function valid(p::ArcHybrid, v::AbstractVector{Bool})
+function valid(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
     v[SHIFT] = (p.wptr <= p.nword)
     v[RIGHT] = (p.sptr >= 2)
     v[LEFT]  = ((p.sptr >= 1) && (p.wptr <= p.nword))
     return v
 end # valid
-
-valid(p::ArcHybrid)=valid(p,Array(Bool, p.nmove))
 
 function arc!(p::ArcHybrid, h::Pval, d::Pval)
     p.head[d] = h;
@@ -147,4 +143,17 @@ function arc!(p::ArcHybrid, h::Pval, d::Pval)
     end # if
 end # arc
 
-:ok
+import Base.copy!
+function copy!(dst::ArcHybrid, src::ArcHybrid)
+    assert(dst.nword == src.nword)
+    assert(dst.nmove == src.nmove)
+    dst.wptr = src.wptr
+    dst.sptr = src.sptr
+    copy!(dst.head, src.head)
+    copy!(dst.stack, src.stack)
+    copy!(dst.lcnt, src.lcnt)
+    copy!(dst.rcnt, src.rcnt)
+    copy!(dst.ldep, src.ldep)
+    copy!(dst.rdep, src.rdep)
+end
+
