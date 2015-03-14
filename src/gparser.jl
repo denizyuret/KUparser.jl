@@ -2,30 +2,46 @@
 # following steps:
 
 function gparse(s::Sentence, n::Net, f::Features; pred::Bool=true, feat::Bool=true)
-    (ndims, nword) = size(s.wvec)
-    p = ArcHybrid(nword)
-    x = Array(eltype(s.wvec), flen(ndims, f), 1)
-    y = Array(eltype(x), p.nmove, 1)
+    (p, x, y, score) = initgparse(s,n,f)
+    nx = 0
     while (v = valid(p); any(v))
-        feat ? features(p, s, f, x) : rand!(x)
-        pred ? predict(n, x, y) : rand!(y)
-        y[!v,:] = -Inf
-        move!(p, indmax(y))
+        nx += 1; xx = sub(x,:,nx:nx)
+        y[indmin(cost(p, s.head)), nx] = one(eltype(y))
+        feat ? features(p, s, f, xx) : rand!(xx)
+        pred ? predict(n, xx, score) : rand!(score)
+        score[!v,:] = -Inf
+        move!(p, indmax(score))
     end
-    p.head
+    (p.head, x, y)
+end
+
+function initgparse(s::Sentence, n::Net, f::Features)
+    (ndims, nword) = size(s.wvec)
+    xtype = eltype(n[1].w)
+    xrows = flen(ndims, f)
+    xcols = 2 * (nword - 1)
+    p = ArcHybrid(nword)
+    x = Array(xtype, xrows, xcols)
+    y = zeros(xtype, p.nmove, xcols)
+    score = Array(xtype, p.nmove, 1)
+    (p, x, y, score)
 end
 
 # We parse a corpus using a for loop or map:
 
 function gparse(c::Corpus, n::Net, f::Features; args...)
-    map(s->gparse(s,n,f;args...), c)
+    p = map(s->gparse(s,n,f;args...), c)
+    h = map(z->z[1], p)
+    x = hcat(map(z->z[2], p)...)
+    y = hcat(map(z->z[3], p)...)
+    (h, x, y)
 end
 
 # There are two opportunities for parallelism:
 # 1. We process multiple sentences to minibatch net input.
 #    This speeds up predict.
 
-function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::Bool=true)
+function gparse(corpus::Corpus, net::Net, feats::Features, batch::Integer; feat::Bool=true)
     # determine dimensions
     (batch > length(corpus)) && (batch = length(corpus))
     nsent = length(corpus)
@@ -33,7 +49,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::
     xcols = 2 * (nword - nsent)
     wvec1 = corpus[1].wvec
     wdims = size(wvec1,1)
-    xrows = flen(wdims, fmat)
+    xrows = flen(wdims, feats)
     xtype = eltype(wvec1)
     yrows = ArcHybrid(1).nmove
 
@@ -75,7 +91,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::
             # First calculate features x[:,idx+1:idx+nvalid]
             for i=1:nvalid
                 s = svalid[i]
-                feat ? features(p[s], corpus[s], fmat, sub(x, :, idx + i)) : rand!(sub(x,:,idx+i))
+                feat ? features(p[s], corpus[s], feats, sub(x, :, idx + i)) : rand!(sub(x,:,idx+i))
             end
 
             KUnet.predict(net, sub(x, 1:xrows, idx+1:idx+nvalid), sub(y, 1:yrows, idx+1:idx+nvalid))
@@ -98,8 +114,7 @@ function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer; feat::
     KUnet.free(xx)
     h = Array(Pvec, nsent) 	# predicted heads
     for s=1:nsent; h[s] = p[s].head; end
-    # return (h, x, y, z)         # TODO: do not need to alloc or return y
-    return h
+    return (h, x, z)
 end
 
 # 2. We do multiple batches in parallel to utilize CPU cores.
@@ -115,28 +130,18 @@ end
 #   @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
 #   require("KUparser")
 
-function gparse(corpus::Corpus, net::Net, fmat::Features, batch::Integer, ncpu::Integer)
+function gparse(corpus::Corpus, net::Net, feats::Features, batch::Integer, ncpu::Integer)
     assert(nworkers() >= ncpu)
     d = distproc(corpus, workers()[1:ncpu])
     n = copy(net, :cpu)
     @everywhere gc()
     @time p = pmap(procs(d)) do x
-        gparse(localpart(d), copy(n, :gpu), fmat, batch)
+        gparse(localpart(d), copy(n, :gpu), feats, batch)
     end
-    vcat(p...)
-    # pmerge(p)
-end
-
-function pmerge(p)
-    (h, x, y, z) = p[1]
-    for i=2:length(p)
-        (h2,x2,y2,z2) = p[i]
-        h = append!(h, h2)
-        x = [x x2]
-        y = [y y2]
-        z = [z z2]
-    end
-    (h, x, y, z)
+    h = vcat(map(z->z[1], p)...)
+    x = hcat(map(z->z[2], p)...)
+    y = hcat(map(z->z[3], p)...)
+    (h, x, y)
 end
 
 function distproc(a::AbstractArray, procs)
