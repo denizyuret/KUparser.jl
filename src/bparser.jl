@@ -1,16 +1,20 @@
-type Bparser nbeam; ncand; sentence; parser; parser2; pscore; pscore2; cost; score; x; cparser; cmove; cscore; csorted; Bparser()=new(); end
+type Beam nbeam; sentence; parser; parser2; pscore; pscore2; cost; score; cparser; cmove; cscore; csorted; Beam()=new(); end
 
-function bparse(sentence::Sentence, net::Net, feats::Features, beam::Integer)
-    b::Bparser = initbeam(sentence, net, feats, beam)         # b.parser, b.pscore: candidate parsers and their scores
+function bparse(sentence::Sentence, net::Net, feats::Features, nbeam::Integer)
+    b = Beam(sentence, net, feats, nbeam)                       # b.parser, b.pscore: candidate parsers and their scores
+    (x,y) = initxy(sentence, net, feats, nbeam)                 # x:feature vectors, y:mincost moves
+    nx = 0                                                      # nx: number of columns filled in x and y
     while true
         for i=1:b.nbeam                                         # b.nbeam: number of parsers on the beam
             cost(b.parser[i], sentence.head, sub(b.cost,:,i))   # b.cost[j,i] is the cost of j'th move for i'th parser
         end
         all(sub(b.cost,:,1:b.nbeam) .== Pinf) && break
         for i=1:b.nbeam
-            features(b.parser[i], sentence, feats, sub(b.x,:,i)) # b.x[:,i] is the feature vector for the i'th parser
+            features(b.parser[i], sentence, feats, sub(x,:,nx+i)) # x[:,nx+i] is the feature vector for the i'th parser
+            y[indmin(sub(b.cost,:,i)),nx+i] = one(eltype(y))      # y[j,nx+i]=1 if j is the mincost move for i'th parser
         end
-        KUnet.predict(net, b.x, b.score)                        # b.score[j,i] is the score for the j'th move of i'th parser
+        KUnet.predict(net, sub(x,:,nx+1:nx+b.nbeam), b.score)   # b.score[j,i] is the score for the j'th move of i'th parser
+        nx += b.nbeam
         nc = 0                                                  # nc is the number of new candidates
         for i=1:b.nbeam
             for j=1:size(b.cost,1)
@@ -22,7 +26,7 @@ function bparse(sentence::Sentence, net::Net, feats::Features, beam::Integer)
             end                                                 
         end
         sortperm!(sub(b.csorted, 1:nc), sub(b.cscore, 1:nc); rev=true)
-        b.nbeam = min(nc,beam)                                  # b.nbeam is now the new beam size
+        b.nbeam = min(nc,nbeam)                                 # b.nbeam is now the new beam size
         for i=1:b.nbeam                                         # i is the index of the new parser
             c=b.csorted[i]                                      # c is the index of the candidate
             p=b.cparser[c]                                      # p is the index of the old parser
@@ -33,27 +37,35 @@ function bparse(sentence::Sentence, net::Net, feats::Features, beam::Integer)
         b.parser,b.parser2 = b.parser2,b.parser                 # we swap parsers and scores
         b.pscore,b.pscore2 = b.pscore2,b.pscore                 # for next round
     end
-    b.parser[1].head
+    (b.parser[1].head, sub(x,:,1:nx), sub(y,:,1:nx))
 end
 
-bparse(c::Corpus, n::Net, f::Features, b::Integer)=map(s->bparse(s,n,f,b), c)
+function initxy(sentence::Sentence, net::Net, feats::Features, nbeam::Integer)
+    nmove = 2 * (wcnt(sentence) - 1)
+    xcols = nmove * nbeam
+    xrows = flen(wdim(sentence), feats)    
+    xtype = eltype(net[1].w)
+    yrows = ArcHybrid(1).nmove
+    x = Array(xtype, xrows, xcols)
+    y = zeros(xtype, yrows, xcols)
+    return (x,y)
+end
 
-function initbeam(sentence::Sentence, net::Net, feats::Features, beam::Integer)
+function Beam(sentence::Sentence, net::Net, feats::Features, nbeam::Integer)
     @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer"
-    b = Bparser()
+    b = Beam()
     nword = wcnt(sentence)
     nmove = ArcHybrid(1).nmove
-    ncand = beam * nmove
-    itype = typeof(beam)
+    ncand = nbeam * nmove
+    itype = typeof(nbeam)
     ftype = eltype(net[1].w)
     fdims = flen(wdim(sentence), feats)
-    b.parser  = [ArcHybrid(nword) for i=1:beam]
-    b.parser2 = [ArcHybrid(nword) for i=1:beam]
-    b.pscore  = Array(ftype, beam)
-    b.pscore2 = Array(ftype, beam)
-    b.cost = Array(Pval, nmove, beam)
-    b.x = Array(ftype, fdims, beam)
-    b.score = Array(ftype, nmove, beam)
+    b.parser  = [ArcHybrid(nword) for i=1:nbeam]
+    b.parser2 = [ArcHybrid(nword) for i=1:nbeam]
+    b.pscore  = Array(ftype, nbeam)
+    b.pscore2 = Array(ftype, nbeam)
+    b.cost = Array(Pval, nmove, nbeam)
+    b.score = Array(ftype, nmove, nbeam)
     b.cparser = Array(itype, ncand)
     b.cmove = Array(Move, ncand)
     b.cscore = Array(ftype, ncand)
@@ -64,13 +76,21 @@ function initbeam(sentence::Sentence, net::Net, feats::Features, beam::Integer)
     return b
 end
 
+function bparse(c::Corpus, n::Net, f::Features, b::Integer)
+    p = map(s->bparse(s,n,f,b), c)
+    h = map(z->z[1], p)
+    x = hcat(map(z->z[2], p)...)
+    y = hcat(map(z->z[3], p)...)
+    (h, x, y)
+end
 
 function bparse(corpus::Corpus, net::Net, feats::Features, nbeam::Integer, nbatch::Integer)
+    (nbatch == 0 || nbatch > length(corpus)) && (nbatch = length(corpus))
     (heads,x,y,score) = initbatch(corpus, net, feats, nbeam, nbatch)
     (x1,x2) = (0,0)
     for s1=1:nbatch:length(corpus)
         s2=min(length(corpus), s1+nbatch-1)
-        batch = [initbeam(corpus[i], net, feats, nbeam) for i=s1:s2]
+        batch = [Beam(corpus[i], net, feats, nbeam) for i=s1:s2]
         while true                                              # processing corpus[s1:s2]
             x1 = x2 + 1                                         # put all patterns in x[x1:x2]
             for b in batch                                      # b is the beam for one sentence
@@ -118,7 +138,7 @@ function bparse(corpus::Corpus, net::Net, feats::Features, nbeam::Integer, nbatc
             heads[s] = batch[s-s1+1].parser[1].head
         end
     end # for s1=1:nbatch:length(corpus)
-    return heads
+    return (heads, sub(x, :, 1:x2), sub(y, :, 1:x2))
 end # function bparse
 
 
@@ -145,6 +165,23 @@ function bparse(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, nbatch
     @time p = pmap(procs(d)) do x
         bparse(localpart(d), copy(n, :gpu), fmat, nbeam, nbatch)
     end
-    vcat(p...)
+    h = vcat(map(z->z[1], p)...)
+    x = hcat(map(z->z[2], p)...)
+    y = hcat(map(z->z[3], p)...)
+    (h, x, y)
+end
+
+function bparse1(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, ncpu::Integer)
+    assert(nworkers() >= ncpu)
+    d = distproc(corpus, workers()[1:ncpu])
+    n = copy(net, :cpu)
+    @everywhere gc()
+    @time p = pmap(procs(d)) do x
+        bparse(localpart(d), copy(n, :gpu), fmat, nbeam)
+    end
+    h = vcat(map(z->z[1], p)...)
+    x = hcat(map(z->z[2], p)...)
+    y = hcat(map(z->z[3], p)...)
+    (h, x, y)
 end
 
