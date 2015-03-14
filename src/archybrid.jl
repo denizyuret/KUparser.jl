@@ -91,7 +91,8 @@ move!(p::ArcHybrid, op::Integer)=move!(p, convert(Move, op))
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function cost(p::ArcHybrid, gold::Pvec, c::Pvec=Array(Pval,p.nmove))
+function cost(p::ArcHybrid, gold::AbstractArray, c::Pvec=Array(Pval,p.nmove))
+    gold = convert(Pvec, gold)
     @assert (length(gold) == p.nword)
     @assert (length(c) == p.nmove)
     fill!(c, Pinf)
@@ -122,8 +123,6 @@ function cost(p::ArcHybrid, gold::Pvec, c::Pvec=Array(Pval,p.nmove))
     @assert (valid(p) == (c .< Pinf))
     return c
 end # cost
-
-cost(p::ArcHybrid, gold::AbstractArray, c::Pvec)=cost(p,convert(Pvec,gold),c)
 
 function valid(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
     v[SHIFT] = (p.wptr <= p.nword)
