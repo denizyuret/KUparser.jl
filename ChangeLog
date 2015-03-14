@@ -1,9 +1,42 @@
 2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* src/bparser.jl: minibatch version:
-        # TODO: do not keep computing costs for finished sentences
-        # do all beam elements finish simultaneously?
-        # cache cost in parser?
+	* src/gparser.jl:
+	- do not need to allocate p, y, etc. for the whole corpus in batch version.
+
+	* TODO:
+	+ return xy from gparser and bparser.
+	- train. (need logploss, need earlystop?, try rmsprop?, adam?: adagrad may not do well on changing data)
+	-- static oracle
+	-- greedy parser
+	-- beam parser
+	- feature select.
+
+	* INFO:
+	+ biyofiz gpu memory is sufficient for nbeam*nbatch*ncpu <= 10000
+
+	julia> @time b42y=KUparser.bparse(dev,net,feats,100,5,20);
+	elapsed time: 261.986853539 seconds (3 MB allocated)
+	julia> @time b41y=KUparser.bparse(dev,net,feats,10,50,20);
+	elapsed time: 32.315438529 seconds (3 MB allocated)
+	julia> find(b41y .!= b42y)
+	1-element Array{Int64,1}:
+	1324
+
+	+ beam parser gives better head score with same model:
+
+	julia> gold=map(x->x.head, dev);
+	julia> mean(vcat(gold...) .== vcat(g0...))
+	0.9105865343869183
+	julia> mean(vcat(gold...) .== vcat(b41y...))
+	0.9154473165989481
+
+	* TODO: src/bparser.jl: minibatch version:
+        - do not keep computing costs for finished sentences
+        - do all beam elements finish simultaneously?
+        - cache cost in parser?
+	- repeated states on the beam?
+	- nbeam=10 and nbeam=100 give the same parse?
+	-- in all except sent 1324. beam1 vs beam10 differ in 224 sentences.
 
 	* test/timing.jl: minibatch version speed test:
 
@@ -15,7 +48,7 @@
 	g4=KUparser.gparse(dev,gnet,feats,100,20)	elapsed time: 8.062792516 seconds
 
 	# These are with beam size 1
-	# Final parses same with g0
+	# Final parses same as g0
 	b0=KUparser.bparse(dev,gnet,feats,1)		elapsed time: 156.000890758 seconds
 	b1=KUparser.bparse(dev,gnet,feats,1,1700)	elapsed time: 30.145607698 seconds
 	b2=KUparser.bparse(dev,gnet,feats,1,1700,20)	elapsed time: 8.18903106 seconds
@@ -92,7 +125,7 @@
 
 2015-03-12  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* src/bparser.jl:
+	* TODO: src/bparser.jl:
 	- early stop?  could implement by copying into big x
 	-- mincost may not be 0 for non-planar sentences
 	- sortperm! suggest AbstractArray to julia
