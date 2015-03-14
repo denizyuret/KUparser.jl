@@ -38,19 +38,8 @@ end
 
 bparse(c::Corpus, n::Net, f::Features, b::Integer)=map(s->bparse(s,n,f,b), c)
 
-function bparse2(corpus::Corpus, net::Net, fmat::Features, beam::Integer, ncpu::Integer)
-    assert(nworkers() >= ncpu)
-    d = distproc(corpus, workers()[1:ncpu])
-    n = copy(net, :cpu)
-    @everywhere gc()
-    @time p = pmap(procs(d)) do x
-        bparse(localpart(d), copy(n, :gpu), fmat, beam)
-    end
-    vcat(p...)
-end
-
 function initbeam(sentence::Sentence, net::Net, feats::Features, beam::Integer)
-    assert(isdefined(net[end],:f) && net[end].f == KUnet.logp)
+    @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer"
     b = Bparser()
     nword = wcnt(sentence)
     nmove = ArcHybrid(1).nmove
@@ -147,3 +136,15 @@ function initbatch(corpus::Corpus, net::Net, feats::Features, nbeam::Integer, nb
     heads = Array(Pvec, nsent)
     return (heads,x,y,score)
 end
+
+function bparse(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, nbatch::Integer, ncpu::Integer)
+    assert(nworkers() >= ncpu)
+    d = distproc(corpus, workers()[1:ncpu])
+    n = copy(net, :cpu)
+    @everywhere gc()
+    @time p = pmap(procs(d)) do x
+        bparse(localpart(d), copy(n, :gpu), fmat, nbeam, nbatch)
+    end
+    vcat(p...)
+end
+

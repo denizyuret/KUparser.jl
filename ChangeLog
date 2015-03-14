@@ -1,3 +1,95 @@
+2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/bparser.jl: minibatch version:
+        # TODO: do not keep computing costs for finished sentences
+        # do all beam elements finish simultaneously?
+        # cache cost in parser?
+
+	* test/timing.jl: minibatch version speed test:
+
+	# Greedy parser
+	g0=KUparser.gparse(dev,gnet,feats)		elapsed time: 148.237107122 seconds
+	g1=KUparser.gparse(dev,gnet,feats,1700)		elapsed time: 22.188889154 seconds
+	g2=KUparser.gparse(dev,gnet,feats,1700,20)	elapsed time: 8.051600384 seconds
+	g3=KUparser.gparse(dev,gnet,feats,100)		elapsed time: 26.318353452 seconds
+	g4=KUparser.gparse(dev,gnet,feats,100,20)	elapsed time: 8.062792516 seconds
+
+	# These are with beam size 1
+	# Final parses same with g0
+	b0=KUparser.bparse(dev,gnet,feats,1)		elapsed time: 156.000890758 seconds
+	b1=KUparser.bparse(dev,gnet,feats,1,1700)	elapsed time: 30.145607698 seconds
+	b2=KUparser.bparse(dev,gnet,feats,1,1700,20)	elapsed time: 8.18903106 seconds
+	b3=KUparser.bparse(dev,gnet,feats,1,100)	elapsed time: 31.510566003 seconds
+	b4=KUparser.bparse(dev,gnet,feats,1,100,20)	elapsed time: 8.234869093 seconds
+
+	# These are with beam size 10 on the first 100 sentences of dev:
+	# Final parses not same with g0[1:100]
+	b01=KUparser.bparse(dev[1:100],gnet,feats,10)		elapsed time: 25.057099378 seconds
+	b11=KUparser.bparse(dev[1:100],gnet,feats,10,100)	elapsed time: 14.705737159 seconds
+	b21=KUparser.bparse(dev[1:100],gnet,feats,10,100,20)	elapsed time: 5.154158539 seconds
+	b31=KUparser.bparse(dev[1:100],gnet,feats,10,10)	elapsed time: 16.469459534 seconds
+	b41=KUparser.bparse(dev[1:100],gnet,feats,10,10,20)	elapsed time: 5.161457464 seconds
+
+	# These are with beam size 100 on the first 100 sentences of dev:
+	# Final parses same as b01
+	b02=KUparser.bparse(dev[1:100],gnet,feats,100)		elapsed time: 137.201635533 seconds
+	b12=KUparser.bparse(dev[1:100],gnet,feats,100,100)	elapsed time: 132.684041541 seconds
+	b22=KUparser.bparse(dev[1:100],gnet,feats,100,100,20)	elapsed time: 18.501004294 seconds
+	b32=KUparser.bparse(dev[1:100],gnet,feats,100,10)	elapsed time: 132.337806865 seconds
+	b42=KUparser.bparse(dev[1:100],gnet,feats,100,10,20)	elapsed time: 18.514346591 seconds
+
+
+2015-03-13  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/bparser.jl: speed test:
+
+	# Time for greedy parser on 1700 sentence dev
+	julia> @time g=KUparser.gparse(dev,gnet,feats);
+	elapsed time: 149.497789522 seconds (4116 MB allocated, 1.06% gc time in 189 pauses with 0 full sweep)
+
+	# Time for beam parser on same data with beam=1
+	julia> @time b=KUparser.bparse(dev,gnet,feats,1);
+	elapsed time: 159.778490775 seconds (7173 MB allocated, 3.76% gc time in 328 pauses with 9 full sweep)
+
+	# Time on dev[1:100]
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,1);
+	elapsed time: 9.962360704 seconds (440 MB allocated, 5.42% gc time in 20 pauses with 1 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,5);
+	elapsed time: 16.47657518 seconds (1940 MB allocated, 8.55% gc time in 89 pauses with 2 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,10);
+	elapsed time: 27.863031912 seconds (3773 MB allocated, 12.66% gc time in 172 pauses with 6 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,50);
+	elapsed time: 84.229235102 seconds (17997 MB allocated, 18.13% gc time in 806 pauses with 25 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,100);
+	elapsed time: 158.230640377 seconds (35313 MB allocated, 16.89% gc time in 1549 pauses with 41 full sweep)
+
+	# Time tests with ncpu=20
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,1,20);
+	elapsed time: 9.237851461 seconds (2 MB allocated)
+	elapsed time: 9.766501577 seconds (107 MB allocated, 4.21% gc time in 3 pauses with 1 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,5,20);
+	elapsed time: 9.447347633 seconds (2 MB allocated)
+	elapsed time: 9.975221305 seconds (107 MB allocated, 4.11% gc time in 3 pauses with 1 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,10,20);
+	elapsed time: 13.658449233 seconds (2 MB allocated)
+	elapsed time: 14.184126282 seconds (107 MB allocated, 2.89% gc time in 3 pauses with 1 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,50,20);
+	elapsed time: 15.286421047 seconds (2 MB allocated)
+	elapsed time: 15.809166647 seconds (107 MB allocated, 2.60% gc time in 3 pauses with 1 full sweep)
+
+	julia> @time b=KUparser.bparse(dev[1:100],gnet,feats,100,20);
+	elapsed time: 27.447839359 seconds (2 MB allocated)
+	elapsed time: 28.380576273 seconds (107 MB allocated, 2.96% gc time in 5 pauses with 2 full sweep)
+
+
 2015-03-12  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* src/bparser.jl:
@@ -8,6 +100,8 @@
 	- softperm! may not be necessary when nc <= beam (unless we care about the first candidate being the best)
 	- do we need features when we have 0 or 1 valid move?
 	- do not return y from gparser, return x,z consistently from each method
+	- maybe have optional trn struct and return trn.x trn.y trn.nx
+	- check for identical states on the beam.
 
 2015-03-08  Deniz Yuret  <dyuret@ku.edu.tr>
 
