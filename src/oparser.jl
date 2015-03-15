@@ -27,7 +27,7 @@ function oparse(c::Corpus, f::Features, ncpu::Integer)
     assert(nworkers() >= ncpu)
     d = distproc(c, workers()[1:ncpu])
     @everywhere gc()
-    @time p = pmap(procs(d)) do x
+    p = pmap(procs(d)) do x
         oparse(localpart(d), f)
     end
     h = vcat(map(z->z[1], p)...)
