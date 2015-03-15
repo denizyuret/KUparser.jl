@@ -22,6 +22,8 @@ include("archybrid.jl")
 include("features.jl")
 include("gparser.jl")
 include("bparser.jl")
+include("oparser.jl")
+include("flist.jl")
 
 # this has been fixed in Julia 0.4:
 import Base: sortperm!, Algorithm, Ordering, DEFAULT_UNSTABLE, Forward, Perm, ord
