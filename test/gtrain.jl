@@ -34,9 +34,11 @@ net[end].f=KUnet.logp
 @show net
 
 for epoch=1:256
-    msg("epoch=$epoch")
+    msg("epoch=$epoch KUnet.train(net, x, y; batch=128, loss=KUnet.logploss)")
     @time KUnet.train(net, x, y; batch=128, loss=KUnet.logploss)
+    x=y=nothing
     @everywhere gc()
+    run(`nvidia-smi`); run(`free`);
     msg("KUparser.gparse(trn, net, feats, nbatch, ncpu)")
     @time (htrn,x,y) = KUparser.gparse(trn, net, feats, nbatch, ncpu)
     e1 = evalheads(htrn,trn)
@@ -46,7 +48,7 @@ for epoch=1:256
     msg("KUparser.gparse(tst, net, feats, nbatch, ncpu)")
     @time (htst,) = KUparser.gparse(tst, net, feats, nbatch, ncpu)
     e3 = evalheads(htst,tst)
-    println("$epoch\t$e1\t$e2\t$e3")
+    println("DATA:\t$epoch\t$e1\t$e2\t$e3"); flush(STDOUT)
 end
 
 msg("done")
