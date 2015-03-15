@@ -133,9 +133,9 @@ end
 function gparse(corpus::Corpus, net::Net, feats::Features, batch::Integer, ncpu::Integer)
     assert(nworkers() >= ncpu)
     d = distproc(corpus, workers()[1:ncpu])
-    n = copy(net, :cpu)
+    n = testnet(net)
     @everywhere gc()
-    @time p = pmap(procs(d)) do x
+    p = pmap(procs(d)) do x
         gparse(localpart(d), copy(n, :gpu), feats, batch)
     end
     h = vcat(map(z->z[1], p)...)
@@ -158,3 +158,17 @@ function distproc(a::AbstractArray, procs)
     end
     d
 end
+
+using CUDArt
+
+function testnet(l::Layer)
+    # Only copy what is needed for predict
+    ll = Layer()
+    isdefined(l,:w) && (ll.w = to_host(l.w))
+    isdefined(l,:b) && (ll.b = to_host(l.b))
+    isdefined(l,:f) && (ll.f = l.f)
+    return ll
+end
+
+testnet(net::Net)=map(l->testnet(l), net)
+
