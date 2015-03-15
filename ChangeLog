@@ -1,4 +1,15 @@
+2015-03-15  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* test/otrain.jl: Train using static oracle.
+	
+
 2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/oparser.jl: Oracle parser: useful for generating static oracle training data.
+	julia> @time o2=KUparser.oparse(dev,feats,20);
+	elapsed time: 2.306022569 seconds (430 MB allocated, 44.86% gc time in 6 pauses with 3 full sweep)
+	julia> mean(vcat(o1[1]...) .== vcat(map(x->x.head,dev)...))
+	0.9950395094349029
 
 	* src/gparser.jl:
 	- do not need to allocate p, y, etc. for the whole corpus in batch version.
