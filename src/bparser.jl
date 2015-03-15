@@ -160,9 +160,9 @@ end
 function bparse(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, nbatch::Integer, ncpu::Integer)
     assert(nworkers() >= ncpu)
     d = distproc(corpus, workers()[1:ncpu])
-    n = copy(net, :cpu)
+    n = testnet(net)
     @everywhere gc()
-    @time p = pmap(procs(d)) do x
+    p = pmap(procs(d)) do x
         bparse(localpart(d), copy(n, :gpu), fmat, nbeam, nbatch)
     end
     h = vcat(map(z->z[1], p)...)
@@ -174,9 +174,9 @@ end
 function bparse1(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, ncpu::Integer)
     assert(nworkers() >= ncpu)
     d = distproc(corpus, workers()[1:ncpu])
-    n = copy(net, :cpu)
+    n = testnet(net)
     @everywhere gc()
-    @time p = pmap(procs(d)) do x
+    p = pmap(procs(d)) do x
         bparse(localpart(d), copy(n, :gpu), fmat, nbeam)
     end
     h = vcat(map(z->z[1], p)...)
