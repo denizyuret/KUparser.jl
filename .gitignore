@@ -2,6 +2,7 @@
 *.jld
 *.h5
 *.mat
+*.job
 foo*
 
 # Object files
