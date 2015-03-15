@@ -12,7 +12,7 @@ function gparse(s::Sentence, n::Net, f::Features; pred::Bool=true, feat::Bool=tr
         score[!v,:] = -Inf
         move!(p, indmax(score))
     end
-    (p.head, x, y)
+    (p.head, sub(x,:,1:nx), sub(y,:,1:nx))
 end
 
 function initgparse(s::Sentence, n::Net, f::Features)
@@ -114,7 +114,7 @@ function gparse(corpus::Corpus, net::Net, feats::Features, batch::Integer; feat:
     KUnet.free(xx)
     h = Array(Pvec, nsent) 	# predicted heads
     for s=1:nsent; h[s] = p[s].head; end
-    return (h, x, z)
+    return (h, sub(x,:,1:idx), sub(z,:,1:idx))
 end
 
 # 2. We do multiple batches in parallel to utilize CPU cores.
@@ -138,10 +138,12 @@ function gparse(corpus::Corpus, net::Net, feats::Features, batch::Integer, ncpu:
     p = pmap(procs(d)) do x
         gparse(localpart(d), copy(n, :gpu), feats, batch)
     end
-    h = vcat(map(z->z[1], p)...)
-    x = hcat(map(z->z[2], p)...)
-    y = hcat(map(z->z[3], p)...)
-    (h, x, y)
+    # n=d=nothing; @everywhere gc()
+    # h = vcat(map(z->z[1], p)...)
+    # x = hcat(map(z->z[2], p)...)
+    # y = hcat(map(z->z[3], p)...)
+    # p=nothing; @everywhere gc()
+    # (h, x, y)
 end
 
 function distproc(a::AbstractArray, procs)
