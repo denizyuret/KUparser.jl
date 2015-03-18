@@ -26,7 +26,10 @@ include("oparser.jl")
 include("flist.jl")
 
 # this has been fixed in Julia 0.4:
-import Base: sortperm!, Algorithm, Ordering, DEFAULT_UNSTABLE, Forward, Perm, ord
+if VERSION >= v"0.4.0-dev+3184"
+    import Base.sortperm!
+end
+using Base: Algorithm, Ordering, DEFAULT_UNSTABLE, Forward, Perm, ord
 function sortperm!{I<:Integer}(x::AbstractVector{I}, v::AbstractVector; alg::Algorithm=DEFAULT_UNSTABLE,
                                lt::Function=isless, by::Function=identity, rev::Bool=false, order::Ordering=Forward,
                                initialized::Bool=false)
