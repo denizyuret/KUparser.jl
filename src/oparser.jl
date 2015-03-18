@@ -30,10 +30,12 @@ function oparse(c::Corpus, f::Features, ncpu::Integer)
     p = pmap(procs(d)) do x
         oparse(localpart(d), f)
     end
-    h = vcat(map(z->z[1], p)...)
-    x = hcat(map(z->z[2], p)...)
-    y = hcat(map(z->z[3], p)...)
-    (h, x, y)
+    # d=nothing; @everywhere gc()
+    # h = vcat(map(z->z[1], p)...)
+    # x = hcat(map(z->z[2], p)...)
+    # y = hcat(map(z->z[3], p)...)
+    # p=nothing; @everywhere gc()
+    # (h, x, y)
 end
 
 function initoparse(s::Sentence, f::Features)
