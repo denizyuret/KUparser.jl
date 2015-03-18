@@ -1,7 +1,7 @@
 using HDF5, JLD, Dates, KUparser, KUnet
 
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
-meminfo()=(@everywhere gc(); whos(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`))
+macro meminfo() :(gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
 evalheads(p,c)=mean(vcat(vcat(map(q->q[1],p)...)...) .== vcat(map(s->s.head,c)...))
 
 function initworkers(ncpu)
@@ -24,28 +24,31 @@ function main()
     @show net
 
     @date @load "conllWSJToken_wikipedia2MUNK-100.jld"
-    @date initworkers(ncpu)
 
+    @date initworkers(ncpu)
     @date p1=KUparser.oparse(trn, feats, ncpu)
     @show evalheads(p1,trn)
     @date p2=KUparser.oparse(dev, feats, ncpu)
-    @show evalheads(p2,dev)
+    @show evalheads(p2,dev); p2=nothing
     @date p3=KUparser.oparse(tst, feats, ncpu)
-    @show evalheads(p3,tst)
+    @show evalheads(p3,tst); p3=nothing
+    @date rmprocs(workers())
 
     for epoch=1:256
         @show epoch
         for q in p1
             @date KUnet.train(net, q[2], q[3]; batch=128, loss=KUnet.logploss)
         end
-        p1=p2=p3=nothing
-        meminfo()
+        p1 = nothing
+        @meminfo
+        @date initworkers(ncpu)
         @date p1 = KUparser.gparse(trn, net, feats, nbatch, ncpu)
         @show e1 = evalheads(p1,trn)
         @date p2 = KUparser.gparse(dev, net, feats, nbatch, ncpu)
-        @show e2 = evalheads(p2,dev)
+        @show e2 = evalheads(p2,dev); p2=nothing
         @date p3 = KUparser.gparse(tst, net, feats, nbatch, ncpu)
-        @show e3 = evalheads(p3,tst)
+        @show e3 = evalheads(p3,tst); p3=nothing
+        @date rmprocs(workers())
         println("DATA:\t$epoch\t$e1\t$e2\t$e3"); flush(STDOUT)
     end
 end
