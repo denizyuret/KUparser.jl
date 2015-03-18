@@ -1,55 +1,75 @@
-using Dates
-msg(x)=(println("$(now()) $x"); flush(STDOUT))
-msg("Setting up workers"); 
-ncpu=12
-nbatch=200
-nbeam=10
-(nworkers() < ncpu) && (addprocs(ncpu - nprocs() + 1))
-require("CUDArt")
-@everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
-require("CUBLAS")
-require("KUnet")
-require("KUparser")
+using HDF5, JLD, Dates, KUparser, KUnet
 
-msg("Loading conllWSJToken_wikipedia2MUNK-100.jld")
-using HDF5, JLD
-@time @load "conllWSJToken_wikipedia2MUNK-100.jld"
+macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
+macro meminfo() :(gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
+evalheads(p,c)=mean(vcat(vcat(map(q->q[1],p)...)...) .== vcat(map(s->s.head,c)...))
 
-evalheads(h,c)=mean(vcat(h...) .== vcat(map(s->s.head,c)...))
-feats=KUparser.Flist.fv021a
-
-if true
-    msg("Parsing trn")          # still initializing with oparser?
-    @time (h,x,y)=KUparser.oparse(trn, feats, ncpu)
-    @show evalheads(h,trn)
-else
-    msg("Parsing dev")          # for debugging
-    @time (h,x,y)=KUparser.oparse(dev, feats, ncpu)
-    @show evalheads(h,dev)
+function initworkers(ncpu)
+    (nworkers() < ncpu) && (addprocs(ncpu - nprocs() + 1))
+    require("CUDArt")
+    @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
+    require("CUBLAS")
+    require("KUnet")
+    require("KUparser")
 end
 
-msg("Setting up net")
-net=KUnet.newnet(KUnet.relu, 1326, 20000, 3; learningRate=2f-2, adagrad=1f-8, dropout=7f-1)
-KUnet.setparam!(net[1]; dropout=2f-1)
-net[end].f=KUnet.logp
-@show net
+function main()
+    @date @load "conllWSJToken_wikipedia2MUNK-100.jld"
+    ncpu=12
+    nbatch=200
+    nbeam=10
+    nsent=length(trn)
+    nblock=int(ceil(nsent/nbeam))
+    feats=KUparser.Flist.fv021a
 
-for epoch=1:256
-    msg("epoch=$epoch KUnet.train(net, x, y; batch=128, loss=KUnet.logploss)")
-    @time KUnet.train(net, x, y; batch=128, loss=KUnet.logploss)
-    x=y=nothing
-    @everywhere gc()
-    run(`nvidia-smi`); run(`free`)
-    msg("KUparser.bparse(trn, net, feats, nbeam, nbatch, ncpu)")
-    @time (htrn,x,y) = KUparser.bparse(trn, net, feats, nbeam, nbatch, ncpu)
-    e1 = evalheads(htrn,trn)
-    msg("KUparser.bparse(dev, net, feats, nbeam, nbatch, ncpu)")
-    @time (hdev,) = KUparser.bparse(dev, net, feats, nbeam, nbatch, ncpu)
-    e2 = evalheads(hdev,dev)
-    msg("KUparser.bparse(tst, net, feats, nbeam, nbatch, ncpu)")
-    @time (htst,) = KUparser.bparse(tst, net, feats, nbeam, nbatch, ncpu)
-    e3 = evalheads(htst,tst)
-    println("DATA:\t$epoch\t$e1\t$e2\t$e3"); flush(STDOUT)
+    @date initworkers(ncpu)
+    @date p1=KUparser.oparse(trn, feats, ncpu)
+    @show evalheads(p1,trn)
+    @date p2=KUparser.oparse(dev, feats, ncpu)
+    @show evalheads(p2,dev); p2=nothing
+    @date p3=KUparser.oparse(tst, feats, ncpu)
+    @show evalheads(p3,tst); p3=nothing
+    @date rmprocs(workers())
+    sleep(5)
+    @meminfo
+
+    net=KUnet.newnet(KUnet.relu, 1326, 20000, 3; learningRate=2f-2, adagrad=1f-8, dropout=7f-1)
+    KUnet.setparam!(net[1]; dropout=2f-1)
+    net[end].f=KUnet.logp
+    @show net
+    for q in p1
+        @date KUnet.train(net, q[2], q[3]; batch=128, loss=KUnet.logploss)
+    end
+    p1=nothing
+
+    for epoch=1:256
+        @show epoch
+        @meminfo
+        e1=0.0; nb=0
+        for s1=1:nblock:nsent
+            s2=min(nsent,s1+nblock-1)
+            s12=sub(trn,s1:s2)
+            @date initworkers(ncpu)
+            @date p1 = KUparser.bparse(s12, net, feats, nbeam, nbatch, ncpu)
+            @date rmprocs(workers())
+            nb += 1 
+            @show e1 = (1-1/nb)*e1 + (1/nb)*evalheads(p1,s12)
+            for q in p1
+                @date KUnet.train(net, q[2], q[3]; batch=128, loss=KUnet.logploss)
+            end
+            p1=nothing
+            @meminfo
+        end
+        @date initworkers(ncpu)
+        @date p2 = KUparser.bparse(dev, net, feats, nbeam, nbatch, ncpu)
+        @show e2 = evalheads(p2,dev); p2=nothing
+        @date p3 = KUparser.bparse(tst, net, feats, nbeam, nbatch, ncpu)
+        @show e3 = evalheads(p3,tst); p3=nothing
+        @date rmprocs(workers())
+        sleep(5)
+        @meminfo
+        println("DATA:\t$epoch\t$e1\t$e2\t$e3"); flush(STDOUT)
+    end
 end
 
-msg("done")
+main()
