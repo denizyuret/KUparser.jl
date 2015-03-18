@@ -1,7 +1,10 @@
 #TODO: save output
 
-using HDF5, JLD, Dates, KUnet, ArgParse, Compat
+using HDF5, JLD, KUnet, ArgParse, Compat, CUDArt
 using KUparser: ArcHybrid, Corpus, flen, wdim, oparse, bparse, gparse
+if VERSION < v"0.4"
+    using Dates
+end
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -92,7 +95,7 @@ function parse_commandline()
 end
 
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
-macro meminfo() :(gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
+macro meminfo() :(@everywhere gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
 evalheads(p,c)=mean(vcat(vcat(map(q->q[1],p)...)...) .== vcat(map(s->s.head,c)...))
 
 function initworkers(ncpu)
@@ -148,39 +151,30 @@ function main()
         p = nothing
     end
     @date rmprocs(workers())
-    @show length(trn)
+    accuracy = Array(Float32, length(data))
     
     for epoch=1:args["epochs"]
+        @meminfo
         @show epoch
         @time for (h,x,y) in trn
             KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
         end
-        acc = Float32[]
-        @meminfo
+        (args["parser"] != "oparser") && (trn=nothing)
         @date initworkers(args["ncpu"])
-        if args["parser"] == "oparser"
-            for i=1:length(data)
+        for i=1:length(data)
+            if in(args["parser"], ["oparser", "gparser"])
                 @date p = gparse(data[i], net, feats, args["pbatch"], args["ncpu"])
-                @show push!(acc, evalheads(p, data[i]))
-                # We do not update trn for static training
-            end
-        elseif args["parser"] == "gparser"
-            for i=1:length(data)
-                @date p = gparse(data[i], net, feats, args["pbatch"], args["ncpu"])
-                @show push!(acc, evalheads(p, data[i]))
-                i == 1 && (trn = p)
-            end
-        elseif args["parser"] == "bparser"
-            for i=1:length(data)
+            elseif (args["parser"] == "bparser")
                 @date p = bparse(data[i], net, feats, args["nbeam"], args["pbatch"], args["ncpu"])
-                @show push!(acc, evalheads(p, data[i]))
-                i == 1 && (trn = p)
+            else
+                error("Unknown parser "*args["parser"])
             end
-        else
-            error("Unknown parser "*args["parser"])
+            @show accuracy[i] = evalheads(p, data[i])
+            (args["parser"] != "oparser") && (i == 1) && (trn=p)
+            p = nothing
         end
         @date rmprocs(workers())
-        println("DATA:\t$epoch\t"*join(acc, '\t')); flush(STDOUT)
+        println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
     end
 end
 
