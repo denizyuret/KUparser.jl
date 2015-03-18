@@ -165,10 +165,10 @@ function bparse(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, nbatch
     p = pmap(procs(d)) do x
         bparse(localpart(d), copy(n, :gpu), fmat, nbeam, nbatch)
     end
-    h = vcat(map(z->z[1], p)...)
-    x = hcat(map(z->z[2], p)...)
-    y = hcat(map(z->z[3], p)...)
-    (h, x, y)
+    # h = vcat(map(z->z[1], p)...)
+    # x = hcat(map(z->z[2], p)...)
+    # y = hcat(map(z->z[3], p)...)
+    # (h, x, y)
 end
 
 function bparse1(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, ncpu::Integer)
@@ -179,9 +179,9 @@ function bparse1(corpus::Corpus, net::Net, fmat::Features, nbeam::Integer, ncpu:
     p = pmap(procs(d)) do x
         bparse(localpart(d), copy(n, :gpu), fmat, nbeam)
     end
-    h = vcat(map(z->z[1], p)...)
-    x = hcat(map(z->z[2], p)...)
-    y = hcat(map(z->z[3], p)...)
-    (h, x, y)
+    # h = vcat(map(z->z[1], p)...)
+    # x = hcat(map(z->z[2], p)...)
+    # y = hcat(map(z->z[3], p)...)
+    # (h, x, y)
 end
 
