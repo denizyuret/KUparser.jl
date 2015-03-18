@@ -5,6 +5,7 @@
 *.job
 foo*
 *_dbg.jl
+*.out.*
 
 # Object files
 *.o
