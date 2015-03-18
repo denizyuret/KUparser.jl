@@ -1,7 +1,68 @@
+2015-03-18  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* todo:
+	- write cparser
+	- try onur's problem
+	- try bparser without dropout
+	- alternative to adagrad?
+	- try gparser with other fvectors
+	- add options to gtrain.
+
+2015-03-16  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	+ solve memory problems: x=10GB, bparse=100GB!
+	+ save networks: implement savenet, testnet or copy:save copy:test
+	- sizeof, print for nets?
+	- beam earlystop? only train with mincostpath?  same with greedy?
+	- play with optimization, rmsprop, adam, layers, dropout, hidden layers?
+	- play with features
+	- calculate word accuracy
+	- debug gc()
+
+	* memory:
+	x do we need to wait for @everywhere gc()?
+	x whos() does not work from inside meminfo: turn into macro?: still does not show locals
+	= check out getBytes from http://stackoverflow.com/questions/28402989/check-size-in-bytes-of-variable-using-julia
+	x if restarting workers does not help, just write code without DArrays.
+	-- but DArrays are only used for corpora, not the returned x!?
+	- maybe forget about workers and write multithreaded.
+
 2015-03-15  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* test/otrain.jl: Train using static oracle.
-	
+	* upper-bound: These are head accuracies with oracle parser (less than 100% because of nonplanar trees?)
+	evalheads(p1,trn) => 0.9940970160879469
+	evalheads(p2,dev) => 0.9950395094349029
+	evalheads(p3,tst) => 0.9935960764942489
+
+	* test/julia3_otrain_jl.out: Train using static oracle. 4m07s per epoch. (5m50s with testing)
+	epoch	trn			dev			tst
+	1	0.8739110847259238	0.8660916818306453	0.8615129489803119
+	2	0.8855433734584665	0.8766607672557769	0.8707218968315574
+	4	0.8988882432938818	0.8874541964753098	0.8828064356784984
+	8	0.9100005473522885	0.8930877184236109	0.8891574341965987
+	16	0.9229485867784949	0.9015130742577959	0.8943264413238303
+	32	0.9391302151094494	0.9064486377346263	0.9001481899654223
+	64	0.9567865368178622	0.9097639404741132	0.903288405899372
+	128	0.9730323737826675	0.9098636488271805	0.9051054971420507
+	256	0.9837520578340849	0.9088665652965077	0.9075047632488886
+
+	* test/julia3_gtrain_jl.out: Train using greedy parser. 6m30s per epoch.
+	1	0.8740110817786423	0.8695565470997333	0.8623244654576248
+	2	0.8796424947475232	0.8704539222773388	0.8683755557123704
+	4	0.8938568126413117	0.8808235909963357	0.8785018700162304
+	8	0.9140688484970969	0.8979734277239075	0.8951732411262437
+	16	0.9277031834851184	0.9051773562330184	0.9003246065909252
+	32	0.941745927488453	0.9094149612383777	0.9050349304918496
+	64	0.9574433595641392	0.9112595657701223	0.9091101545409639
+	93	0.9657357467358857	0.9154223895106812	0.9110330957589443
+	127	0.9721671361265142	0.9149986290101453	0.9128678286641733
+
+	* test/julia3_btrain_jl.out: Train using beam parser. ~1h per epoch.
+	1	0.8701039810002603	0.8869058005334397	0.882153694164138
+	2	0.8951521543134597	0.8947079791609542	0.8900571589866629
+	3	0.9055132348980205	0.8985467507540444	0.8948556912003387
+	4	0.9123341030793707	0.9016875638756637	0.8973078822948275
 
 2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -12,14 +73,14 @@
 	0.9950395094349029
 
 	* src/gparser.jl:
-	- do not need to allocate p, y, etc. for the whole corpus in batch version.
+	x do not need to allocate p, y, etc. for the whole corpus in batch version.
 
 	* TODO:
 	+ return xy from gparser and bparser.
 	- train. (need logploss, need earlystop?, try rmsprop?, adam?: adagrad may not do well on changing data)
-	-- static oracle
-	-- greedy parser
-	-- beam parser
+	= static oracle
+	= greedy parser
+	- beam parser: still has memory issues
 	- feature select.
 
 	* INFO:
@@ -42,12 +103,12 @@
 	0.9154473165989481
 
 	* TODO: src/bparser.jl: minibatch version:
-        - do not keep computing costs for finished sentences
-        - do all beam elements finish simultaneously?
-        - cache cost in parser?
-	- repeated states on the beam?
-	- nbeam=10 and nbeam=100 give the same parse?
-	-- in all except sent 1324. beam1 vs beam10 differ in 224 sentences.
+        x do not keep computing costs for finished sentences: too minor
+        x do all beam elements finish simultaneously?
+        x cache cost in parser?
+	x repeated states on the beam?
+	= nbeam=10 and nbeam=100 give the same parse?
+	== in all except sent 1324. beam1 vs beam10 differ in 224 sentences.
 
 	* test/timing.jl: minibatch version speed test:
 
@@ -139,13 +200,13 @@
 	* TODO: src/bparser.jl:
 	- early stop?  could implement by copying into big x
 	-- mincost may not be 0 for non-planar sentences
-	- sortperm! suggest AbstractArray to julia
-	- Now we sort the nc candidates and copy top np back to the beam
-	- softperm! may not be necessary when nc <= beam (unless we care about the first candidate being the best)
-	- do we need features when we have 0 or 1 valid move?
-	- do not return y from gparser, return x,z consistently from each method
-	- maybe have optional trn struct and return trn.x trn.y trn.nx
-	- check for identical states on the beam.
+	= sortperm! suggest AbstractArray to julia
+	= Now we sort the nc candidates and copy top np back to the beam
+	x softperm! may not be necessary when nc <= beam (unless we care about the first candidate being the best)
+	= do we need features when we have 0 or 1 valid move?
+	= do not return y from gparser, return x,z consistently from each method
+	x maybe have optional trn struct and return trn.x trn.y trn.nx
+	x check for identical states on the beam: score will be difft
 
 2015-03-08  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -166,13 +227,13 @@
 2015-03-05  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
-	- write bparser
+	= write bparser
 	- can we use rnn's to learn parser-action sequences?
 	- real use of rnn's is to map text to meaning!
 
-	- should we try parallel for?
-	- see how SharedArray is implemented and use it for net weights.
-	
+	= should we try parallel for?
+	= see how SharedArray is implemented and use it for net weights: x is bigger!
+
 	* src/gparser.jl: gpu minibatch version:
 
 	# dev has 1700 sentences and 40117 words
@@ -203,7 +264,7 @@
 	> @time foo=KUparser.gparse(dev[1:100], n, Feats.fv021a); # with rand!
 	> elapsed time: 0.899239837 seconds (212 MB allocated, 4.95% gc time in 9 pauses with 0 full sweep)
 
-	- Better but still allocating, why?
+	= Better but still allocating, why?
 
 	> @time foo=KUparser.gparse(dev[1:100], n, Feats.fv021a); # with predict
 	> elapsed time: 9.124658661 seconds (254 MB allocated, 0.79% gc time in 11 pauses with 0 full sweep)
@@ -214,10 +275,10 @@
 2015-03-03  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
-	- get rid of allocation
-	- optimize feature extraction
-	- cuda parser?
-	- solve pmap problem (shared arrays, pointers?)
+	= get rid of allocation
+	= optimize feature extraction
+	x cuda parser?
+	x solve pmap problem (shared arrays, pointers?)
 
 	* timing: dev is the 1700 sentences:
 	sent_pct: 0.5888
