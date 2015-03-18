@@ -2,9 +2,7 @@
 
 using HDF5, JLD, KUnet, ArgParse, Compat, CUDArt
 using KUparser: ArcHybrid, Corpus, flen, wdim, oparse, bparse, gparse
-if VERSION < v"0.4"
-    using Dates
-end
+VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -154,12 +152,12 @@ function main()
     accuracy = Array(Float32, length(data))
     
     for epoch=1:args["epochs"]
-        @meminfo
         @show epoch
         @time for (h,x,y) in trn
             KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
         end
         (args["parser"] != "oparser") && (trn=nothing)
+        @meminfo
         @date initworkers(args["ncpu"])
         for i=1:length(data)
             if in(args["parser"], ["oparser", "gparser"])
