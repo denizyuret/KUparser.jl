@@ -4,6 +4,7 @@
 *.mat
 *.job
 foo*
+*_dbg.jl
 
 # Object files
 *.o
