@@ -93,7 +93,7 @@ function parse_commandline()
 end
 
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
-macro meminfo() :(@everywhere gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
+macro meminfo() :(gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
 evalheads(p,c)=mean(vcat(vcat(map(q->q[1],p)...)...) .== vcat(map(s->s.head,c)...))
 
 function initworkers(ncpu)
@@ -152,7 +152,7 @@ function main()
     accuracy = Array(Float32, length(data))
     
     for epoch=1:args["epochs"]
-        @show epoch
+        @show epoch; flush(STDOUT)
         @time for (h,x,y) in trn
             KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
         end
