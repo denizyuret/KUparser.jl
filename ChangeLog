@@ -1,10 +1,24 @@
 2015-03-20  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* ~/src/acl11: Got Yue Zhang's acl11 data.  Heads are different!
-	- ** generate new dataset with acl11 heads. **
-	- generate new dataset with conll07.
+	+ ** generate new dataset with acl11 heads. **
+	+ generate new dataset with conll07.
+	- feature select with acl11
+	- feature select with conll07
+
+	@@480058 0.50531 gpacl11    dyuret       r     03/20/2015 18:14:25 ilac.q@ilac-1-3.local
+	480059 0.50531 opacl11    dyuret       r     03/20/2015 18:15:10 ilac.q@ilac-2-0.local
+	480062 0.50531 bpacl11    dyuret       r     03/20/2015 18:27:55 ilac.q@ilac-2-3.local
+	480064 0.50531 opconll07  dyuret       r     03/20/2015 18:39:10 ilac.q@ilac-0-0.local
+	480065 0.50531 gpconll07  dyuret       r     03/20/2015 18:45:10 ilac.q@ilac-3-0.local
+	480066 0.50531 bpconll07  dyuret       r     03/20/2015 18:45:55 ilac.q@ilac-2-1.local
+
+	Note: fv021a may not be ideal for acl11! run gfeatures after fixing bugs.
+	Note: using fv022b for conll07.
+
+	* TODO:
 	- save models and/or compute eval.py (wordacc) score.
-	- are they using the deprels during parsing? (BILOU is better than BIO)
+	- are they (Goldberg,Zhang) using the deprels during parsing? (BILOU is better than BIO)
 
 	* 03200918-gfeatures_sh.out: experiment with features (honnibal comment)
 	+ try gparse 10 epochs all Flist
@@ -39,11 +53,11 @@
 	fv034 died
 	fv022b died
 
+	= try to debug and fix the crashes
+	@@480067 0.50531 gfeatures2 dyuret       qw    03/20/2015 19:19:08
+
 	- try bparse 10 epochs all Flist
 	- try local search around best feats
-	- try with acl11 heads
-	- try to debug and fix the crashes
-	- do the same with conll07 data
 
 2015-03-19  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -54,9 +68,8 @@
 	2	0.8944715	0.8857093	0.8815892
 	4	0.9085364	0.8967271	0.8914861
 	8	0.9206171	0.90582544	0.9008715
-	15	0.9320599	0.9131042	0.905723	*d*
 	16	0.93292725	0.9116833	0.9058465
-	17	0.93324935	0.9126804	0.906852	*t*
+	23	0.94009966	0.91412616	0.9093924
 
 	* bparselatestop.out: why is this different from static oracle training?  we are
 	rewarding mincost state/move pairs on the beam.  are the mincost
@@ -73,6 +86,7 @@
 	32	0.94735837	0.9163447	0.91173875
 	51	0.9574234	0.91881245	0.9150201	*t*
 	53	0.9584549	0.9195104	0.91431445	*d*
+	81	0.9674957	0.91851336	0.9148084
 
 	* bparsedbg.out: mincostpath bparser results: at most one xy pair
 	per beam (the first one which has the initial mincost) is added to
@@ -85,27 +99,26 @@
 	16	0.9332304	0.9117581	0.9058112
 	32	0.94746995	0.91639453	0.91230327
 	64	0.9625506	0.9181644	0.9151789
-	102	0.9721366	0.91923624	0.91600806	*t*
 	108	0.97320396	0.9201087	0.9149848	*d*
 	115	0.9742134	0.918638	0.91532004
+	142	0.9780417	0.91878754	0.9162903
 
 	Note: trn improvement is slower.  dev/tst catches up and passes
 	after 32 epochs.  Less overfitting?  Speed 3x faster.
 
-	* julia3_btrain_jl.out: Train using beam parser. ~1h per
+	* 03201925-julia3_btrain_jl.out: Train using beam parser. ~1h per
 	epoch.  Training on the whole beam with nbeam=10.
 	- merge mincostpath with master after this one finishes.
-	@@479844 0.50531 julia3_btr dyuret       r     03/17/2015 12:01:55 ilac.q@ilac-0-3.local
+	$$479844 0.50531 julia3_btr dyuret       r     03/17/2015 12:01:55 ilac.q@ilac-0-3.local
 	1	0.8714639358032035	0.8880773736819803	0.8838649354315151
 	2	0.8950433643212408	0.8938604581598824	0.890762825488674
 	4	0.9122091687400475	0.903033626642072	0.8975901488956319
 	8	0.9273346259121167	0.9078694817658349	0.9040117140639334
 	16	0.9424559294340376	0.912007378418127	0.9076811798743913
 	32	0.9569711670068192	0.9151481915397462	0.9107331874955896
-	48	0.9645255639679668	0.9162200563352195	0.9122856538000141
-	51	0.9655221015040253	0.9160455667173517	0.9118269705737069
 	64	0.9691327587380277	0.9175910461898945	0.9127443370263214
-	68	0.9699719513285439	0.9176159732781614	0.9134323618657822
+	74	0.9711445121199407	0.9180397337786973	0.9135734951661845	*t*
+	77	0.9718000903088589	0.9186130568088342	0.9132030202526286	*d*
 
 	* TODO:
 	+ headpct-wordpct diff around 1% according to vectorparser/ChangeLog.
@@ -117,7 +130,7 @@
 	- parse conll07 for static/dynamic comparison.
 	- try arceasy (better on Goldberg&Nivre13)
 	- implement earlystop for efficiency (Zhang does it)
-	- experiment with subsets of the beam to use for training (zhang email)?
+	= experiment with subsets of the beam to use for training (zhang email)?
 
 	* Zhang&Nivre11: nbeam=64 dev=.9314 tst=.9290 conv=Penn2Malt.
 
