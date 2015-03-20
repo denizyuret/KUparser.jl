@@ -1,14 +1,152 @@
+2015-03-20  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* ~/src/acl11: Got Yue Zhang's acl11 data.  Heads are different!
+	- ** generate new dataset with acl11 heads. **
+	- generate new dataset with conll07.
+	- save models and/or compute eval.py (wordacc) score.
+	- are they using the deprels during parsing? (BILOU is better than BIO)
+
+	* 03200918-gfeatures_sh.out: experiment with features (honnibal comment)
+	+ try gparse 10 epochs all Flist
+	$$479993 0.50531 _gfeatures dyuret       r     03/19/2015 10:46:40 ilac.q@ilac-2-3.local
+	$$479998 0.50531 _gfeatures dyuret       r     03/19/2015 11:46:40 ilac.q@ilac-1-3.local
+	$ egrep '^(DATA:.10|julia3)' _gfeatures_sh.out
+	fv031a	0.9175582	0.90168756	0.8972373
+	fv021a	0.9179561	0.90113914	0.89709616
+	fv022a	0.918115	0.9009896	0.8971138
+	fv023	0.9185719	0.9005908	0.8966375
+	fv022	0.9171161	0.9003415	0.8965669
+	fv023a	0.91787714	0.8998679	0.89737844
+	fv018	0.91692454	0.8995937	0.8934091
+	fv804	0.91603404	0.89899546	0.89492625
+	fv021	0.91659826	0.89894557	0.8955437
+	fv708	0.9135615	0.89847195	0.89399123
+	fv019	0.915633	0.8984221	0.89533204
+	fv015a	0.914752	0.8978488	0.8922976
+	fv018a	0.9154783	0.89777404	0.89423823
+	fv017	0.9170309	0.8975247	0.89513797
+	fv808	0.91797924	0.89655256	0.89259756
+	fv017a	0.916613	0.89615375	0.893021
+	fv012	0.9068354	0.88982224	0.88806367
+	fv008	0.9009608	0.8860832	0.88349444
+	fv008w	0.8957652	0.8806242	0.8796309
+	fv1768 died
+	fv136 died
+	fv130 died
+	fv102 died
+	fv084 died
+	fv039 died
+	fv034 died
+	fv022b died
+
+	- try bparse 10 epochs all Flist
+	- try local search around best feats
+	- try with acl11 heads
+	- try to debug and fix the crashes
+	- do the same with conll07 data
+
+2015-03-19  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* bparse64.out: experiment with larger beams 1h22m/epoch
+	@@479988 0.50531 bparse64   dyuret       r     03/19/2015 09:48:25 ilac.q@ilac-1-0.local
+	- could speed up by (1) **earlystop** (2) **multi-epoch train after parse which takes 20x more time**
+	1	0.88225925	0.8752399	0.87107474
+	2	0.8944715	0.8857093	0.8815892
+	4	0.9085364	0.8967271	0.8914861
+	8	0.9206171	0.90582544	0.9008715
+	15	0.9320599	0.9131042	0.905723	*d*
+	16	0.93292725	0.9116833	0.9058465
+	17	0.93324935	0.9126804	0.906852	*t*
+
+	* bparselatestop.out: why is this different from static oracle training?  we are
+	rewarding mincost state/move pairs on the beam.  are the mincost
+	states on the beam that different than the mincost states for the
+	static oracle?  why not use earlystop in gparser?  **why not
+	follow the whole mincostpath and not use earlystop in bparser?**
+	$$480009 0.50531 bparselate dyuret       r     03/19/2015 14:17:25 ilac.q@ilac-2-2.local
+	@@480024 0.50531 bparselate dyuret       r     03/19/2015 17:07:40 ilac.q@ilac-2-2.local
+	1	0.8824845	0.8760874	0.8711453
+	2	0.8931568	0.8864322	0.8810599
+	4	0.9077248	0.8963033	0.89115095
+	8	0.92096025	0.9067976	0.8996013
+	16	0.9335746	0.9120572	0.90686965
+	32	0.94735837	0.9163447	0.91173875
+	51	0.9574234	0.91881245	0.9150201	*t*
+	53	0.9584549	0.9195104	0.91431445	*d*
+
+	* bparsedbg.out: mincostpath bparser results: at most one xy pair
+	per beam (the first one which has the initial mincost) is added to
+	the training set. nbeam=10.  (18m50s per epoch)
+	@@479933 0.50531 bparsedbg  dyuret       r     03/18/2015 21:32:10 ilac.q@ilac-0-1.local
+	1	0.8811414	0.8743675	0.87079245
+	2	0.8940389	0.8873545	0.8804777
+	4	0.9079269	0.89695144	0.8927387
+	8	0.92069286	0.9061495	0.89916027
+	16	0.9332304	0.9117581	0.9058112
+	32	0.94746995	0.91639453	0.91230327
+	64	0.9625506	0.9181644	0.9151789
+	102	0.9721366	0.91923624	0.91600806	*t*
+	108	0.97320396	0.9201087	0.9149848	*d*
+	115	0.9742134	0.918638	0.91532004
+
+	Note: trn improvement is slower.  dev/tst catches up and passes
+	after 32 epochs.  Less overfitting?  Speed 3x faster.
+
+	* julia3_btrain_jl.out: Train using beam parser. ~1h per
+	epoch.  Training on the whole beam with nbeam=10.
+	- merge mincostpath with master after this one finishes.
+	@@479844 0.50531 julia3_btr dyuret       r     03/17/2015 12:01:55 ilac.q@ilac-0-3.local
+	1	0.8714639358032035	0.8880773736819803	0.8838649354315151
+	2	0.8950433643212408	0.8938604581598824	0.890762825488674
+	4	0.9122091687400475	0.903033626642072	0.8975901488956319
+	8	0.9273346259121167	0.9078694817658349	0.9040117140639334
+	16	0.9424559294340376	0.912007378418127	0.9076811798743913
+	32	0.9569711670068192	0.9151481915397462	0.9107331874955896
+	48	0.9645255639679668	0.9162200563352195	0.9122856538000141
+	51	0.9655221015040253	0.9160455667173517	0.9118269705737069
+	64	0.9691327587380277	0.9175910461898945	0.9127443370263214
+	68	0.9699719513285439	0.9176159732781614	0.9134323618657822
+
+	* TODO:
+	+ headpct-wordpct diff around 1% according to vectorparser/ChangeLog.
+	= compare Penn2Malt conversion with Zhang: emailed Zhang.
+	+ check Suzuki11.
+	- implement save so we can interrupt and continue.
+	- merge mincostpath and structure code to experiment with other variants.
+	- try more hidden layers.
+	- parse conll07 for static/dynamic comparison.
+	- try arceasy (better on Goldberg&Nivre13)
+	- implement earlystop for efficiency (Zhang does it)
+	- experiment with subsets of the beam to use for training (zhang email)?
+
+	* Zhang&Nivre11: nbeam=64 dev=.9314 tst=.9290 conv=Penn2Malt.
+
+	* Goldberg&Nivre13: .8643/.8762 static/dynamic archybrid on
+	conll07 headacc (including punct).  no beam.
+
+	* Chen&Zhang&Zhang14: .9422 is best from related work Suzuki11 in
+	http://www.aclweb.org/anthology/C14-1078. Conversion with
+	Penn2Malt.  Uses Carreras07 decoder with MIRA and Bohnet2010 features.
+
+	* Suzuki11: (condensed feature representations, semisupervised)
+	cites dev/tst Suzuki11:9433/9422, Koo08:9330/9316, Chen09:?/9316,
+	Suzuki09:9413/9379.  Uses 3.7b token for unsupervised learning (as
+	Suzuki09).  Suzuki 09 uses conv=yamada parser=2nd-order.
+
+	* Koo08: tst23=.9316 (excluding punct).  Uses Carreras07 (second
+	order).  Cluster info adds +1.14.
+
+
 2015-03-18  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* todo:
 	= write bparser:mincostpath - testing on *julia*
 	= add options to gtrain/btrain - testing on {ogb}parsedbg.out
-	- try onur's problem
-	- try bparser without dropout
+	+ try onur's problem
+	x try bparser without dropout: no reason to do it with mincostpath, input similar to oparser.
 	- alternative to adagrad?
-	- try gparser with other fvectors
-	- implement conll eval.
-	- save models.
+	= try gparser with other fvectors
+	- save models from train.jl
 
 2015-03-16  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -16,19 +154,18 @@
 	+ solve memory problems: x=10GB, bparse=100GB!
 	+ save networks: implement savenet, testnet or copy:save copy:test
 	- sizeof, print for nets?
-	- beam earlystop? only train with mincostpath?  same with greedy?
+	= beam earlystop? only train with mincostpath?  same with greedy?
 	- play with optimization, rmsprop, adam, layers, dropout, hidden layers?
-	- play with features
-	- calculate word accuracy
-	- debug gc()
+	= play with features
+	- calculate word accuracy: for now assume it is +1%
 
 	* memory:
 	x do we need to wait for @everywhere gc()?
 	x whos() does not work from inside meminfo: turn into macro?: still does not show locals
 	= check out getBytes from http://stackoverflow.com/questions/28402989/check-size-in-bytes-of-variable-using-julia
 	x if restarting workers does not help, just write code without DArrays.
-	-- but DArrays are only used for corpora, not the returned x!?
-	- maybe forget about workers and write multithreaded.
+	x maybe forget about workers and write multithreaded.
+	- but DArrays are only used for corpora, not the returned x!?  help debug gc().
 
 2015-03-15  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -37,7 +174,9 @@
 	evalheads(p2,dev) => 0.9950395094349029
 	evalheads(p3,tst) => 0.9935960764942489
 
-	* test/julia3_otrain_jl.out: Train using static oracle. 4m07s per epoch. (5m50s with testing)
+	* 03160543-julia3_otrain_jl.out: Train using static oracle. 4m07s
+	per epoch. (5m50s with testing)
+
 	epoch	trn			dev			tst
 	1	0.8739110847259238	0.8660916818306453	0.8615129489803119
 	2	0.8855433734584665	0.8766607672557769	0.8707218968315574
@@ -49,7 +188,21 @@
 	128	0.9730323737826675	0.9098636488271805	0.9051054971420507
 	256	0.9837520578340849	0.9088665652965077	0.9075047632488886
 
-	* test/julia3_gtrain_jl.out: Train using greedy parser. 6m30s per epoch.
+	* 03200328-oparsedbg.out: Replicating otrain results with new train.jl (6m22s/epoch)
+	$$479920 0.50500 oparsedbg  dyuret       r     03/18/2015 19:55:10 ilac.q@ilac-0-2.local
+	1	0.8737332	0.86576766	0.8628537
+	2	0.8857002	0.87501556	0.8715687
+	4	0.89788723	0.88446295	0.8803366
+	8	0.91024685	0.8940349	0.88966906
+	16	0.9238307	0.901538	0.89517325
+	32	0.93902916	0.9065733	0.8999365
+	64	0.95688546	0.90904105	0.9024416
+	128	0.97318393	0.91016275	0.9060052
+	254	0.98392576	0.9116335	0.9063228	*d*
+	255	0.9839089	0.91013783	0.90736365	*t*
+	256	0.98388153	0.910786	0.90690494
+
+	* 03171146-julia3_gtrain_jl.out: Train using greedy parser. 6m30s per epoch.
 	1	0.8740110817786423	0.8695565470997333	0.8623244654576248
 	2	0.8796424947475232	0.8704539222773388	0.8683755557123704
 	4	0.8938568126413117	0.8808235909963357	0.8785018700162304
@@ -60,16 +213,19 @@
 	93	0.9657357467358857	0.9154223895106812	0.9110330957589443
 	127	0.9721671361265142	0.9149986290101453	0.9128678286641733
 
-	* test/julia3_btrain_jl.out: Train using beam parser. ~1h per epoch.
-	1	0.8714639358032035	0.8880773736819803	0.8838649354315151
-	2	0.8950433643212408	0.8938604581598824	0.890762825488674
-	4	0.9122091687400475	0.903033626642072	0.8975901488956319
-	8	0.9273346259121167	0.9078694817658349	0.9040117140639334
-	16	0.9424559294340376	0.912007378418127	0.9076811798743913
-	21	0.9485837466607918	0.9137273475085376	0.9091630795286147
-
-
-
+	* 03192351-gparsedbg.out: Replicating gtrain results (6m32s/epoch) with new train.jl
+	$$479926 0.50531 gparsedbg  dyuret       r     03/18/2015 19:58:55 ilac.q@ilac-0-0.local
+	1	0.87359005	0.86753744	0.8616188
+	2	0.88026565	0.87152576	0.86717594
+	4	0.89791775	0.8860832	0.88430595
+	8	0.9142257	0.90056586	0.8936737
+	16	0.92736214	0.90445447	0.8997248
+	32	0.9417891	0.90948975	0.9047703
+	64	0.95761913	0.91292965	0.9092689
+	128	0.9720545	0.91372734	0.91122717
+	194	0.9796385	0.9158212	0.9123562	*d*
+	238	0.98255104	0.9152479	0.9139616	*t*
+	256	0.98354787	0.9134033	0.91325593
 
 2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -84,11 +240,11 @@
 
 	* TODO:
 	+ return xy from gparser and bparser.
-	- train. (need logploss, need earlystop?, try rmsprop?, adam?: adagrad may not do well on changing data)
-	= static oracle
-	= greedy parser
-	- beam parser: still has memory issues
-	- feature select.
+	+ train. (need logploss, need earlystop?, try rmsprop?, adam?: adagrad may not do well on changing data)
+	+ static oracle
+	+ greedy parser
+	+ beam parser: still has memory issues
+	= feature select.
 
 	* INFO:
 	+ biyofiz gpu memory is sufficient for nbeam*nbatch*ncpu <= 10000
@@ -205,8 +361,8 @@
 2015-03-12  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO: src/bparser.jl:
-	- early stop?  could implement by copying into big x
-	-- mincost may not be 0 for non-planar sentences
+	+ early stop?  could implement by copying into big x
+	+ mincost may not be 0 for non-planar sentences
 	= sortperm! suggest AbstractArray to julia
 	= Now we sort the nc candidates and copy top np back to the beam
 	x softperm! may not be necessary when nc <= beam (unless we care about the first candidate being the best)
@@ -311,3 +467,83 @@
 	However there is too much allocation and speed can be improved.
 
 	More impact would be to batch sentences first.
+
+2014-10-27  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* run_static_dynamic_1023_archybrid_conllWSJToken_wikipedia2MUNK_100_fv021a_0_333140404105682_ilac.out:
+	First two epochs identical to 1017 run.  For conll07 use the 2014-10-10 result.
+	:(copied from vectorparser/ChangeLog)
+
+		stat_pct		move_pct	      	head_pct	      	word_pct
+	epoch	trn	dev	tst	trn	dev	tst   	trn	dev	tst   	trn	dev	tst
+	1	0.0142	0.0329	0.0346	0.0203	0.0409	0.0423	0.0590	0.1081	0.1134	0.0509	0.0946	0.0983
+	2	0.0138	0.0376	0.0389	0.0136	0.0373	0.0374	0.0400	0.0994	0.1023	0.0359	0.0881	0.0912
+	3	0.0102	0.0364	0.0380	0.0081	0.0351	0.0355	0.0269	0.0934	0.0969	0.0246	0.0832	0.0860
+	4	0.0088	0.0361	0.0378	0.0058	0.0348	0.0352	0.0209	0.0921	0.0955	0.0193	0.0819	0.0845
+	5	0.0076	0.0360	0.0376	0.0043	0.0342	0.0349	0.0174	0.0910	0.0950	0.0162	0.0810	0.0839
+	6	0.0071	0.0359	0.0375	0.0033	0.0341	0.0347	0.0150	0.0907	0.0940	0.0142	0.0807	0.0835
+	7	0.0068	0.0359	0.0374	0.0025	0.0336	0.0346	0.0131	0.0894	0.0940	0.0123	0.0795	0.0835
+	8	0.0067	0.0360	0.0374	0.0023	0.0336	0.0343	0.0125	0.0892	0.0934	0.0118	0.0792	0.0832
+	9	0.0068	0.0359	0.0377	0.0023	0.0333	0.0342	0.0125	0.0888	0.0935	0.0119	0.0789	0.0833
+	10	0.0068	0.0358	0.0376	0.0021	0.0333	0.0342	0.0121	0.0885	0.0933	0.0116	0.0786	0.0830
+	11	0.0068	0.0360	0.0377	0.0021	0.0335	0.0341	0.0120	0.0891	0.0928	0.0116	0.0792	0.0827
+	12	0.0068	0.0361	0.0378	0.0021	0.0335	0.0341	0.0119	0.0889	0.0925	0.0116	0.0790	0.0824
+	13	0.0068	0.0359	0.0379	0.0020	0.0332	0.0339	0.0117	0.0884	0.0920	0.0114	0.0785	0.0821
+	14	0.0069	0.0359	0.0380	0.0020	0.0333	0.0340	0.0116	0.0888	0.0921	0.0112	0.0788	0.0823
+	15	0.0068	0.0360	0.0380	0.0019	0.0334	0.0340	0.0115	0.0888	0.0920	0.0111	0.0787	0.0820
+	16	0.0068	0.0364	0.0380	0.0019	0.0338	0.0340	0.0116	0.0899	0.0919	0.0113	0.0798	0.0820
+	17	0.0069	0.0364	0.0379	0.0019	0.0337	0.0340	0.0114	0.0898	0.0918	0.0110	0.0799	0.0819
+	18	0.0069	0.0363	0.0380	0.0018	0.0336	0.0341	0.0115	0.0894	0.0922	0.0110	0.0795	0.0823
+	19	0.0069	0.0365	0.0380	0.0018	0.0336	0.0341	0.0115	0.0893	0.0921	0.0109	0.0795	0.0822
+	20	0.0069	0.0364	0.0380	0.0017	0.0337	0.0342	0.0113	0.0894	0.0927	0.0108	0.0796	0.0827
+
+2014-10-10  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* conll07-dev: trn/dev/tst results (copied from vectorparser/ChangeLog)
+	run_static_dynamic_1005_archybrid_conll07EnglishToken_wikipedia2MUNK_100_fv019_0_372063662109375_.out
+	run/log2table.pl: extract table from log file:
+	run/log2table.pl head_pct run_static_dynamic_1005_archybrid_conll07EnglishToken_wikipedia2MUNK_100_fv019_0_372063662109375_.out
+
+	epoch	trn	dev	tst
+	1	0.0644	0.1442	0.1455
+	2	0.0408	0.1318	0.1403
+	3	0.0211	0.1258	0.1317
+	4	0.0148	0.1240	0.1305
+	5	0.0108	0.1233	0.1269
+	6	0.0087	0.1231	0.1267
+	7	0.0073	0.1224	0.1235
+	8	0.0065	0.1223	0.1235
+	9	0.0063	0.1225	0.1235
+	10	0.0060	0.1214	0.1219
+	11	0.0060	0.1216	0.1219
+	12	0.0056	0.1211	0.1201
+	13	0.0056	0.1212	0.1219
+	14	0.0055	0.1214	0.1221
+	15	0.0053	0.1210	0.1217
+	16	0.0052	0.1206	0.1229
+	17	0.0050	0.1202	0.1241
+	18	0.0050	0.1202	0.1243
+	19	0.0048	0.1200	0.1239
+	20	0.0049	0.1199	0.1251
+
+2014-10-16  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Best points: (copied from vectorparser/ChangeLog)
+
+	corpus: conllWSJToken (trn02-21:39832s,950028w,1820392m;dev22:1700s,40117w,76834m;tst23:2416s,56684w,108536m)
+	arctype: archybrid (TODO: can archybrid13 be the same?)
+	embedding: wikipedia2MUNK-100
+	feats: fv021a
+	kernel: rbf
+	gamma: 0.333140404105682
+	devscore: 0.0325506937033084 (nsv=96326, single=0.0328500403467215)
+	test: (TODO)
+
+	corpus: conll07EnglishToken (trn:16588s,398439w,763702m;dev:1989s,48134w,92290m;trn+dev:18577s,446573w,855992m;tst:214s,5003w)
+	arctype: archybrid
+	embedding: wikipedia2MUNK-100 (TODO: other embeddings, bansal)
+	feats: fv022b (TODO: compare with wsj feats)
+	kernel: rbf
+	gamma: 0.376747095368119
+	tstscore: 0.0418668 (1-epoch full-trn/tst, nsv=57661)
+	test: (TODO: debug run_static_dynamic)
