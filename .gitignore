@@ -6,6 +6,7 @@
 foo*
 *_dbg.jl
 *.out.*
+log
 
 # Object files
 *.o
