@@ -53,7 +53,7 @@ for a=-3:1
       if ((a > 0) && !in(c, [1,-1,4,-4])) continue; end      # no deps/dist/in-between/head for a>0
       if ((a == 0) && (b == 0) && !in(c, [1,-1,4,-4,-2,-5,-6])) continue; end  # no rdeps/dist/in-between/head for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8,9,-9])) continue; end  # no dist/in-between/head for deps
-      fv034 = [fv034; [a b c]]
+      fv034 = [fv034; Int8[a b c]]
     end
   end
 end
@@ -175,7 +175,7 @@ for a=-3:1
       if ((a > 0) && !in(c, [1,-1,4,-4])) continue; end      # no deps/dist/in-between/head for a>0
       if ((a == 0) && (b == 0) && !in(c, [1,-1,4,-4,-2,-5,-6])) continue; end  # no rdeps/dist/in-between/head for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8,9,-9])) continue; end  # no dist/in-between/head for deps
-      fv084 = [fv084; [a b c]]
+      fv084 = [fv084; Int8[a b c]]
     end
   end
 end
@@ -216,7 +216,7 @@ for a=-3:2
       if ((a > 0) && !in(c, [1,-1,4,-4])) continue; end      # no deps/dist/in-between/head for a>0
       if ((a == 0) && (b == 0) && !in(c, [1,-1,4,-4,-2,-5,-6])) continue; end  # no rdeps/dist/in-between/head for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8,9,-9])) continue; end  # no dist/in-between/head for deps
-      fv136 = [fv136; [a b c]]
+      fv136 = [fv136; Int8[a b c]]
     end
   end
 end
@@ -232,7 +232,7 @@ for a=-3:2
       if ((a == 0) && (b == 0) && in(c, [2,3,-3,5,6,7,-7,8,-8])) continue; end  # no rdeps/dist/in-between for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8])) continue; end  # no dist/in-between for deps
       if ((c == 0) || (c == -3)) continue; end  # do not use the word+context combination, keep them separate
-      fv130 = [fv130; [a b c]]
+      fv130 = [fv130; Int8[a b c]]
     end
   end
 end
@@ -246,17 +246,101 @@ for a=-2:1
       if ((a > 0) && in(c, [2,-2,3,-3,5,-5,6,-6,7,-7,8,-8])) continue; end      # no deps/dist/in-between for a>0
       if ((a == 0) && (b == 0) && in(c, [2,3,-3,5,6,7,-7,8,-8])) continue; end  # no rdeps/dist/in-between for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8])) continue; end  # no dist/in-between for deps
-      fv102 = [fv102; [a b c]]
+      fv102 = [fv102; Int8[a b c]]
     end
   end
 end
 
-fv1768 = Int8[
-#n0            n1             n2             s0             s1             s2             s0l1           s0l2           s0r1           s0r2           s1l1           s1l2           s1r1           s1r2           n0l1           n0l2          n0s0 s0s1
-0  0  0  0  0  1  1  1  1  1  2  2  2  2  2 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -3 -3 -3 -3 -3 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2  0  0  0  0  0  0  0  0  0  0 -1   -2;
-0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2  1  1  1  1  1  2  2  2  2  2 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2  1  1  1  1  1  2  2  2  2  2 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2  0    0;
-0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  3    3;
-]';
+# fv1768 = Int8[
+# #n0            n1             n2             s0             s1             s2             s0l1           s0l2           s0r1           s0r2           s1l1           s1l2           s1r1           s1r2           n0l1           n0l2          n0s0 s0s1
+# 0  0  0  0  0  1  1  1  1  1  2  2  2  2  2 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -3 -3 -3 -3 -3 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2 -2  0  0  0  0  0  0  0  0  0  0 -1   -2;
+# 0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2  1  1  1  1  1  2  2  2  2  2 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2  1  1  1  1  1  2  2  2  2  2 -1 -1 -1 -1 -1 -2 -2 -2 -2 -2  0    0;
+# 0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  0 -2  2  1 -1  3    3;
+# ]';
+
+fv1768 = 
+Int8[0 0 0
+     0 0 -2
+#    0 0 2   # buffer words dont have right children
+     0 0 1
+     0 0 -1
+     1 0 0
+#    1 0 -2  # buffer words other than n0 do not have ldeps
+#    1 0 2   # buffer words dont have right children
+     1 0 1
+     1 0 -1
+     2 0 0
+#    2 0 -2  # buffer words other than n0 do not have ldeps
+#    2 0 2   # buffer words dont have right children
+     2 0 1
+     2 0 -1
+     -1 0 0
+     -1 0 -2
+     -1 0 2
+     -1 0 1
+     -1 0 -1
+     -2 0 0
+     -2 0 -2
+     -2 0 2
+     -2 0 1
+     -2 0 -1
+     -3 0 0
+     -3 0 -2
+     -3 0 2
+     -3 0 1
+     -3 0 -1
+     -1 -1 0
+     -1 -1 -2
+     -1 -1 2
+     -1 -1 1
+     -1 -1 -1
+     -1 -2 0
+     -1 -2 -2
+     -1 -2 2
+     -1 -2 1
+     -1 -2 -1
+     -1 1 0
+     -1 1 -2
+     -1 1 2
+     -1 1 1
+     -1 1 -1
+     -1 2 0
+     -1 2 -2
+     -1 2 2
+     -1 2 1
+     -1 2 -1
+     -2 -1 0
+     -2 -1 -2
+     -2 -1 2
+     -2 -1 1
+     -2 -1 -1
+     -2 -2 0
+     -2 -2 -2
+     -2 -2 2
+     -2 -2 1
+     -2 -2 -1
+     -2 1 0
+     -2 1 -2
+     -2 1 2
+     -2 1 1
+     -2 1 -1
+     -2 2 0
+     -2 2 -2
+     -2 2 2
+     -2 2 1
+     -2 2 -1
+     0 -1 0
+     0 -1 -2
+     0 -1 2
+     0 -1 1
+     0 -1 -1
+     0 -2 0
+     0 -2 -2
+     0 -2 2
+     0 -2 1
+     0 -2 -1
+     -1 0 3
+     -2 0 3]
 
 fv804 = Int8[
 #n0 s0 s1 n1 n0l1 s0r1 s0l1 s1r1 s0r
