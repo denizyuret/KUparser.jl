@@ -204,7 +204,7 @@ function features(p::Parser, s::Sentence, f::Features, x)
 		@assert (c > b) "c <= b"
 		d = c - b
 		dmin = [2,3,4,6,8,12,16,20]
-		for id=1:length(dmin); (d >= dmin(id)) && (x[i+id] = 1); end
+		for id=1:length(dmin); (d >= dmin[id]) && (x[i+id] = 1); end
 	    end 
 	    i+=8; 
 
@@ -220,7 +220,7 @@ function features(p::Parser, s::Sentence, f::Features, x)
 		@assert (c > b) "c <= b"
 		d = c - b
 		dmax = [1,2,3,4,6,8,12,16]
-		for id=1:length(dmax); (d <= dmax(id)) && (x[i+id] = 1); end
+		for id=1:length(dmax); (d <= dmax[id]) && (x[i+id] = 1); end
 	    end 
 	    i+=8; 
 
