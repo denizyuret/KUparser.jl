@@ -53,7 +53,7 @@ for a=-3:1
       if ((a > 0) && !in(c, [1,-1,4,-4])) continue; end      # no deps/dist/in-between/head for a>0
       if ((a == 0) && (b == 0) && !in(c, [1,-1,4,-4,-2,-5,-6])) continue; end  # no rdeps/dist/in-between/head for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8,9,-9])) continue; end  # no dist/in-between/head for deps
-      fv034 = [fv034; [a b c]]
+      fv034 = [fv034; Int8[a b c]]
     end
   end
 end
@@ -175,7 +175,7 @@ for a=-3:1
       if ((a > 0) && !in(c, [1,-1,4,-4])) continue; end      # no deps/dist/in-between/head for a>0
       if ((a == 0) && (b == 0) && !in(c, [1,-1,4,-4,-2,-5,-6])) continue; end  # no rdeps/dist/in-between/head for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8,9,-9])) continue; end  # no dist/in-between/head for deps
-      fv084 = [fv084; [a b c]]
+      fv084 = [fv084; Int8[a b c]]
     end
   end
 end
@@ -216,7 +216,7 @@ for a=-3:2
       if ((a > 0) && !in(c, [1,-1,4,-4])) continue; end      # no deps/dist/in-between/head for a>0
       if ((a == 0) && (b == 0) && !in(c, [1,-1,4,-4,-2,-5,-6])) continue; end  # no rdeps/dist/in-between/head for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8,9,-9])) continue; end  # no dist/in-between/head for deps
-      fv136 = [fv136; [a b c]]
+      fv136 = [fv136; Int8[a b c]]
     end
   end
 end
@@ -232,7 +232,7 @@ for a=-3:2
       if ((a == 0) && (b == 0) && in(c, [2,3,-3,5,6,7,-7,8,-8])) continue; end  # no rdeps/dist/in-between for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8])) continue; end  # no dist/in-between for deps
       if ((c == 0) || (c == -3)) continue; end  # do not use the word+context combination, keep them separate
-      fv130 = [fv130; [a b c]]
+      fv130 = [fv130; Int8[a b c]]
     end
   end
 end
@@ -246,7 +246,7 @@ for a=-2:1
       if ((a > 0) && in(c, [2,-2,3,-3,5,-5,6,-6,7,-7,8,-8])) continue; end      # no deps/dist/in-between for a>0
       if ((a == 0) && (b == 0) && in(c, [2,3,-3,5,6,7,-7,8,-8])) continue; end  # no rdeps/dist/in-between for a=0
       if ((b != 0) && in(c, [3,-3,7,-7,8,-8])) continue; end  # no dist/in-between for deps
-      fv102 = [fv102; [a b c]]
+      fv102 = [fv102; Int8[a b c]]
     end
   end
 end
