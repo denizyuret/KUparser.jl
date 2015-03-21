@@ -1,26 +1,97 @@
+2015-03-21  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Zhang&Nivre11: nbeam=64 dev=.9314 tst=.9290 wordacc (excluding
+	punct) conv=Penn2Malt.  parser=arceager.  learner=perceptron.
+	uses labels to improve link accuracy!  (seems they get .65) also
+	check out their feature set, and their distance encoding.
+
+	* Goldberg&Nivre13: .8643/.8762 static/dynamic archybrid on
+	conll07 headacc (including punct).  no beam.  I think uses labels,
+	but better check feature specs.
+
+	* TODO: parser and training
+	- ** add deprel labels as features! **: features.jl, archybrid.jl
+	-- output two variables (move+label) or one (movelabel)?
+	- check features and encodings of zhang&nivre11.
+	- use oparser for fselect.  faster if only test at the end.
+	- need fselect again for labeled parser.
+	- try previous moves as features? (rnn idea)
+	- try arceasy (better on Goldberg&Nivre13) arceager (Zhang&Nivre11).
+	- train.jl: write pepochs option to get nbeam=64 to work.
+	- train.jl: implement earlystop for efficiency (Zhang does it)
+	- train.jl: longer training (stop if 2x best epoch)
+	- train.jl: save models
+	- train.jl: compute eval.py (wordacc) score.
+	= can we use rnn's to learn parser-action sequences? prepare
+	  ordered data for ozan.  @@iui-ilac
+	= better vectors: fastsubs and scode on bigger better data.  which
+	  data did volkan use? onur interested. sent email.
+	+ are they (Goldberg,Zhang) using the deprels during parsing?
+	  (BILOU is better than BIO) YES!
+	+ which arc system are they (Zhang&Nivre11) using? arceager.
+
+	* TODO: model and optimization
+	- play with optimization, rmsprop, adam, layers, dropout, hidden layers?
+	- alternative to adagrad?
+	- try more hidden layers.
+
+	* TODO: features
+	- fv1768: memory error
+	- try bparse 10 epochs all Flist
+	- try local search around best feats
+	- try on acl11 and conll07 tags
+	- feature select with acl11
+	- feature select with conll07
+
 2015-03-20  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* ~/src/acl11: Got Yue Zhang's acl11 data.  Heads are different!
 	+ ** generate new dataset with acl11 heads. **
 	+ generate new dataset with conll07.
-	- feature select with acl11
-	- feature select with conll07
-
-	@@480058 0.50531 gpacl11    dyuret       r     03/20/2015 18:14:25 ilac.q@ilac-1-3.local
-	480059 0.50531 opacl11    dyuret       r     03/20/2015 18:15:10 ilac.q@ilac-2-0.local
-	480062 0.50531 bpacl11    dyuret       r     03/20/2015 18:27:55 ilac.q@ilac-2-3.local
-	480064 0.50531 opconll07  dyuret       r     03/20/2015 18:39:10 ilac.q@ilac-0-0.local
-	480065 0.50531 gpconll07  dyuret       r     03/20/2015 18:45:10 ilac.q@ilac-3-0.local
-	480066 0.50531 bpconll07  dyuret       r     03/20/2015 18:45:55 ilac.q@ilac-2-1.local
 
 	Note: fv021a may not be ideal for acl11! run gfeatures after fixing bugs.
 	Note: using fv022b for conll07.
 
-	* TODO:
-	- save models and/or compute eval.py (wordacc) score.
-	- are they (Goldberg,Zhang) using the deprels during parsing? (BILOU is better than BIO)
+	* 03210931-opconll07.out:
+	@@480064 0.50531 opconll07  dyuret       r     03/20/2015 18:39:10 ilac.q@ilac-0-0.local
+	1	0.8383803	0.8205077
+	2	0.8559474	0.841695
+	4	0.87357944	0.8420947
+	8	0.8902576	0.84929043
+	16	0.91164714	0.8560864
+	32	0.9369286	0.85808516
+	64	0.9609493	0.86128324
+	128	0.97914565	0.86128324
+	170	0.98390406	0.86987805	*** (compare to GN13=.8643)
+	256	0.9885506	0.86508095
 
-	* 03200918-gfeatures_sh.out: experiment with features (honnibal comment)
+	* log/03210908-gpconll07.out:
+	$$480065 0.50531 gpconll07  dyuret       r     03/20/2015 18:45:10 ilac.q@ilac-3-0.local
+	1	0.8376861	0.8237058
+	2	0.79815173	0.77953225
+	4	0.87328166	0.85108936
+	8	0.89544153	0.8604837
+	16	0.91665864	0.86667997
+	32	0.9414877	0.8712772
+	64	0.964232	0.8702778
+	128	0.9813267	0.8786728
+	133	0.98199844	0.87927246	*** (compare to GN13=.8762)
+	256	0.98990756	0.8724765
+
+	@@480066 0.50531 bpconll07  dyuret       r     03/20/2015 18:45:55 ilac.q@ilac-2-1.local
+	$ grep DATA bpconll07.out | awk '$2>=a{print;a=$2*2}'
+	1	0.8489049	0.836698
+	2	0.86899793	0.8554867
+	4	0.8904457	0.8686788
+	8	0.9080262	0.875075
+	16	0.92726606	0.88227063
+	32	0.94914156	0.88127124
+	54	0.9653002	0.8864681	***
+	64	0.9700833	0.8772736
+
+
+	* 03200918-gfeatures_sh.out: experiment with features (honnibal
+	comment).  This is on husnu deps.
 	+ try gparse 10 epochs all Flist
 	$$479993 0.50531 _gfeatures dyuret       r     03/19/2015 10:46:40 ilac.q@ilac-2-3.local
 	$$479998 0.50531 _gfeatures dyuret       r     03/19/2015 11:46:40 ilac.q@ilac-1-3.local
@@ -44,32 +115,45 @@
 	fv012	0.9068354	0.88982224	0.88806367
 	fv008	0.9009608	0.8860832	0.88349444
 	fv008w	0.8957652	0.8806242	0.8796309
-	fv1768 died
-	fv136 died
-	fv130 died
-	fv102 died
+	fv1768 died (3348 dims, 865MiB)
+	fv136 died (3544 dims, 910MiB)
+	fv130 died (3538 dims, 909MiB)
+	fv102 died (4638 dims)
 	fv084 died
-	fv039 died
-	fv034 died
+	fv039 died (2744 dims, 727MiB)
+	fv034 died (2452 dims, 660MiB)
 	fv022b died
 
 	= try to debug and fix the crashes
-	@@480067 0.50531 gfeatures2 dyuret       qw    03/20/2015 19:19:08
-
-	- try bparse 10 epochs all Flist
-	- try local search around best feats
+	$$480067 0.50531 gfeatures2 dyuret       qw    03/20/2015 19:19:08
+	@@480068 0.50531 gfeatures3 dyuret       qw    03/20/2015 21:53:02
 
 2015-03-19  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* 03201925-julia3_btrain_jl.out: Train using beam parser. ~1h per
+	epoch.  Training on the whole beam with nbeam=10.
+	+ merge mincostpath with master after this one finishes.
+	$$479844 0.50531 julia3_btr dyuret       r     03/17/2015 12:01:55 ilac.q@ilac-0-3.local
+	1	0.8714639358032035	0.8880773736819803	0.8838649354315151
+	2	0.8950433643212408	0.8938604581598824	0.890762825488674
+	4	0.9122091687400475	0.903033626642072	0.8975901488956319
+	8	0.9273346259121167	0.9078694817658349	0.9040117140639334
+	16	0.9424559294340376	0.912007378418127	0.9076811798743913
+	32	0.9569711670068192	0.9151481915397462	0.9107331874955896
+	64	0.9691327587380277	0.9175910461898945	0.9127443370263214
+	74	0.9711445121199407	0.9180397337786973	0.9135734951661845	*t*
+	77	0.9718000903088589	0.9186130568088342	0.9132030202526286	*d*
+
 	* bparse64.out: experiment with larger beams 1h22m/epoch
 	@@479988 0.50531 bparse64   dyuret       r     03/19/2015 09:48:25 ilac.q@ilac-1-0.local
-	- could speed up by (1) **earlystop** (2) **multi-epoch train after parse which takes 20x more time**
 	1	0.88225925	0.8752399	0.87107474
 	2	0.8944715	0.8857093	0.8815892
 	4	0.9085364	0.8967271	0.8914861
 	8	0.9206171	0.90582544	0.9008715
 	16	0.93292725	0.9116833	0.9058465
-	23	0.94009966	0.91412616	0.9093924
+	32	0.9474447	0.9167186	0.91170347
+DATA:	35	0.9491026	0.91729194	0.9125503	*t*
+DATA:	36	0.9496152	0.91771567	0.91173875	*d*
 
 	* bparselatestop.out: why is this different from static oracle training?  we are
 	rewarding mincost state/move pairs on the beam.  are the mincost
@@ -84,13 +168,18 @@
 	8	0.92096025	0.9067976	0.8996013
 	16	0.9335746	0.9120572	0.90686965
 	32	0.94735837	0.9163447	0.91173875
-	51	0.9574234	0.91881245	0.9150201	*t*
-	53	0.9584549	0.9195104	0.91431445	*d*
-	81	0.9674957	0.91851336	0.9148084
+	64	0.9624811	0.9194606	0.9139969
+DATA:	121	0.9752039	0.9198843	0.9171371	*t*
+	128	0.9760491	0.92015857	0.91664314
+	129	0.97622174	0.9211307	0.9169078	*d*
 
 	* bparsedbg.out: mincostpath bparser results: at most one xy pair
 	per beam (the first one which has the initial mincost) is added to
-	the training set. nbeam=10.  (18m50s per epoch)
+	the training set. nbeam=10.  (18m50s per epoch) Note: trn
+	improvement is slower compared to whole beam training.  dev/tst
+	catches up and passes after 32 epochs.  Less overfitting?  Speed
+	3x faster.
+
 	@@479933 0.50531 bparsedbg  dyuret       r     03/18/2015 21:32:10 ilac.q@ilac-0-1.local
 	1	0.8811414	0.8743675	0.87079245
 	2	0.8940389	0.8873545	0.8804777
@@ -99,43 +188,29 @@
 	16	0.9332304	0.9117581	0.9058112
 	32	0.94746995	0.91639453	0.91230327
 	64	0.9625506	0.9181644	0.9151789
-	108	0.97320396	0.9201087	0.9149848	*d*
-	115	0.9742134	0.918638	0.91532004
+	128	0.97627544	0.91808957	0.91576105
+	130	0.97652704	0.9197597	0.9165726	*t*
 	142	0.9780417	0.91878754	0.9162903
+DATA:	193	0.982411	0.92053246	0.91503775	*d*
 
-	Note: trn improvement is slower.  dev/tst catches up and passes
-	after 32 epochs.  Less overfitting?  Speed 3x faster.
-
-	* 03201925-julia3_btrain_jl.out: Train using beam parser. ~1h per
-	epoch.  Training on the whole beam with nbeam=10.
-	- merge mincostpath with master after this one finishes.
-	$$479844 0.50531 julia3_btr dyuret       r     03/17/2015 12:01:55 ilac.q@ilac-0-3.local
-	1	0.8714639358032035	0.8880773736819803	0.8838649354315151
-	2	0.8950433643212408	0.8938604581598824	0.890762825488674
-	4	0.9122091687400475	0.903033626642072	0.8975901488956319
-	8	0.9273346259121167	0.9078694817658349	0.9040117140639334
-	16	0.9424559294340376	0.912007378418127	0.9076811798743913
-	32	0.9569711670068192	0.9151481915397462	0.9107331874955896
-	64	0.9691327587380277	0.9175910461898945	0.9127443370263214
-	74	0.9711445121199407	0.9180397337786973	0.9135734951661845	*t*
-	77	0.9718000903088589	0.9186130568088342	0.9132030202526286	*d*
+	* bpacl11.out: Trying acl11 dependencies.
+	@@480062 0.50531 bpacl11    dyuret       r     03/20/2015 18:27:55 ilac.q@ilac-2-3.local
+	1	0.87517524	0.86920756	0.86677015
+	2	0.88630337	0.8795274	0.87807846
+	4	0.9019197	0.891617	0.8888046
+	8	0.9159751	0.8992198	0.8985252
+	16	0.92985153	0.9061495	0.9052113
+	32	0.94513106	0.91220677	0.9099746
+DATA:	51	0.9566234	0.9139766	0.9111213	*d* (ZN11:9314w)
+DATA:	53	0.957456	0.9135529	0.9126032	*t* (ZN11:9290w)
 
 	* TODO:
 	+ headpct-wordpct diff around 1% according to vectorparser/ChangeLog.
 	= compare Penn2Malt conversion with Zhang: emailed Zhang.
 	+ check Suzuki11.
-	- implement save so we can interrupt and continue.
-	- merge mincostpath and structure code to experiment with other variants.
-	- try more hidden layers.
-	- parse conll07 for static/dynamic comparison.
-	- try arceasy (better on Goldberg&Nivre13)
-	- implement earlystop for efficiency (Zhang does it)
+	+ merge mincostpath and structure code to experiment with other variants.
+	= parse conll07 for static/dynamic comparison.
 	= experiment with subsets of the beam to use for training (zhang email)?
-
-	* Zhang&Nivre11: nbeam=64 dev=.9314 tst=.9290 conv=Penn2Malt.
-
-	* Goldberg&Nivre13: .8643/.8762 static/dynamic archybrid on
-	conll07 headacc (including punct).  no beam.
 
 	* Chen&Zhang&Zhang14: .9422 is best from related work Suzuki11 in
 	http://www.aclweb.org/anthology/C14-1078. Conversion with
@@ -157,20 +232,15 @@
 	= add options to gtrain/btrain - testing on {ogb}parsedbg.out
 	+ try onur's problem
 	x try bparser without dropout: no reason to do it with mincostpath, input similar to oparser.
-	- alternative to adagrad?
 	= try gparser with other fvectors
-	- save models from train.jl
 
 2015-03-16  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
 	+ solve memory problems: x=10GB, bparse=100GB!
 	+ save networks: implement savenet, testnet or copy:save copy:test
-	- sizeof, print for nets?
 	= beam earlystop? only train with mincostpath?  same with greedy?
-	- play with optimization, rmsprop, adam, layers, dropout, hidden layers?
 	= play with features
-	- calculate word accuracy: for now assume it is +1%
 
 	* memory:
 	x do we need to wait for @everywhere gc()?
@@ -178,7 +248,7 @@
 	= check out getBytes from http://stackoverflow.com/questions/28402989/check-size-in-bytes-of-variable-using-julia
 	x if restarting workers does not help, just write code without DArrays.
 	x maybe forget about workers and write multithreaded.
-	- but DArrays are only used for corpora, not the returned x!?  help debug gc().
+	+ but DArrays are only used for corpora, not the returned x!?  help debug gc().
 
 2015-03-15  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -215,6 +285,18 @@
 	255	0.9839089	0.91013783	0.90736365	*t*
 	256	0.98388153	0.910786	0.90690494
 
+	* opacl11.out: Trying the ACL11 Zhang dependencies.
+	@@480059 0.50531 opacl11    dyuret       r     03/20/2015 18:15:10 ilac.q@ilac-2-0.local
+	1	0.86862916	0.8634993	0.86227155
+	2	0.88202244	0.87424284	0.87324464
+	4	0.8953294	0.8846873	0.8833357
+	8	0.90825427	0.8924396	0.8921036
+	16	0.92300224	0.89936936	0.8979077
+	32	0.9404091	0.9041554	0.9030238
+	64	0.95960015	0.90749556	0.9038882
+	100	0.9718787	0.9084428	0.9046468	*d*
+DATA:	143	0.980429	0.9079692	0.9054936	*t*
+
 	* 03171146-julia3_gtrain_jl.out: Train using greedy parser. 6m30s per epoch.
 	1	0.8740110817786423	0.8695565470997333	0.8623244654576248
 	2	0.8796424947475232	0.8704539222773388	0.8683755557123704
@@ -239,6 +321,18 @@
 	194	0.9796385	0.9158212	0.9123562	*d*
 	238	0.98255104	0.9152479	0.9139616	*t*
 	256	0.98354787	0.9134033	0.91325593
+
+	* gpacl11.out: Trying the acl11 dependencies.
+	@@480058 0.50531 gpacl11    dyuret       r     03/20/2015 18:14:25 ilac.q@ilac-1-3.local
+	1	0.8675871	0.8654436	0.86175996
+	2	0.85359275	0.8475958	0.8446828
+	4	0.8899264	0.87940276	0.87911934
+	8	0.91075844	0.89585465	0.8929857
+	16	0.92462856	0.901887	0.89970714
+	32	0.94124806	0.90712166	0.90517604
+	64	0.9581886	0.9111848	0.90812224
+	104	0.9702798	0.91342825	0.9093924	*d*
+DATA:	116	0.9726871	0.9120572	0.9109096	*t*
 
 2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -404,8 +498,7 @@
 
 	* TODO:
 	= write bparser
-	- can we use rnn's to learn parser-action sequences?
-	- real use of rnn's is to map text to meaning!
+	= real use of rnn's is to map text to meaning!
 
 	= should we try parallel for?
 	= see how SharedArray is implemented and use it for net weights: x is bigger!
