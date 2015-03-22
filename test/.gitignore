@@ -2,3 +2,6 @@ unused
 acl11
 conll07
 embedded
+*.wvec
+*.jld3
+*.dict
