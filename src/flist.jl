@@ -1,3 +1,5 @@
+typealias Features Matrix{Int8}
+
 module Flist                    # feature matrices
 
 # 0.0418668 archybrid_conll07EnglishToken_wikipedia2MUNK-100_rbf376678_1014_cache.mat (trn/tst) (rbf-gamma:0.376747095368119)
