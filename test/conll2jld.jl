@@ -1,26 +1,35 @@
 using HDF5,JLD,DataStructures
 using KUparser: Sentence, Pval, Dval
+const ROOT="ROOT"               # ROOT deprel is stored as the special value 0
 
 # Store strings as positive integer values
-form_hash = OrderedDict{UTF8String,UInt32}()
-postag_hash = OrderedDict{UTF8String,Dval}()
-deprel_hash = OrderedDict{UTF8String,Dval}()
-getid(h,x)=get!(h,convert(UTF8String,x),1+length(h))
+form_hash = Dict{UTF8String,UInt32}()
+postag_hash = Dict{UTF8String,Dval}()
+deprel_hash = Dict{UTF8String,Dval}()
 
+# First argument is a dictionary file
+dict = load(ARGS[1])
+for i=1:length(dict["form"]); form_hash[dict["form"][i]] = i; end
+for i=1:length(dict["postag"]); postag_hash[dict["postag"][i]] = i; end
+for i=1:length(dict["deprel"]); deprel_hash[dict["deprel"][i]] = i; end
+deprel_hash[ROOT] = 0
+
+# Second argument is a 4+n column conll file
+f = open(ARGS[2])
 corpus  = Sentence[]
-f = open(ARGS[1])
 s = nothing
 ndims = 0
 for l in eachline(f)
     if l == "\n"
+        @assert s != nothing
         push!(corpus, s)
         s = nothing
         continue
     end
     (form, postag, head, deprel, wvec) = split(chomp(l), '\t')
-    form = getid(form_hash, form)
-    postag = getid(postag_hash, postag)
-    deprel = getid(deprel_hash, deprel)
+    form = form_hash[form]
+    postag = postag_hash[postag]
+    deprel = deprel_hash[deprel]
     head = convert(Pval, int(head))
     wvec = map(float32, split(wvec, ' '))
     if s == nothing
@@ -43,7 +52,4 @@ end
 
 @assert s == nothing
 @assert length(corpus) > 0
-save(ARGS[2], "corpus", corpus,
-     "form", collect(keys(form_hash)),
-     "postag", collect(keys(postag_hash)),
-     "deprel", collect(keys(deprel_hash)))
+save(ARGS[3], "corpus", corpus)
