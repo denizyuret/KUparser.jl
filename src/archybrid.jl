@@ -19,7 +19,8 @@ typealias Mvec AbstractVector{Mval}
 typealias Pvec AbstractVector{Pval}
 typealias Pmat AbstractMatrix{Pval}
 const Pinf=typemax(Pval)
-pzeros(n::Integer...)=zeros(Pval, n...)
+Pzeros(n::Integer...)=zeros(Pval, n...)
+Dzeros(n::Integer...)=zeros(Dval, n...)
 movedep(m::Mval)=(m>>1)         # 1..ndep for m>1
 movedir(m::Mval)=(m&1)          # 0=LEFT 1=RIGHT for m>1
 const SHIFT=convert(Mval,1)     # m=0 illegal, m=1 shift, m=2..nmove L/R moves
@@ -46,10 +47,10 @@ type ArcHybrid <: Parser
         @assert (nword <= (typemax(Pval)-1))    "nword > $(typemax(Pval)-1)"
         @assert (ndeps <= (typemax(Mval)-1)>>1) "ndeps > $((typemax(Mval)-1)>>1)"
         p = new(nword, ndeps, 1+2*ndeps,       # nword, ndeps, nmove
-                1, 0, pzeros(nword),           # wptr, sptr, stack
-                pzeros(nword), dzeros(nword),  # head, deps
-                pzeros(nword), pzeros(nword),  # lcnt, rcnt
-                pzeros(nword,nword), pzeros(nword,nword)) # ldep, rdep
+                1, 0, Pzeros(nword),           # wptr, sptr, stack
+                Pzeros(nword), Dzeros(nword),  # head, deps
+                Pzeros(nword), Pzeros(nword),  # lcnt, rcnt
+                Pzeros(nword,nword), Pzeros(nword,nword)) # ldep, rdep
         move!(p, SHIFT)
         return p
     end
@@ -108,6 +109,15 @@ function move!(p::ArcHybrid, op::Integer)
         p.sptr -= 1
     end
 end # move!
+
+function validmoves(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
+    v[SHIFT] = (p.wptr <= p.nword)
+    right_ok = (p.sptr >= 2)
+    left_ok = ((p.sptr >= 1) && (p.wptr <= p.nword))
+    for m=2:2:p.nmove; v[m] = left_ok; end
+    for m=3:2:p.nmove; v[m] = right_ok; end
+    return v
+end # validmoves
 
 # movecosts() counts gold arcs that become impossible after possible
 # transitions.  Tokens start their lifecycle in the buffer without
@@ -174,16 +184,7 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deps::AbstractArray, cost:
             end
         end
     end
-    @assert (validmoves(p) == (cost .< Pinf))
+    # @assert (validmoves(p) == (cost .< Pinf))
     return cost
 end # movecosts
-
-function validmoves(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
-    v[SHIFT] = (p.wptr <= p.nword)
-    right_ok = (p.sptr >= 2)
-    left_ok = ((p.sptr >= 1) && (p.wptr <= p.nword))
-    for m=2:2:p.nmove; v[m] = left_ok; end
-    for m=3:2:p.nmove; v[m] = right_ok; end
-    return v
-end # validmoves
 
