@@ -37,7 +37,7 @@ type ArcHybrid <: Parser
     sptr::Pval    # index of last word (top) of stack
     stack::Pvec   # 1xn vector for stack of indices
     head::Pvec    # 1xn vector of heads
-    deps::Dvec    # 1xn vector of dependency labels
+    deprel::Dvec  # 1xn vector of dependency labels
     lcnt::Pvec    # lcnt(h): number of left deps for h
     rcnt::Pvec    # rcnt(h): number of right deps for h
     ldep::Pmat    # nxn matrix for left dependents
@@ -48,7 +48,7 @@ type ArcHybrid <: Parser
         @assert (ndeps <= (typemax(Mval)-1)>>1) "ndeps > $((typemax(Mval)-1)>>1)"
         p = new(nword, ndeps, 1+2*ndeps,       # nword, ndeps, nmove
                 1, 0, Pzeros(nword),           # wptr, sptr, stack
-                Pzeros(nword), Dzeros(nword),  # head, deps
+                Pzeros(nword), Dzeros(nword),  # head, deprel
                 Pzeros(nword), Pzeros(nword),  # lcnt, rcnt
                 Pzeros(nword,nword), Pzeros(nword,nword)) # ldep, rdep
         move!(p, SHIFT)
@@ -65,7 +65,7 @@ function copy!(dst::ArcHybrid, src::ArcHybrid)
     dst.sptr = src.sptr
     copy!(dst.stack, src.stack)
     copy!(dst.head, src.head)
-    copy!(dst.deps, src.deps)
+    copy!(dst.deprel, src.deprel)
     copy!(dst.lcnt, src.lcnt)
     copy!(dst.rcnt, src.rcnt)
     copy!(dst.ldep, src.ldep)
@@ -76,7 +76,7 @@ end # copy!
 
 function arc!(p::ArcHybrid, h::Pval, d::Pval, l::Dval)
     p.head[d] = h
-    p.deps[d] = l
+    p.deprel[d] = l
     if d < h
         p.lcnt[h] += 1
         p.ldep[h, p.lcnt[h]] = d
@@ -141,11 +141,11 @@ end # validmoves
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function movecosts(p::ArcHybrid, head::AbstractArray, deps::AbstractArray, cost::Pvec=Array(Pval,p.nmove))
+function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cost::Pvec=Array(Pval,p.nmove))
     head = convert(Pvec, head)
-    deps = convert(Dvec, deps)
+    deprel = convert(Dvec, deprel)
     @assert (length(head) == p.nword)
-    @assert (length(deps) == p.nword)
+    @assert (length(deprel) == p.nword)
     @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
     n0 = p.wptr                                                 # n0 is top of buffer
@@ -170,7 +170,7 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deps::AbstractArray, cost:
                 cost[2:2:p.nmove] = leftcost                    # even numbered moves >= 2 are left moves
             else
                 cost[2:2:p.nmove] = leftcost + 1                # +1 for the wrong labels
-                cost[deps[s0]<<1] -= 1                          # except for the correct label
+                cost[deprel[s0]<<1] -= 1                        # except for the correct label
             end
         end
         if (p.sptr >= 2)                                        # right is legal making s1 head of s0
@@ -180,7 +180,7 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deps::AbstractArray, cost:
                 cost[3:2:p.nmove] = rightcost                   # odd numbered moves >= 3 are right moves
             else
                 cost[3:2:p.nmove] = rightcost + 1               # +1 for the wrong labels
-                cost[deps[s0]<<1+1] -= 1                        # except for the correct label
+                cost[deprel[s0]<<1+1] -= 1                      # except for the correct label
             end
         end
     end
