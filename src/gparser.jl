@@ -146,31 +146,3 @@ function gparse(corpus::Corpus, net::Net, feats::Features, batch::Integer, ncpu:
     # (h, x, y)
 end
 
-function distproc(a::AbstractArray, procs)
-    owner = myid()
-    rr = RemoteRef()
-    put!(rr, a)
-    d = DArray(size(a), procs) do I
-        remotecall_fetch(owner, ()->fetch(rr)[I...])
-    end
-    # Ensure that all workers have fetched their localparts.
-    # Else a gc in between can recover the RemoteRef rr
-    for chunk in d.chunks
-        wait(chunk)
-    end
-    d
-end
-
-using CUDArt
-
-function testnet(l::Layer)
-    # Only copy what is needed for predict
-    ll = Layer()
-    isdefined(l,:w) && (ll.w = to_host(l.w))
-    isdefined(l,:b) && (ll.b = to_host(l.b))
-    isdefined(l,:f) && (ll.f = l.f)
-    return ll
-end
-
-testnet(net::Net)=map(l->testnet(l), net)
-
