@@ -3,12 +3,6 @@
 # Goldberg, Yoav; Nivre, Joakim. Training Deterministic Parsers with Non-Deterministic Oracles. TACL 2013.
 # Modified valid_moves to output a single root-child.
 
-@compat typealias Pval UInt16   # Type representing sentence position
-typealias Pvec AbstractVector{Pval}
-typealias Pmat AbstractMatrix{Pval}
-const Pinf=typemax(Pval)
-pzeros(n::Integer...)=zeros(Pval, n...)
-
 # TODO: think of other parser types with more moves.
 # if we standardize move numbers (REDUCE=4), only NMOVE differs
 # nmove can be a function.
@@ -17,31 +11,79 @@ pzeros(n::Integer...)=zeros(Pval, n...)
 # how to use that?
 # also think of arceasy.
 
-@compat typealias Move UInt8
-const SHIFT=convert(Move,1)
-const RIGHT=convert(Move,2)
-const LEFT=convert(Move,3)
+@compat typealias Pval UInt8    # Type representing sentence position
+@compat typealias Mval UInt8    # Type representing parser move
+@compat typealias Dval UInt8    # Type representing dependency label
+typealias Dvec AbstractVector{Dval}
+typealias Mvec AbstractVector{Mval}
+typealias Pvec AbstractVector{Pval}
+typealias Pmat AbstractMatrix{Pval}
+const Pinf=typemax(Pval)
+pzeros(n::Integer...)=zeros(Pval, n...)
+movedep(m::Mval)=(m>>1)         # 1..ndep for m>1
+movedir(m::Mval)=(m&1)          # 0=LEFT 1=RIGHT for m>1
+const SHIFT=convert(Mval,1)     # m=0 illegal, m=1 shift, m=2..nmove L/R moves
+const LEFT=convert(Mval,0)
+const RIGHT=convert(Mval,1)
 
 abstract Parser
 
 type ArcHybrid <: Parser
     nword::Pval   # number of words in sentence
-    nmove::Pval   # number of legal moves
+    ndeps::Dval   # number of dependency labels
+    nmove::Mval   # number of legal moves
     wptr::Pval    # index of first word in buffer
     sptr::Pval    # index of last word (top) of stack
-    head::Pvec    # 1xn vector of heads
     stack::Pvec   # 1xn vector for stack of indices
+    head::Pvec    # 1xn vector of heads
+    deps::Dvec    # 1xn vector of dependency labels
     lcnt::Pvec    # lcnt(h): number of left deps for h
     rcnt::Pvec    # rcnt(h): number of right deps for h
     ldep::Pmat    # nxn matrix for left dependents
     rdep::Pmat    # nxn matrix for right dependents
     
-    function ArcHybrid(n::Integer)
-        p = new(n, 3, 1, 0, pzeros(n), pzeros(n), pzeros(n), pzeros(n), pzeros(n,n), pzeros(n,n))
+    function ArcHybrid(nword::Integer, ndeps::Integer)
+        @assert (nword <= (typemax(Pval)-1))    "nword > $(typemax(Pval)-1)"
+        @assert (ndeps <= (typemax(Mval)-1)>>1) "ndeps > $((typemax(Mval)-1)>>1)"
+        p = new(nword, ndeps, 1+2*ndeps,       # nword, ndeps, nmove
+                1, 0, pzeros(nword),           # wptr, sptr, stack
+                pzeros(nword), dzeros(nword),  # head, deps
+                pzeros(nword), pzeros(nword),  # lcnt, rcnt
+                pzeros(nword,nword), pzeros(nword,nword)) # ldep, rdep
         move!(p, SHIFT)
         return p
     end
 end
+
+import Base.copy!
+function copy!(dst::ArcHybrid, src::ArcHybrid)
+    assert(dst.nword == src.nword)
+    assert(dst.ndeps == src.ndeps)
+    assert(dst.nmove == src.nmove)
+    dst.wptr = src.wptr
+    dst.sptr = src.sptr
+    copy!(dst.stack, src.stack)
+    copy!(dst.head, src.head)
+    copy!(dst.deps, src.deps)
+    copy!(dst.lcnt, src.lcnt)
+    copy!(dst.rcnt, src.rcnt)
+    copy!(dst.ldep, src.ldep)
+    copy!(dst.rdep, src.rdep)
+end
+
+# arc! sets the head of d as h with label l
+
+function arc!(p::ArcHybrid, h::Pval, d::Pval, l::Dval)
+    p.head[d] = h
+    p.deps[d] = l
+    if d < h
+        p.lcnt[h] += 1
+        p.ldep[h, p.lcnt[h]] = d
+    else
+        p.rcnt[h] += 1
+        p.rdep[h, p.rcnt[h]] = d
+    end # if
+end # arc
 
 # In the archybrid system:
 # A token starts life without any arcs in the buffer.
@@ -51,25 +93,23 @@ end
 # s0 acquires rdeps using shift+right.
 # Finally gets a head with left or right.
 
-function move!(p::ArcHybrid, op::Move)
+function move!(p::ArcHybrid, op::Integer)
+    @assert (op > 0 && op <= p.nmove) "Move $op is not supported"
+    op = convert(Mval, op)
     if op == SHIFT
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
-    elseif op == RIGHT
-        arc!(p, p.stack[p.sptr-1], p.stack[p.sptr])
+    elseif movedir(op) == LEFT
+        arc!(p, p.wptr, p.stack[p.sptr], movedep(op))
         p.sptr -= 1
-    elseif op == LEFT
-        arc!(p, p.wptr, p.stack[p.sptr])
+    else # if movedir(op) == RIGHT
+        arc!(p, p.stack[p.sptr-1], p.stack[p.sptr], movedep(op))
         p.sptr -= 1
-    else
-        error("Move $op is not supported")
     end
 end
 
-move!(p::ArcHybrid, op::Integer)=move!(p, convert(Move, op))
-
-# Oracle cost counts gold arcs that become impossible after possible
+# movecosts() counts gold arcs that become impossible after possible
 # transitions.  Tokens start their lifecycle in the buffer without
 # links.  They move to the top of the buffer (n0) with SHIFT moves.
 # There they acquire left dependents using LEFT moves.  After that a
@@ -91,68 +131,47 @@ move!(p::ArcHybrid, op::Integer)=move!(p, convert(Move, op))
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function cost(p::ArcHybrid, gold::AbstractArray, c::Pvec=Array(Pval,p.nmove))
-    gold = convert(Pvec, gold)
-    @assert (length(gold) == p.nword)
-    @assert (length(c) == p.nmove)
-    fill!(c, Pinf)
+function movecosts(p::ArcHybrid, head::AbstractArray, deps::AbstractArray, cost::Pvec=Array(Pval,p.nmove))
+    head = convert(Pvec, head)
+    deps = convert(Dvec, deps)
+    @assert (length(head) == p.nword)
+    @assert (length(deps) == p.nword)
+    @assert (length(cost) == p.nmove)
+    fill!(cost, Pinf)
     n0 = p.wptr
     if (n0 <= p.nword)      # shift is legal
-        n0h = gold[n0]
-        c[SHIFT] = sum(gold[p.stack[1:p.sptr]] .== n0) + 
-        sum(p.stack[1:p.sptr-1] .== n0h) + 
-        ((n0h == 0) && (p.sptr >= 1)) 
+        n0h = head[n0]
+        cost[SHIFT] = (sum(head[p.stack[1:p.sptr]] .== n0) + 
+                       sum(p.stack[1:p.sptr-1] .== n0h) + 
+                       ((n0h == 0) && (p.sptr >= 1)))
     end
 
     if (p.sptr >= 1)
         s0 = p.stack[p.sptr]
-        s0h = gold[s0]
-        s0b = sum(gold[n0:end] .== s0)
+        s0h = head[s0]
+        s0b = sum(head[n0:end] .== s0)
 
         if (n0 <= p.nword)    # left is legal
-            c[LEFT] = s0b + 
-            ((s0h > n0) || 
-             ((p.sptr == 1) && (s0h == 0)) || 
-             ((p.sptr >  1) && (s0h == p.stack[p.sptr-1])))
+            cost[LEFT] = (s0b + 
+                          ((s0h > n0) || 
+                           ((p.sptr == 1) && (s0h == 0)) || 
+                           ((p.sptr >  1) && (s0h == p.stack[p.sptr-1]))))
         end
 
         if (p.sptr >= 2)      # right is legal
-            c[RIGHT] = s0b + (s0h >= n0)
+            cost[RIGHT] = s0b + (s0h >= n0)
         end
     end
-    @assert (valid(p) == (c .< Pinf))
-    return c
+    @assert (validmoves(p) == (cost .< Pinf))
+    return cost
 end # cost
 
-function valid(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
+function validmoves(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
     v[SHIFT] = (p.wptr <= p.nword)
-    v[RIGHT] = (p.sptr >= 2)
-    v[LEFT]  = ((p.sptr >= 1) && (p.wptr <= p.nword))
+    right_ok = (p.sptr >= 2)
+    left_ok = ((p.sptr >= 1) && (p.wptr <= p.nword))
+    for m=2:2:p.nmove; v[m] = left_ok; end
+    for m=3:2:p.nmove; v[m] = right_ok; end
     return v
 end # valid
-
-function arc!(p::ArcHybrid, h::Pval, d::Pval)
-    p.head[d] = h;
-    if d < h
-        p.lcnt[h] += 1
-        p.ldep[h, p.lcnt[h]] = d
-    else
-        p.rcnt[h] += 1
-        p.rdep[h, p.rcnt[h]] = d
-    end # if
-end # arc
-
-import Base.copy!
-function copy!(dst::ArcHybrid, src::ArcHybrid)
-    assert(dst.nword == src.nword)
-    assert(dst.nmove == src.nmove)
-    dst.wptr = src.wptr
-    dst.sptr = src.sptr
-    copy!(dst.head, src.head)
-    copy!(dst.stack, src.stack)
-    copy!(dst.lcnt, src.lcnt)
-    copy!(dst.rcnt, src.rcnt)
-    copy!(dst.ldep, src.ldep)
-    copy!(dst.rdep, src.rdep)
-end
 
