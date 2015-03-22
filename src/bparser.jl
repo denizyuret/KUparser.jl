@@ -25,7 +25,7 @@ function bparse(sentence::Sentence, net::Net, feats::Features, nbeam::Integer)
                 b.cscore[nc] = b.pscore[i] + b.score[j,i]       # b.cscore[c] is the score for b.cparser[c]+b.cmove[c]
             end                                                 
         end
-        sortperm!(sub(b.csorted, 1:nc), sub(b.cscore, 1:nc); rev=true)
+        sortpermx(sub(b.csorted, 1:nc), sub(b.cscore, 1:nc); rev=true)
         b.nbeam = min(nc,nbeam)                                 # b.nbeam is now the new beam size
         for i=1:b.nbeam                                         # i is the index of the new parser
             c=b.csorted[i]                                      # c is the index of the candidate
@@ -127,7 +127,7 @@ function bparse(corpus::Corpus, net::Net, feats::Features, nbeam::Integer, nbatc
                     end # for j=1:size(b.cost,1)
                 end # for i=1:b.nbeam (1)
                 @assert (ncand > 0) "No candidates found"
-                sortperm!(sub(b.csorted, 1:ncand), sub(b.cscore, 1:ncand); rev=true)
+                sortpermx(sub(b.csorted, 1:ncand), sub(b.cscore, 1:ncand); rev=true)
                 b.nbeam = min(ncand,nbeam)                      # b.nbeam is now the new beam size
                 for i=1:b.nbeam                                 # i is the index of the new parser
                     c=b.csorted[i]                              # c is the index of the candidate
