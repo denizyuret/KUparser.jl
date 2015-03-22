@@ -5,6 +5,14 @@
 	conll07: NMOD, P, PMOD, SBJ, ADV, OBJ, COORD, VMOD, ROOT, AMOD, VC, IOBJ, CC, PRT, PRN, LGS, DEP, GAP, EXP, TMP
 	conllWSJToken_wikipedia2MUNK-100: NMOD, P, PMOD, SBJ, OBJ, ROOT, ADV, VC, COORD, NAME, DEP, TMP, CONJ, LOC, AMOD, APPO, PRD, IM, SUB, OPRD, SUFFIX, TITLE, DIR, MNR, POSTHON, PRP, PRT, LGS, EXT, PRN, LOC-PRD, EXTR, DTV, PUT, GAP-SBJ, GAP-OBJ, DEP-GAP, GAP-TMP, GAP-PRD, PRD-TMP, PRD-PRP, BNF, GAP-LGS, GAP-LOC, DIR-GAP, LOC-OPRD, VOC, GAP-PMOD, ADV-GAP, GAP-VC, EXT-GAP, GAP-NMOD, AMOD-GAP, DTV-GAP, GAP-LOC-PRD, GAP-MNR, DIR-PRD, GAP-PRP, EXTR-GAP, MNR-PRD, LOC-TMP, GAP-OPRD, LOC-MNR, GAP-SUB, GAP-PUT, MNR-TMP, DIR-OPRD
 
+	So we have conll2dict.jl which takes a conll corpus and construct
+	dictionaries for forms, postags, and deprels.  Then we have
+	conll2jld.jl which takes this dictionary and saves the conll
+	corpus in a jld file replacing strings with ints (based on their
+	position in dict).  Note: deprel ROOT is special, it does not
+	create a new left/right move and is represented by the special
+	value 0.
+
 	* Summary:
 
 	+ conll07 experiments: comparing best test result (should be test
@@ -60,12 +68,13 @@
 	grow our LM and SCODE corpora as well.
 	+ ZN11 uses arceager, GN13 best result with arceasy.
 
-	* Zhang&Nivre11: nbeam=64 dev=.9314 tst=.9290 wordacc (excluding
-	punct) conv=Penn2Malt.  parser=arceager.  learner=perceptron.
-	uses labels to improve link accuracy!  (seems they get .65) also
-	check out their feature set, and their distance encoding.
+	* ZN11: (Zhang&Nivre11) nbeam=64 dev=.9314 tst=.9290
+	wordacc (excluding punct) conv=Penn2Malt.  parser=arceager.
+	learner=perceptron.  uses labels to improve link accuracy!  (seems
+	they get .65) also check out their feature set, and their distance
+	encoding.  Their whole dataset is projective!
 
-	* Goldberg&Nivre13: .8643/.8762 static/dynamic archybrid on
+	* GN13: (Goldberg&Nivre13) .8643/.8762 static/dynamic archybrid on
 	conll07 headacc (including punct).  no beam.  I think uses labels,
 	but better check feature specs.
 
