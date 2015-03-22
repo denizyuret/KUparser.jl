@@ -5,8 +5,43 @@
 	conll07: NMOD, P, PMOD, SBJ, ADV, OBJ, COORD, VMOD, ROOT, AMOD, VC, IOBJ, CC, PRT, PRN, LGS, DEP, GAP, EXP, TMP
 	conllWSJToken_wikipedia2MUNK-100: NMOD, P, PMOD, SBJ, OBJ, ROOT, ADV, VC, COORD, NAME, DEP, TMP, CONJ, LOC, AMOD, APPO, PRD, IM, SUB, OPRD, SUFFIX, TITLE, DIR, MNR, POSTHON, PRP, PRT, LGS, EXT, PRN, LOC-PRD, EXTR, DTV, PUT, GAP-SBJ, GAP-OBJ, DEP-GAP, GAP-TMP, GAP-PRD, PRD-TMP, PRD-PRP, BNF, GAP-LGS, GAP-LOC, DIR-GAP, LOC-OPRD, VOC, GAP-PMOD, ADV-GAP, GAP-VC, EXT-GAP, GAP-NMOD, AMOD-GAP, DTV-GAP, GAP-LOC-PRD, GAP-MNR, DIR-PRD, GAP-PRP, EXTR-GAP, MNR-PRD, LOC-TMP, GAP-OPRD, LOC-MNR, GAP-SUB, GAP-PUT, MNR-TMP, DIR-OPRD
 
-	* TODO:
-	- do we need InplaceOps?
+	* Summary:
+
+	+ conll07 experiments: comparing best test result (should be test
+	at best validation and should take averages) to GN13 archybrid
+	result (we are not using deprels).
+
+	parser	score	GN13
+	oparser	.8699	.8643	03210931-opconll07.out
+	gparser	.8793	.8762	03210908-gpconll07.out
+	beam10	.8865	---	03221208-bpconll07.out
+
+	+ acl11 experiments: ZN11 for comparison has word accuracy
+	dev=.9314 test=.9290.  Word accuracy (excluding punct) is about 1%
+	higher than head accuracy (including punct).  We are not using
+	deprels.  We are using nbeam=10, they use 64.  We are using
+	archybrid, they use arceager.  test1 is the test score at best dev
+	result.  test2 is the best test score.
+
+	parser	dev	test1	test2
+	oparser	.9093	.9046	.9060	03212217-opacl11.out
+	gparser	.9136	.9096	.9109	03212217-gpacl11.out
+	beam10	.9158	.9122	.9145	bpacl11.out -- running at epoch=132
+
+	+ conllWSJToken_wikipedia2MUNK-100 experiments: Different gold
+	head than acl11.  Latestop better than earlystop.
+	- How about train on all mincost state/move pairs (if multiple).
+	- beam64 too slow, get pepochs to work.
+
+	parser	dev	test1	test2
+	beam10a	.9186	.9132	.9136	03201925-julia3_btrain_jl.out: using whole beam to train, quit at epoch=77
+	beam64	.9195	.9129	.9136	bparse64.out -- running at epoch=49
+	beam10l	.9211	.9169	.9171	03220927-bparselatestop.out: no earlystop, crashed at epoch=207
+	beam10	.9205	.9150	.9166	03220548-bparsedbg.out: earlystop
+
+	+ gfeatures experiments: Large feature sets more effective with
+	nnets compared to perceptron.  Redo feature optimization and/or
+	take a careful look at ZN11 and GN13 feature sets.
 
 2015-03-21  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -90,7 +125,7 @@
 	170	0.98390406	0.86987805	*** (compare to GN13=.8643)
 	256	0.9885506	0.86508095
 
-	* log/03210908-gpconll07.out:
+	* 03210908-gpconll07.out:
 	$$480065 0.50531 gpconll07  dyuret       r     03/20/2015 18:45:10 ilac.q@ilac-3-0.local
 	1	0.8376861	0.8237058
 	2	0.79815173	0.77953225
@@ -103,6 +138,7 @@
 	133	0.98199844	0.87927246	*** (compare to GN13=.8762)
 	256	0.98990756	0.8724765
 
+	* 03221208-bpconll07.out:
 	@@480066 0.50531 bpconll07  dyuret       r     03/20/2015 18:45:55 ilac.q@ilac-2-1.local
 	$ grep DATA bpconll07.out | awk '$2>=a{print;a=$2*2}'
 	1	0.8489049	0.836698
@@ -114,6 +150,7 @@
 	54	0.9653002	0.8864681	***
 	64	0.9700833	0.8772736
 	128	0.9850327	0.875075
+	256	0.9918983	0.8680791
 
 	* 03200918-gfeatures_sh.out: experiment with features (honnibal
 	comment).  This is on husnu deps.
@@ -122,7 +159,8 @@
 	$$479998 0.50531 _gfeatures dyuret       r     03/19/2015 11:46:40 ilac.q@ilac-1-3.local
 	= try to debug and fix the crashes
 	$$480067 0.50531 gfeatures2 dyuret       qw    03/20/2015 19:19:08
-	@@480068 0.50531 gfeatures3 dyuret       qw    03/20/2015 21:53:02
+	$$480068 0.50531 gfeatures3 dyuret       qw    03/20/2015 21:53:02
+	@@480069 0.50531 gfeatures3 dyuret       r     03/22/2015 13:12:40 ilac.q@ilac-2-2.local
 	$ egrep '^(DATA:.10|julia3)' _gfeatures_sh.out
 	fv1768	0.92688215	0.9029838	0.8982076	(3348 dims, 865MiB)
 	fv031a	0.9175582	0.90168756	0.8972373	(2512 dims)
@@ -148,9 +186,9 @@
 	fv012	0.9068354	0.88982224	0.88806367	(1200 dims)
 	fv008	0.9009608	0.8860832	0.88349444	(800 dims)
 	fv008w	0.8957652	0.8806242	0.8796309	(800 dims)
-	fv102 died (4638 dims)
-	fv084 died
 	fv022b died (1424 dims)
+	fv084 died
+	fv102 died (4638 dims, crashed again)
 
 
 2015-03-19  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -180,13 +218,15 @@
 DATA:	45	0.9546024	0.9194855	0.9129384	*d*
 DATA:	49	0.956676	0.918987	0.9136441	*t*
 
-	* bparselatestop.out: why is this different from static oracle training?  we are
-	rewarding mincost state/move pairs on the beam.  are the mincost
-	states on the beam that different than the mincost states for the
-	static oracle?  why not use earlystop in gparser?  **why not
-	follow the whole mincostpath and not use earlystop in bparser?**
+	* 03220927-bparselatestop.out: why is this different from static
+	oracle training?  we are rewarding mincost state/move pairs on the
+	beam.  are the mincost states on the beam that different than the
+	mincost states for the static oracle?  why not use earlystop in
+	gparser?  **why not follow the whole mincostpath and not use
+	earlystop in bparser?**
+
 	$$480009 0.50531 bparselate dyuret       r     03/19/2015 14:17:25 ilac.q@ilac-2-2.local
-	@@480024 0.50531 bparselate dyuret       r     03/19/2015 17:07:40 ilac.q@ilac-2-2.local
+	$$480024 0.50531 bparselate dyuret       r     03/19/2015 17:07:40 ilac.q@ilac-2-2.local
 	1	0.8824845	0.8760874	0.8711453
 	2	0.8931568	0.8864322	0.8810599
 	4	0.9077248	0.8963033	0.89115095
@@ -197,10 +237,11 @@ DATA:	49	0.956676	0.918987	0.9136441	*t*
 	121	0.9752039	0.9198843	0.9171371	*t*
 	128	0.9760491	0.92015857	0.91664314
 	129	0.97622174	0.9211307	0.9169078	*d*
+	207	0.9833121	0.9198843	0.91528475	crashed
 
-	* bparsedbg.out: mincostpath bparser results: at most one xy pair
-	per beam (the first one which has the initial mincost) is added to
-	the training set. nbeam=10.  (18m50s per epoch) Note: trn
+	* 03220548-bparsedbg.out: mincostpath bparser results: at most one
+	xy pair per beam (the first one which has the initial mincost) is
+	added to the training set. nbeam=10.  (18m50s per epoch) Note: trn
 	improvement is slower compared to whole beam training.  dev/tst
 	catches up and passes after 32 epochs.  Less overfitting?  Speed
 	3x faster.
@@ -228,7 +269,9 @@ DATA:	49	0.956676	0.918987	0.9136441	*t*
 	32	0.94513106	0.91220677	0.9099746
 	64	0.9617148	0.9144004	0.9116329
 	79	0.9671715	0.9158212	0.9121622	*d* (ZN11:9314w)
-	106	0.9742165	0.9146746	0.9142615	*t* (ZN11:9290w)
+	121	0.9770028	0.91380215	0.9145438	*t* (ZN11:9290w)
+	128	0.97827536	0.91502357	0.91406745
+	132	0.9789954	0.9143754	0.91440266
 
 	* TODO:
 	+ headpct-wordpct diff around 1% according to vectorparser/ChangeLog.
@@ -311,7 +354,7 @@ DATA:	49	0.956676	0.918987	0.9136441	*t*
 	255	0.9839089	0.91013783	0.90736365	*t*
 	256	0.98388153	0.910786	0.90690494
 
-	* opacl11.out: Trying the ACL11 Zhang dependencies.
+	* 03212217-opacl11.out: Trying the ACL11 Zhang dependencies.
 	$$480059 0.50531 opacl11    dyuret       r     03/20/2015 18:15:10 ilac.q@ilac-2-0.local
 	1	0.86862916	0.8634993	0.86227155
 	2	0.88202244	0.87424284	0.87324464
@@ -350,7 +393,7 @@ DATA:	49	0.956676	0.918987	0.9136441	*t*
 	238	0.98255104	0.9152479	0.9139616	*t*
 	256	0.98354787	0.9134033	0.91325593
 
-	* gpacl11.out: Trying the acl11 dependencies.
+	* 03212217-gpacl11.out: Trying the acl11 dependencies.
 	$$480058 0.50531 gpacl11    dyuret       r     03/20/2015 18:14:25 ilac.q@ilac-1-3.local
 	1	0.8675871	0.8654436	0.86175996
 	2	0.85359275	0.8475958	0.8446828
