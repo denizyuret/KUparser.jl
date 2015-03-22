@@ -44,16 +44,11 @@ function fidx(ndim::Int, f::Features)
     return idx
 end
 
-function features(p::Parser, s::Sentence, f::Features)
-    x = Array(eltype(s.wvec), flen(size(s.wvec,1), f), 1)
-    features(p, s, f, x)
-end
-
-function features(p::Parser, s::Sentence, f::Features, x)
+function features(p::Parser, s::Sentence, f::Features, x::AbstractArray=Array(eltype(s.wvec),flen(size(s.wvec,1),f),1))
 
     # Given a parser state p, a sentence s, and a feature matrix f, fills and
     # returns a feature vector x, which should be preallocated to have
-    # flen(size(s.wvec,1), f) dimensions.
+    # flen(size(s.wvec,1), f) dimensions.  x will be allocated if not given.
 
     ndim = size(s.wvec,1)               # token vector dimensionality
     ndim2 = ndim>>1                     # for token encodings the first half is the word vector, the second half is the context vector
