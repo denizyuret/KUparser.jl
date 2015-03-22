@@ -1,5 +1,20 @@
 2015-03-21  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* Summary:
+	+ Everybody is using deprels even when training for unlabelled
+	accuracy.
+	+ ZN11 uses different heads than Husnu&Volkan's dataset.  I have
+	created acl11 files to match ZN11.
+	+ Nnets seem to handle extra features better than perceptrons,
+	high dimensional feature sets seem to do well.
+	+ We are better than GN13 even without deprels, however this is
+	directly optimizing on test data, we need to use dev.
+	+ We have the code for ZN11 and GN13, we can take a look at the
+	feature sets in detail.
+	+ Suzuki uses 3.5B words for semisupervised learning, we should
+	grow our LM and SCODE corpora as well.
+	+ ZN11 uses arceager, GN13 best result with arceasy.
+
 	* Zhang&Nivre11: nbeam=64 dev=.9314 tst=.9290 wordacc (excluding
 	punct) conv=Penn2Malt.  parser=arceager.  learner=perceptron.
 	uses labels to improve link accuracy!  (seems they get .65) also
@@ -23,7 +38,7 @@
 	- train.jl: save models
 	- train.jl: compute eval.py (wordacc) score.
 	= can we use rnn's to learn parser-action sequences? prepare
-	  ordered data for ozan.  @@iui-ilac
+	  ordered data for ozan.
 	= better vectors: fastsubs and scode on bigger better data.  which
 	  data did volkan use? onur interested. sent email.
 	+ are they (Goldberg,Zhang) using the deprels during parsing?
@@ -36,12 +51,12 @@
 	- try more hidden layers.
 
 	* TODO: features
-	- fv1768: memory error
-	- try bparse 10 epochs all Flist
+	= fv1768: memory error
+	x try bparse 10 epochs all Flist: oparse instead for fselect.
 	- try local search around best feats
-	- try on acl11 and conll07 tags
 	- feature select with acl11
 	- feature select with conll07
+	- features from ZN11 and GN13
 
 2015-03-20  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -53,7 +68,7 @@
 	Note: using fv022b for conll07.
 
 	* 03210931-opconll07.out:
-	@@480064 0.50531 opconll07  dyuret       r     03/20/2015 18:39:10 ilac.q@ilac-0-0.local
+	$$480064 0.50531 opconll07  dyuret       r     03/20/2015 18:39:10 ilac.q@ilac-0-0.local
 	1	0.8383803	0.8205077
 	2	0.8559474	0.841695
 	4	0.87357944	0.8420947
@@ -88,45 +103,45 @@
 	32	0.94914156	0.88127124
 	54	0.9653002	0.8864681	***
 	64	0.9700833	0.8772736
-
+	128	0.9850327	0.875075
 
 	* 03200918-gfeatures_sh.out: experiment with features (honnibal
 	comment).  This is on husnu deps.
 	+ try gparse 10 epochs all Flist
 	$$479993 0.50531 _gfeatures dyuret       r     03/19/2015 10:46:40 ilac.q@ilac-2-3.local
 	$$479998 0.50531 _gfeatures dyuret       r     03/19/2015 11:46:40 ilac.q@ilac-1-3.local
-	$ egrep '^(DATA:.10|julia3)' _gfeatures_sh.out
-	fv031a	0.9175582	0.90168756	0.8972373
-	fv021a	0.9179561	0.90113914	0.89709616
-	fv022a	0.918115	0.9009896	0.8971138
-	fv023	0.9185719	0.9005908	0.8966375
-	fv022	0.9171161	0.9003415	0.8965669
-	fv023a	0.91787714	0.8998679	0.89737844
-	fv018	0.91692454	0.8995937	0.8934091
-	fv804	0.91603404	0.89899546	0.89492625
-	fv021	0.91659826	0.89894557	0.8955437
-	fv708	0.9135615	0.89847195	0.89399123
-	fv019	0.915633	0.8984221	0.89533204
-	fv015a	0.914752	0.8978488	0.8922976
-	fv018a	0.9154783	0.89777404	0.89423823
-	fv017	0.9170309	0.8975247	0.89513797
-	fv808	0.91797924	0.89655256	0.89259756
-	fv017a	0.916613	0.89615375	0.893021
-	fv012	0.9068354	0.88982224	0.88806367
-	fv008	0.9009608	0.8860832	0.88349444
-	fv008w	0.8957652	0.8806242	0.8796309
-	fv1768 died (3348 dims, 865MiB)
-	fv136 died (3544 dims, 910MiB)
-	fv130 died (3538 dims, 909MiB)
-	fv102 died (4638 dims)
-	fv084 died
-	fv039 died (2744 dims, 727MiB)
-	fv034 died (2452 dims, 660MiB)
-	fv022b died
-
 	= try to debug and fix the crashes
 	$$480067 0.50531 gfeatures2 dyuret       qw    03/20/2015 19:19:08
 	@@480068 0.50531 gfeatures3 dyuret       qw    03/20/2015 21:53:02
+	$ egrep '^(DATA:.10|julia3)' _gfeatures_sh.out
+	fv1768	0.92688215	0.9029838	0.8982076	(3348 dims, 865MiB)
+	fv031a	0.9175582	0.90168756	0.8972373	(2512 dims)
+	fv034	0.92510116	0.9013386	0.8971491	(2452 dims, 660MiB)
+	fv021a	0.9179561	0.90113914	0.89709616	(1326 dims)
+	fv022a	0.918115	0.9009896	0.8971138	(1426 dims)
+	fv023	0.9185719	0.9005908	0.8966375	(1526 dims)
+	fv022	0.9171161	0.9003415	0.8965669	(1516 dims)
+	fv023a	0.91787714	0.8998679	0.89737844	(1616 dims)
+	fv018	0.91692454	0.8995937	0.8934091	(1608 dims)
+	fv804	0.91603404	0.89899546	0.89492625	(1604 dims)
+	fv021	0.91659826	0.89894557	0.8955437	(1416 dims)
+	fv708	0.9135615	0.89847195	0.89399123	(1408 dims)
+	fv019	0.915633	0.8984221	0.89533204	(1411 dims)
+	fv015a	0.914752	0.8978488	0.8922976	(1401 dims)
+	fv018a	0.9154783	0.89777404	0.89423823	(1407 dims)
+	fv017	0.9170309	0.8975247	0.89513797	(1508 dims)
+	fv039	0.9245001	0.897450	0.89577305	(2744 dims, 727MiB)
+	fv130	0.91527617	0.8966772	0.89319736	(3538 dims, 909MiB)
+	fv808	0.91797924	0.89655256	0.89259756	(1608 dims)
+	fv017a	0.916613	0.89615375	0.893021	(1508 dims)
+	fv136	0.9144846	0.8956053	0.8926505	(3544 dims, 910MiB)
+	fv012	0.9068354	0.88982224	0.88806367	(1200 dims)
+	fv008	0.9009608	0.8860832	0.88349444	(800 dims)
+	fv008w	0.8957652	0.8806242	0.8796309	(800 dims)
+	fv102 died (4638 dims)
+	fv084 died
+	fv022b died (1424 dims)
+
 
 2015-03-19  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -152,8 +167,8 @@
 	8	0.9206171	0.90582544	0.9008715
 	16	0.93292725	0.9116833	0.9058465
 	32	0.9474447	0.9167186	0.91170347
-DATA:	35	0.9491026	0.91729194	0.9125503	*t*
-DATA:	36	0.9496152	0.91771567	0.91173875	*d*
+DATA:	45	0.9546024	0.9194855	0.9129384	*d*
+DATA:	49	0.956676	0.918987	0.9136441	*t*
 
 	* bparselatestop.out: why is this different from static oracle training?  we are
 	rewarding mincost state/move pairs on the beam.  are the mincost
@@ -169,7 +184,7 @@ DATA:	36	0.9496152	0.91771567	0.91173875	*d*
 	16	0.9335746	0.9120572	0.90686965
 	32	0.94735837	0.9163447	0.91173875
 	64	0.9624811	0.9194606	0.9139969
-DATA:	121	0.9752039	0.9198843	0.9171371	*t*
+	121	0.9752039	0.9198843	0.9171371	*t*
 	128	0.9760491	0.92015857	0.91664314
 	129	0.97622174	0.9211307	0.9169078	*d*
 
@@ -180,7 +195,7 @@ DATA:	121	0.9752039	0.9198843	0.9171371	*t*
 	catches up and passes after 32 epochs.  Less overfitting?  Speed
 	3x faster.
 
-	@@479933 0.50531 bparsedbg  dyuret       r     03/18/2015 21:32:10 ilac.q@ilac-0-1.local
+	$$479933 0.50531 bparsedbg  dyuret       r     03/18/2015 21:32:10 ilac.q@ilac-0-1.local
 	1	0.8811414	0.8743675	0.87079245
 	2	0.8940389	0.8873545	0.8804777
 	4	0.9079269	0.89695144	0.8927387
@@ -190,8 +205,8 @@ DATA:	121	0.9752039	0.9198843	0.9171371	*t*
 	64	0.9625506	0.9181644	0.9151789
 	128	0.97627544	0.91808957	0.91576105
 	130	0.97652704	0.9197597	0.9165726	*t*
-	142	0.9780417	0.91878754	0.9162903
-DATA:	193	0.982411	0.92053246	0.91503775	*d*
+	193	0.982411	0.92053246	0.91503775	*d*
+	256	0.985992	0.9191365	0.91507304
 
 	* bpacl11.out: Trying acl11 dependencies.
 	@@480062 0.50531 bpacl11    dyuret       r     03/20/2015 18:27:55 ilac.q@ilac-2-3.local
@@ -201,8 +216,9 @@ DATA:	193	0.982411	0.92053246	0.91503775	*d*
 	8	0.9159751	0.8992198	0.8985252
 	16	0.92985153	0.9061495	0.9052113
 	32	0.94513106	0.91220677	0.9099746
-DATA:	51	0.9566234	0.9139766	0.9111213	*d* (ZN11:9314w)
-DATA:	53	0.957456	0.9135529	0.9126032	*t* (ZN11:9290w)
+	64	0.9617148	0.9144004	0.9116329
+	79	0.9671715	0.9158212	0.9121622	*d* (ZN11:9314w)
+	106	0.9742165	0.9146746	0.9142615	*t* (ZN11:9290w)
 
 	* TODO:
 	+ headpct-wordpct diff around 1% according to vectorparser/ChangeLog.
@@ -286,7 +302,7 @@ DATA:	53	0.957456	0.9135529	0.9126032	*t* (ZN11:9290w)
 	256	0.98388153	0.910786	0.90690494
 
 	* opacl11.out: Trying the ACL11 Zhang dependencies.
-	@@480059 0.50531 opacl11    dyuret       r     03/20/2015 18:15:10 ilac.q@ilac-2-0.local
+	$$480059 0.50531 opacl11    dyuret       r     03/20/2015 18:15:10 ilac.q@ilac-2-0.local
 	1	0.86862916	0.8634993	0.86227155
 	2	0.88202244	0.87424284	0.87324464
 	4	0.8953294	0.8846873	0.8833357
@@ -294,8 +310,10 @@ DATA:	53	0.957456	0.9135529	0.9126032	*t* (ZN11:9290w)
 	16	0.92300224	0.89936936	0.8979077
 	32	0.9404091	0.9041554	0.9030238
 	64	0.95960015	0.90749556	0.9038882
-	100	0.9718787	0.9084428	0.9046468	*d*
-DATA:	143	0.980429	0.9079692	0.9054936	*t*
+	128	0.9779785	0.908044	0.90415287
+	205	0.9867804	0.9072712	0.90602285	*t*
+	210	0.9871225	0.9092903	0.9046115	*d*
+	256	0.9896782	0.9065234	0.9043998
 
 	* 03171146-julia3_gtrain_jl.out: Train using greedy parser. 6m30s per epoch.
 	1	0.8740110817786423	0.8695565470997333	0.8623244654576248
@@ -323,7 +341,7 @@ DATA:	143	0.980429	0.9079692	0.9054936	*t*
 	256	0.98354787	0.9134033	0.91325593
 
 	* gpacl11.out: Trying the acl11 dependencies.
-	@@480058 0.50531 gpacl11    dyuret       r     03/20/2015 18:14:25 ilac.q@ilac-1-3.local
+	$$480058 0.50531 gpacl11    dyuret       r     03/20/2015 18:14:25 ilac.q@ilac-1-3.local
 	1	0.8675871	0.8654436	0.86175996
 	2	0.85359275	0.8475958	0.8446828
 	4	0.8899264	0.87940276	0.87911934
@@ -331,8 +349,10 @@ DATA:	143	0.980429	0.9079692	0.9054936	*t*
 	16	0.92462856	0.901887	0.89970714
 	32	0.94124806	0.90712166	0.90517604
 	64	0.9581886	0.9111848	0.90812224
-	104	0.9702798	0.91342825	0.9093924	*d*
-DATA:	116	0.9726871	0.9120572	0.9109096	*t*
+	116	0.9726871	0.9120572	0.9109096	*t*
+	128	0.9751281	0.9124561	0.90872204
+	184	0.98290575	0.9135778	0.90960413	*d*
+	256	0.98849404	0.9113094	0.9093748
 
 2015-03-14  Deniz Yuret  <dyuret@ku.edu.tr>
 
