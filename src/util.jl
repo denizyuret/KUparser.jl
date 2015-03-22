@@ -44,3 +44,26 @@ function testnet(l::KUnet.Layer)
 end
 
 testnet(net::KUnet.Net)=map(l->testnet(l), net)
+
+
+# Compute relevant scores
+function evalparse(parsers, sentences, words)
+    ph = map(p->p.head, parsers)
+    sh = map(s->s.head, sentences)
+    pd = map(p->p.deprel, parsers)
+    sd = map(s->s.deprel, sentences)
+    wf = map(s->s.form, sentences)
+    phcat = vcat(ph...)
+    shcat = vcat(sh...)
+    pdcat = vcat(pd...)
+    sdcat = vcat(sd...)
+    wfcat = vcat(wf...)
+    isword = map(w->(!ismatch(r"^\W+$",words[w]) || ismatch(r"^[`$]+$",words[w])), wfcat)
+    uas = mean(phcat .== shcat)
+    uas2 = mean(phcat[isword] .== shcat[isword])
+    las = mean((phcat .== shcat) & (pdcat .== sdcat))
+    las2 = mean((phcat[isword] .== shcat[isword]) & (pdcat[isword] .== sdcat[isword]))
+    uem = mean(ph .== sh)
+    lem = mean((ph .== sh) & (pd .== sd))
+    (uas, uas2, las, las2, uem, lem)
+end
