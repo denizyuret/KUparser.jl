@@ -27,8 +27,6 @@ const SHIFT=convert(Mval,1)     # m=0 illegal, m=1 shift, m=2..nmove L/R moves
 const LEFT=convert(Mval,0)
 const RIGHT=convert(Mval,1)
 
-abstract Parser
-
 type ArcHybrid <: Parser
     nword::Pval   # number of words in sentence
     ndeps::Dval   # number of dependency labels
