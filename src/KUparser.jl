@@ -23,6 +23,7 @@ include("features.jl")
 include("gparser.jl")
 include("bparser.jl")
 include("oparser.jl")
+include("rparser.jl")
 include("flist.jl")
 
 # this has been fixed in Julia 0.4:
