@@ -1,6 +1,7 @@
 *~
 *.jld
 *.h5
+*.dp
 *.mat
 *.job
 foo*
