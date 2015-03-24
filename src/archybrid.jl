@@ -159,7 +159,7 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cos
                        sum(p.stack[1:p.sptr-1] .== n0h) +       # no heads to the left of s0 for n0
                        ((n0h == 0) && (p.sptr >= 1)))           # no root head for n0 if there is s0
     end
-    if (p.sptr >= 1)                                            # left/right valid if stack nonempty
+    if (p.sptr >= 1)                                            # left/right only valid if stack nonempty
         s0 = p.stack[p.sptr]                                    # s0 is top of stack
         s0h = head[s0]                                          # s0h is the actual head of s0
         s0b = sum(head[n0:end] .== s0)                          # num buffer words whose head is s0
@@ -174,7 +174,7 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cos
                 cost[L1:2:p.nmove] = leftcost                   # odd numbered moves >= 3 are left moves
             else
                 cost[L1:2:p.nmove] = leftcost + 1               # +1 for the wrong labels
-                cost[deprel[s0]<<1] -= 1                        # except for the correct label
+                cost[deprel[s0]<<1+LEFT] -= 1                   # except for the correct label
             end
         end
         if (p.sptr >= 2)                                        # right is legal making s1 head of s0
@@ -184,7 +184,7 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cos
                 cost[R1:2:p.nmove] = rightcost                  # even numbered moves >= 2 are right moves
             else
                 cost[R1:2:p.nmove] = rightcost + 1              # +1 for the wrong labels
-                cost[deprel[s0]<<1+1] -= 1                      # except for the correct label
+                cost[deprel[s0]<<1+RIGHT] -= 1                  # except for the correct label
             end
         end
     end
