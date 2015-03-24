@@ -3,7 +3,7 @@
 function oparse(s::Sentence, f::Features, ndeps::Integer)
     (p, x, y, c, v) = initoparse(s, f, ndeps)
     nx = 0; cost = 0
-    while any(validmoves(p,v))
+    while anyvalidmoves(p)
         nx += 1
         features(p, s, f, sub(x,:,nx:nx))
         movecosts(p, s.head, s.deprel, c)
@@ -31,6 +31,7 @@ function oparse(c::Corpus, f::Features, ndeps::Integer, ncpu::Integer)
     pxy = pmap(procs(d)) do x
         oparse(localpart(d), f, ndeps)
     end
+    rmprocs(workers())
     p = vcat(map(z->z[1], pxy)...)
     x = hcat(map(z->z[2], pxy)...)
     y = hcat(map(z->z[3], pxy)...)
