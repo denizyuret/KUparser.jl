@@ -6,10 +6,9 @@ using KUnet
 abstract Parser
 type Sentence form; postag; head; deprel; wvec; Sentence()=new(); end
 typealias Corpus AbstractVector{Sentence}
-wdim(s)=size(s.wvec,1)
-wcnt(s)=size(s.wvec,2)
 
-include("util.jl");	  export @date, evalparse
+			  export Sentence, Corpus
+include("util.jl");	  export @date, evalparse, wdim, wcnt
 include("archybrid.jl");  # export ArcHybrid
 include("flist.jl");      export Features, Flist 	# these are feature templates
 include("features.jl");   export features, flen, fidx   # these extract features
