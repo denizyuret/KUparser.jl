@@ -1,17 +1,17 @@
 using HDF5,JLD,DataStructures
 using KUparser: Sentence, Pval, Dval
-const ROOT="ROOT"               # ROOT deprel is stored as the special value 0
 
-# Store strings as positive integer values
-form_hash = Dict{UTF8String,UInt32}()
+# Store postag/deprel strings as positive integer values
 postag_hash = Dict{UTF8String,Dval}()
 deprel_hash = Dict{UTF8String,Dval}()
 
 # First argument is a dictionary file
 dict = load(ARGS[1])
-for i=1:length(dict["form"]); form_hash[dict["form"][i]] = i; end
 for i=1:length(dict["postag"]); postag_hash[dict["postag"][i]] = i; end
 for i=1:length(dict["deprel"]); deprel_hash[dict["deprel"][i]] = i; end
+
+# ROOT deprel is stored as the special value 0
+const ROOT="ROOT" 
 deprel_hash[ROOT] = 0
 
 # Second argument is a 4+n column conll file
@@ -27,7 +27,7 @@ for l in eachline(f)
         continue
     end
     (form, postag, head, deprel, wvec) = split(chomp(l), '\t')
-    form = form_hash[form]
+    form = convert(UTF8String, form)
     postag = postag_hash[postag]
     deprel = deprel_hash[deprel]
     head = convert(Pval, int(head))
@@ -52,4 +52,4 @@ end
 
 @assert s == nothing
 @assert length(corpus) > 0
-save(ARGS[3], "corpus", corpus)
+save(ARGS[3], "corpus", corpus, "postag", dict["postag"], "deprel", dict["deprel"])

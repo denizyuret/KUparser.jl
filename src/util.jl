@@ -47,7 +47,7 @@ testnet(net::KUnet.Net)=map(l->testnet(l), net)
 
 
 # Compute relevant scores
-function evalparse(parsers, sentences, words=nothing)
+function evalparse(parsers, sentences)
     ph = map(p->p.head, parsers)
     sh = map(s->s.head, sentences)
     pd = map(p->p.deprel, parsers)
@@ -62,14 +62,10 @@ function evalparse(parsers, sentences, words=nothing)
     las = mean((phcat .== shcat) & (pdcat .== sdcat))
     uem = mean(ph .== sh)
     lem = mean((ph .== sh) & (pd .== sd))
-    if words == nothing
-        return (uas, las, uem, lem)
-    else
-        isword = map(w->(!ismatch(r"^\W+$",words[w]) || ismatch(r"^[`$]+$",words[w])), wfcat)
-        uas2 = mean(phcat[isword] .== shcat[isword])
-        las2 = mean((phcat[isword] .== shcat[isword]) & (pdcat[isword] .== sdcat[isword]))
-        return (uas, uas2, las, las2, uem, lem)
-    end
+    isword = map(w->(!ismatch(r"^\W+$",w) || ismatch(r"^[`$]+$",w)), wfcat)
+    uas2 = mean(phcat[isword] .== shcat[isword])
+    las2 = mean((phcat[isword] .== shcat[isword]) & (pdcat[isword] .== sdcat[isword]))
+    return (uas, uas2, las, las2, uem, lem)
 end
 
 import Base.isequal
