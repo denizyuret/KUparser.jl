@@ -50,23 +50,23 @@ conll07.dict: conll07.trn.wvec conll07.tst.wvec
 	cat $^ | julia conll2dict.jl $@
 
 
-jld3: \
-acl11.dev.jld3 \
-acl11.trn.jld3 \
-acl11.tst.jld3 \
-conll07.trn.jld3 \
-conll07.tst.jld3 \
-wsj.dev.jld3 \
-wsj.trn.jld3 \
-wsj.tst.jld3
+jld4: \
+acl11.dev.jld4 \
+acl11.trn.jld4 \
+acl11.tst.jld4 \
+conll07.trn.jld4 \
+conll07.tst.jld4 \
+wsj.dev.jld4 \
+wsj.trn.jld4 \
+wsj.tst.jld4
 
-%.trn.jld3: conll2jld.jl %.dict %.trn.wvec 
+%.trn.jld4: conll2jld.jl %.dict %.trn.wvec 
 	julia $^ $@
 
-%.dev.jld3: conll2jld.jl %.dict %.dev.wvec 
+%.dev.jld4: conll2jld.jl %.dict %.dev.wvec 
 	julia $^ $@
 
-%.tst.jld3: conll2jld.jl %.dict %.tst.wvec 
+%.tst.jld4: conll2jld.jl %.dict %.tst.wvec 
 	julia $^ $@
 
 NCPU=20
