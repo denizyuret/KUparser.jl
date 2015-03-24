@@ -22,10 +22,12 @@ const Pinf=typemax(Pval)
 Pzeros(n::Integer...)=zeros(Pval, n...)
 Dzeros(n::Integer...)=zeros(Dval, n...)
 movedep(m::Mval)=(m>>1)         # 1..ndep for m>1
-movedir(m::Mval)=(m&1)          # 0=LEFT 1=RIGHT for m>1
+movedir(m::Mval)=(m&1)          # 0=RIGHT 1=LEFT for m>1
 const SHIFT=convert(Mval,1)     # m=0 illegal, m=1 shift, m=2..nmove L/R moves
-const LEFT=convert(Mval,0)
-const RIGHT=convert(Mval,1)
+const RIGHT=convert(Mval,0)     # even moves m=2,4,6,... are RIGHT
+const LEFT=convert(Mval,1)      # odd moves m=3,5,7,... are LEFT
+const R1=convert(Mval,SHIFT+1+RIGHT)
+const L1=convert(Mval,SHIFT+1+LEFT)
 
 type ArcHybrid <: Parser
     nword::Pval   # number of words in sentence
@@ -99,11 +101,11 @@ function move!(p::ArcHybrid, op::Integer)
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
-    elseif movedir(op) == LEFT
-        arc!(p, p.wptr, p.stack[p.sptr], movedep(op))
-        p.sptr -= 1
-    else # if movedir(op) == RIGHT
+    elseif movedir(op) == RIGHT
         arc!(p, p.stack[p.sptr-1], p.stack[p.sptr], movedep(op))
+        p.sptr -= 1
+    else # if movedir(op) == LEFT
+        arc!(p, p.wptr, p.stack[p.sptr], movedep(op))
         p.sptr -= 1
     end
 end # move!
@@ -112,10 +114,14 @@ function validmoves(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
     v[SHIFT] = (p.wptr <= p.nword)
     right_ok = (p.sptr >= 2)
     left_ok = ((p.sptr >= 1) && (p.wptr <= p.nword))
-    for m=2:2:p.nmove; v[m] = left_ok; end
-    for m=3:2:p.nmove; v[m] = right_ok; end
+    for m=L1:2:p.nmove; v[m] = left_ok; end
+    for m=R1:2:p.nmove; v[m] = right_ok; end
     return v
 end # validmoves
+
+function anyvalidmoves(p::ArcHybrid)
+    (p.wptr <= p.nword) || (p.sptr >= 2)
+end
 
 # movecosts() counts gold arcs that become impossible after possible
 # transitions.  Tokens start their lifecycle in the buffer without
@@ -165,9 +171,9 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cos
                          ((p.sptr > 1) &&                       # no more s1 for head of s0
                           (s0h == p.stack[p.sptr-1]))))
             if (s0h != n0)
-                cost[2:2:p.nmove] = leftcost                    # even numbered moves >= 2 are left moves
+                cost[L1:2:p.nmove] = leftcost                   # odd numbered moves >= 3 are left moves
             else
-                cost[2:2:p.nmove] = leftcost + 1                # +1 for the wrong labels
+                cost[L1:2:p.nmove] = leftcost + 1               # +1 for the wrong labels
                 cost[deprel[s0]<<1] -= 1                        # except for the correct label
             end
         end
@@ -175,9 +181,9 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cos
             s1 = p.stack[p.sptr-1]                              # s1 is the stack element before s0
             rightcost = s0b + (s0h >= n0)                       # no more right head or dependent for s0
             if (s0h != s1)
-                cost[3:2:p.nmove] = rightcost                   # odd numbered moves >= 3 are right moves
+                cost[R1:2:p.nmove] = rightcost                  # even numbered moves >= 2 are right moves
             else
-                cost[3:2:p.nmove] = rightcost + 1               # +1 for the wrong labels
+                cost[R1:2:p.nmove] = rightcost + 1              # +1 for the wrong labels
                 cost[deprel[s0]<<1+1] -= 1                      # except for the correct label
             end
         end
