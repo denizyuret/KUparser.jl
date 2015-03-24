@@ -1,7 +1,6 @@
 #TODO: save output
 
-using HDF5, JLD, KUnet, ArgParse, Compat, CUDArt
-using KUparser: ArcHybrid, Corpus, flen, wdim, oparse, bparse, gparse
+using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 
 function parse_commandline()
@@ -32,6 +31,10 @@ function parse_commandline()
         help = "Number of epochs to train"
         arg_type = Int
         default = 256
+        "--pepochs"
+        help = "Number of epochs between parsing"
+        arg_type = Int
+        default = 1
         "--ncpu"
         help = "Number of workers for multithreaded parsing"
         arg_type = Int
@@ -92,18 +95,7 @@ function parse_commandline()
     return args
 end
 
-macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
 macro meminfo() :(gc(); run(`nvidia-smi`); run(`ps auxww`|>`grep julia`); run(`free`)) end
-evalheads(p,c)=mean(vcat(vcat(map(q->q[1],p)...)...) .== vcat(map(s->s.head,c)...))
-
-function initworkers(ncpu)
-    (nworkers() < ncpu) && (addprocs(ncpu - nprocs() + 1))
-    require("CUDArt")
-    @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
-    require("CUBLAS")
-    require("KUnet")
-    require("KUparser")
-end
 
 function main()
     args = parse_commandline()
@@ -111,16 +103,22 @@ function main()
     args["nogpu"] && blas_set_num_threads(20)
     
     data = Corpus[]
+    deprel = nothing
+    ndeps = 0
     for f in args["datafiles"]
         @date d=load(f)
-        d = collect(values(d))
-        @assert length(d)==1 "$f has more than one variable"
-        push!(data, d[1])
+        push!(data, d["corpus"])
+        if deprel == nothing
+            deprel = d["deprel"]
+            ndeps = length(deprel)
+        else
+            @assert deprel == d["deprel"]
+        end
     end
 
     feats=eval(parse("KUparser.Flist."*args["feats"]))
     xrows=flen(wdim(data[1][1]), feats)
-    yrows=ArcHybrid(1).nmove
+    yrows=KUparser.ArcHybrid(1,length(deprel)).nmove # TODO: change when multiple parsers implemented
 
     net=KUnet.newnet(KUnet.relu, [xrows; args["hidden"]; yrows]...)
     net[end].f=KUnet.logp
@@ -141,38 +139,36 @@ function main()
     @show net
 
     trn = nothing
-    @date initworkers(args["ncpu"])
     for i=1:length(data)
-        @date p = oparse(data[i], feats, args["ncpu"])
-        @show evalheads(p, data[i])
-        i == 1 && (trn = p)
-        p = nothing
+        @date pxy = oparse(data[i], feats, ndeps, args["ncpu"])
+        @show evalparse(pxy[1], data[i])
+        i == 1 && (trn = pxy)
+        pxy = nothing
     end
-    @date rmprocs(workers())
     accuracy = Array(Float32, length(data))
     
     for epoch=1:args["epochs"]
-        @show epoch; flush(STDOUT)
-        @time for (h,x,y) in trn
-            KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
-        end
-        (args["parser"] != "oparser") && (trn=nothing)
-        @meminfo
-        @date initworkers(args["ncpu"])
-        for i=1:length(data)
-            if in(args["parser"], ["oparser", "gparser"])
-                @date p = gparse(data[i], net, feats, args["pbatch"], args["ncpu"])
-            elseif (args["parser"] == "bparser")
-                @date p = bparse(data[i], net, feats, args["nbeam"], args["pbatch"], args["ncpu"])
-            else
-                error("Unknown parser "*args["parser"])
+        @show epoch
+        (p,x,y) = trn
+        @date KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
+        if epoch % args["pepochs"] == 0
+            (args["parser"] != "oparser") && (trn=nothing)
+            @meminfo
+            for i=1:length(data)
+                if in(args["parser"], ["oparser", "gparser"])
+                    @date pxy = gparse(data[i], net, feats, ndeps, args["pbatch"], args["ncpu"])
+                elseif (args["parser"] == "bparser")
+                    @date pxy = bparse(data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
+                else
+                    error("Unknown parser "*args["parser"])
+                end
+                @show e = evalparse(pxy[1], data[i])
+                accuracy[i] = e[1]
+                (args["parser"] != "oparser") && (i == 1) && (trn=pxy)
+                pxy = nothing
             end
-            @show accuracy[i] = evalheads(p, data[i])
-            (args["parser"] != "oparser") && (i == 1) && (trn=p)
-            p = nothing
+            println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
         end
-        @date rmprocs(workers())
-        println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
     end
 end
 
