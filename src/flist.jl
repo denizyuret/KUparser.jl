@@ -2,6 +2,196 @@ typealias Features Matrix{Int8}
 
 module Flist                    # feature matrices
 
+# Goldberg&Nivre TACL13 ArcHybrid features from: tacl2013dynamicoracles/lefttoright/features:HybridFeatures
+# s0,s1,s2: stack word forms: a=-1,-2,-3 b=0 c=4
+# w0,w1: buffer word forms: a=0,1 b=0 c=4
+# Ts0: tag of s0 (-1 0 -4)
+# Trcs1: tag of rightmost child of s1 (-2 1 -4)
+# use word half of vector (c=+4) for form, context half of vector (c=-4) for tag
+# No need for feature combinations, we have a nonlinear model.
+
+tacl13hybrid = Int8[
+	# (1)
+-1 0 4	# append("s0_%s" % s0)
+-1 0 -4	# append("Ts0_%s" % Ts0)
+        # append("Ts0s0_%s_%s" % (Ts0, s0))
+
+-2 0 4	# append("s1_%s" % s1)
+-2 0 -4	# append("Ts1_%s" % Ts1)
+     	# append("Ts1s1_%s_%s" % (Ts1, s1))
+
+0 0 4	# append("w0_%s" % w0)
+0 0 -4	# append("Tw0_%s" % Tw0)
+	# append("Tw0w0_%s_%s" % (Tw0, w0))
+	# +hybrid
+1 0 4	# append("w1_%s" % w1)
+1 0 -4	# append("Tw1_%s" % Tw1)
+	# append("Tw1w1_%s_%s" % (Tw1, w1))
+
+	# (2)
+	# append("s0s1_%s_%s" % (s0,s1))
+	# append("Ts0Ts1_%s_%s" % (Ts0,Ts1))
+	# append("Ts0Tw0_%s_%s" % (Ts0,Tw0))
+	# append("s0Ts0Ts1_%s_%s_%s" % (s0,Ts0,Ts1))
+	# append("Ts0s1Ts1_%s_%s_%s" % (Ts0,s1,Ts1))
+	# append("s0s1Ts1_%s_%s_%s" % (s0,s1,Ts1))
+	# append("s0Ts0s1_%s_%s_%s" % (s0,Ts0,s1))
+	# append("s0Ts0Ts1_%s_%s_%s" % (s0,Ts0,Ts1))
+	# +hybrid   
+	# append("s0w0_%s_%s" % (s0,w0))
+	# append("Ts0Tw0_%s_%s" % (Ts0,Tw0))
+	# append("Ts0Tw1_%s_%s" % (Ts0,Tw1))
+	# append("s0Ts0Tw0_%s_%s_%s" % (s0,Ts0,Tw0))
+	# append("Ts0w0Tw0_%s_%s_%s" % (Ts0,w0,Tw0))
+	# append("s0w0Tw0_%s_%s_%s" % (s0,w0,Tw0))
+	# append("s0Ts0w0_%s_%s_%s" % (s0,Ts0,w0))
+	# append("w0Tw0Tw1_%s_%s_%s" % (w0,Tw0,Tw1)) #
+	
+	# (3)
+	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
+	# append("Ts1Ts0Tw0_%s_%s_%s" % (Ts1,Ts0,Tw0))
+	# append("s0Tw0Tw1_%s_%s_%s" % (s0,Tw0,Tw1))
+	# append("Ts1s0Tw0_%s_%s_%s" % (Ts1,s0,Tw0))
+	
+	# (4) rc -1  lc 1
+-2 1 -4	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
+	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Ts0))
+-2 -1 -4 # append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
+-1 -1 -4 # append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
+-1 1 -4	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
+	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Tlcs1, s0))
+	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Trcs0))
+	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Trcs1, s0))
+	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Tlcs0))
+	
+	# +hybrid
+	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw0))
+	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw1))
+	# append("Ts0Tlcs0Tw0_%s_%s_%s" % (Ts0,Tlcs0,Tw0))
+0 -1 -4	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
+	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Tlcs0,w0))
+	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Trcs0,w0))
+	# append("Ts0w0Tlcw0_%s_%s_%s" % (Ts0,w0,Tlcw0))
+	
+	# append("Ts0Tw0Trcs0Tlcw0_%s_%s_%s_%s" % (Ts0,Tw0,Tlcw0,Trcs0))
+	# append("Ts0Ts1Trcs1Tlcs0_%s_%s_%s_%s" % (Ts0,Ts1,Tlcs0,Trcs1))
+	
+	# (5)
+	# append("Ts2Ts1Ts0_%s_%s_%s" % (Ts2,Ts1,Ts0))
+	# append("Ts1Ts0Tw0_%s_%s_%s" % (Ts1,Ts0,Tw0))
+	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
+] # tacl13hybrid
+
+
+# Goldberg&Nivre TACL13 ArcEager features from: 
+# tacl2013dynamicoracles/lefttoright/features:EagerZhangNivre2011Extractor
+# (seems to be the ones used in acl11)
+# s0: top of stack (a=-1)
+# n0,n1,n2: buffer (a=0,1,2)
+# s0h,s0h2: parent and grandparent of s0
+# s0l,s0r: left/rightmost child of s0
+# s0l2,s0r2: second left/rightmost child of s0
+# s0w,s0p,s0wp: form, postag, form-postag for s0
+# d: refers to s0-n0 distance, encoded 1,2,3,...,9,10+
+# s0vl,s0vr: number of left/right children of s0, flat encoding
+# s0L: dependency label for s0 (NA for n0!)
+# s0sl,s0sr: set of dependency labels to the left/right of s0
+
+acl11eager = Int8[
+	# # Single Words
+	# f("s0wp_%s" % (s0wp))
+	# f("s0w_%s"  % (s0w))
+	# f("s0p_%s"  % (s0p))
+	# f("n0wp_%s" % (n0wp))
+	# f("n0w_%s"  % (n0w))
+	# f("n0p_%s"  % (n0p))
+	# f("n1wp_%s" % (n1wp))
+	# f("n1w_%s"  % (n1w))
+	# f("n1p_%s"  % (n1p))
+	# f("n2wp_%s" % (n2wp))
+	# f("n2w_%s"  % (n2w))
+	# f("n2p_%s"  % (n2p))
+	# 
+	# # Pairs
+	# f("s0wp,n0wp_%s_%s" % (s0wp, n0wp))
+	# f("s0wp,n0w_%s_%s" % (s0wp, n0w))
+	# f("s0w,n0wp_%s_%s" % (s0w, n0wp))
+	# f("s0wp,n0p_%s_%s" % (s0wp, n0p))
+	# f("s0p,n0wp_%s_%s" % (s0p, n0wp))
+	# f("s0w,n0w_%s_%s" % (s0w, n0w)) #?
+	# f("s0p,n0p_%s_%s" % (s0p, n0p))
+	# f("n0p,n1p_%s_%s" % (n0p, n1p))
+	# 
+	# # Tuples
+	# f("n0p,n1p,n2p_%s_%s_%s" % (n0p, n1p, n2p))
+	# f("s0p,n0p,n1p_%s_%s_%s" % (s0p, n0p, n1p))
+	# f("s0hp,s0p,n0p_%s_%s_%s" % (s0hp, s0p, n0p))
+	# f("s0p,s0lp,n0p_%s_%s_%s" % (s0p, s0lp, n0p))
+	# f("s0p,s0rp,n0p_%s_%s_%s" % (s0p, s0rp, n0p))
+	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp))
+	# 
+	# # Distance
+	# f("s0wd_%s:%s" % (s0w, d))
+	# f("s0pd_%s:%s" % (s0p, d))
+	# f("n0wd_%s:%s" % (n0w, d))
+	# f("n0pd_%s:%s" % (n0p, d))
+	# f("s0w,n0w,d_%s:%s:%s" % (s0w, n0w, d))
+	# f("s0p,n0p,d_%s:%s:%s" % (s0p, n0p, d))
+	# 
+	# # Valence
+	# f("s0wvr_%s:%s" % (s0w, s0vr))
+	# f("s0pvr_%s:%s" % (s0p, s0vr))
+	# f("s0wvl_%s:%s" % (s0w, s0vl))
+	# f("s0pvl_%s:%s" % (s0p, s0vl))
+	# f("n0wvl_%s:%s" % (n0w, n0vl))
+	# f("n0pvl_%s:%s" % (n0p, n0vl))
+	# 
+	# # Unigrams
+	# f("s0hw_%s" % (s0hw))
+	# f("s0hp_%s" % (s0hp))
+	# f("s0L_%s" % (s0L))
+	# 
+	# f("s0lw_%s" % (s0lw))
+	# f("s0lp_%s" % (s0lp))
+	# f("s0lL_%s" % (s0lL))
+	# 
+	# f("s0rw_%s" % (s0rw))
+	# f("s0rp_%s" % (s0rp))
+	# f("s0rL_%s" % (s0rL))
+	# 
+	# f("n0lw_%s" % (n0lw))
+	# f("n0lp_%s" % (n0lp))
+	# f("n0lL_%s" % (n0lL))
+	# 
+	# # Third-order
+	# #do we really need the non-grandparent ones?
+	# f("s0h2w_%s" % (s0h2w))
+	# f("s0h2p_%s" % (s0h2p))
+	# f("s0hL_%s"  % (s0hL))
+	# f("s0l2w_%s" % (s0l2w))
+	# f("s0l2p_%s" % (s0l2p))
+	# f("s0l2L_%s" % (s0l2L))
+	# f("s0r2w_%s" % (s0r2w))
+	# f("s0r2p_%s" % (s0r2p))
+	# f("s0r2L_%s" % (s0r2L))
+	# f("n0l2w_%s" % (n0l2w))
+	# f("n0l2p_%s" % (n0l2p))
+	# f("n0l2L_%s" % (n0l2L))
+	# f("s0p,s0lp,s0l2p_%s_%s_%s" % (s0p, s0lp, s0l2p))
+	# f("s0p,s0rp,s0r2p_%s_%s_%s" % (s0p, s0rp, s0r2p))
+	# f("s0p,s0hp,s0h2p_%s_%s_%s" % (s0p, s0hp, s0h2p))
+	# f("n0p,n0lp,n0l2p_%s_%s_%s" % (n0p, n0lp, n0l2p))
+	# 
+	# # Labels
+	# f("s0wsr_%s_%s" % (s0w, s0sr))
+	# f("s0psr_%s_%s" % (s0p, s0sr))
+	# f("s0wsl_%s_%s" % (s0w, s0sl))
+	# f("s0psl_%s_%s" % (s0p, s0sl))
+	# f("n0wsl_%s_%s" % (n0w, n0sl))
+	# f("n0psl_%s_%s" % (n0p, n0sl))
+] # tacl13eager
+
+
 # 0.0418668 archybrid_conll07EnglishToken_wikipedia2MUNK-100_rbf376678_1014_cache.mat (trn/tst) (rbf-gamma:0.376747095368119)
 fv022b = Int8[-3 0 8;-2 -1 -4;-2 -1 5;-2 0 -9;-2 0 -4;-2 0 4;-2 0 7;-2 1 1;-1 -1 -1;-1 -1 4;-1 0 -9;-1 0 -4;-1 0 4;-1 0 6;-1 1 4;0 -1 -4;0 -1 4;0 0 -4;0 0 -2;0 0 4;1 0 -4;1 0 4]
 
