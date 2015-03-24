@@ -34,7 +34,7 @@
 	parser	dev	test1	test2
 	oparser	.9093	.9046	.9060	03212217-opacl11.out
 	gparser	.9136	.9096	.9109	03212217-gpacl11.out
-	beam10	.9158	.9122	.9145	bpacl11.out -- running at epoch=132
+	beam10	.9158	.9122	.9145	03240436-bpacl11.out
 
 	+ conllWSJToken_wikipedia2MUNK-100 experiments: Different gold
 	head than acl11.  Latestop better than earlystop.
@@ -43,7 +43,7 @@
 
 	parser	dev	test1	test2
 	beam10a	.9186	.9132	.9136	03201925-julia3_btrain_jl.out: using whole beam to train, quit at epoch=77
-	beam64	.9195	.9129	.9136	bparse64.out -- running at epoch=49
+	beam64	.9205	.9131	.9154	bparse64.out -- running at epoch=86
 	beam10l	.9211	.9169	.9171	03220927-bparselatestop.out: no earlystop, crashed at epoch=207
 	beam10	.9205	.9150	.9166	03220548-bparsedbg.out: earlystop
 
@@ -169,7 +169,7 @@
 	= try to debug and fix the crashes
 	$$480067 0.50531 gfeatures2 dyuret       qw    03/20/2015 19:19:08
 	$$480068 0.50531 gfeatures3 dyuret       qw    03/20/2015 21:53:02
-	@@480069 0.50531 gfeatures3 dyuret       r     03/22/2015 13:12:40 ilac.q@ilac-2-2.local
+	$$480069 0.50531 gfeatures3 dyuret       r     03/22/2015 13:12:40 ilac.q@ilac-2-2.local
 	$ egrep '^(DATA:.10|julia3)' _gfeatures_sh.out
 	fv1768	0.92688215	0.9029838	0.8982076	(3348 dims, 865MiB)
 	fv031a	0.9175582	0.90168756	0.8972373	(2512 dims)
@@ -179,6 +179,7 @@
 	fv022a	0.918115	0.9009896	0.8971138	(1426 dims)
 	fv023	0.9185719	0.9005908	0.8966375	(1526 dims)
 	fv022	0.9171161	0.9003415	0.8965669	(1516 dims)
+	fv102	0.9187382	0.90001744	0.8975549	(4638 dims)
 	fv022b	0.916714	0.8999177	0.89713144	(1424 dims)
 	fv023a	0.91787714	0.8998679	0.89737844	(1616 dims)
 	fv018	0.91692454	0.8995937	0.8934091	(1608 dims)
@@ -197,7 +198,6 @@
 	fv012	0.9068354	0.88982224	0.88806367	(1200 dims)
 	fv008	0.9009608	0.8860832	0.88349444	(800 dims)
 	fv008w	0.8957652	0.8806242	0.8796309	(800 dims)
-	fv102 died (4638 dims, crashed again)
 
 
 2015-03-19  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -224,8 +224,9 @@
 	8	0.9206171	0.90582544	0.9008715
 	16	0.93292725	0.9116833	0.9058465
 	32	0.9474447	0.9167186	0.91170347
-DATA:	45	0.9546024	0.9194855	0.9129384	*d*
-DATA:	49	0.956676	0.918987	0.9136441	*t*
+DATA:	59	0.96037275	0.92053246	0.9131148	*d*
+DATA:	82	0.9676999	0.9191365	0.91537297	*t*
+	86	0.9688483	0.9205075	0.91532004
 
 	* 03220927-bparselatestop.out: why is this different from static
 	oracle training?  we are rewarding mincost state/move pairs on the
@@ -268,8 +269,8 @@ DATA:	49	0.956676	0.918987	0.9136441	*t*
 	193	0.982411	0.92053246	0.91503775	*d*
 	256	0.985992	0.9191365	0.91507304
 
-	* bpacl11.out: Trying acl11 dependencies.
-	@@480062 0.50531 bpacl11    dyuret       r     03/20/2015 18:27:55 ilac.q@ilac-2-3.local
+	* 03240436-bpacl11.out: Trying acl11 dependencies.
+	$$480062 0.50531 bpacl11    dyuret       r     03/20/2015 18:27:55 ilac.q@ilac-2-3.local
 	1	0.87517524	0.86920756	0.86677015
 	2	0.88630337	0.8795274	0.87807846
 	4	0.9019197	0.891617	0.8888046
@@ -280,7 +281,7 @@ DATA:	49	0.956676	0.918987	0.9136441	*t*
 	79	0.9671715	0.9158212	0.9121622	*d* (ZN11:9314w)
 	121	0.9770028	0.91380215	0.9145438	*t* (ZN11:9290w)
 	128	0.97827536	0.91502357	0.91406745
-	132	0.9789954	0.9143754	0.91440266
+	256	0.99009085	0.9123564	0.9130795
 
 	* TODO:
 	+ headpct-wordpct diff around 1% according to vectorparser/ChangeLog.
