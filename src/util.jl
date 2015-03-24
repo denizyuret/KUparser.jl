@@ -2,6 +2,7 @@ using CUDArt
 using KUnet
 
 # Print date, expression and elapsed time after execution
+VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
 
 # This is "distribute" with an extra procs argument:
@@ -72,3 +73,6 @@ import Base.isequal
 function isequal(a::Parser, b::Parser)
     all(map(isequal, map(n->a.(n), fieldnames(a)), map(n->b.(n), fieldnames(a))))
 end
+
+wdim(s)=size(s.wvec,1)
+wcnt(s)=size(s.wvec,2)
