@@ -70,7 +70,7 @@ function gparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatc
     pxy = pmap(procs(d)) do x
         gparse(localpart(d), copy(net, :gpu), feats, ndeps, nbatch)
     end
-    rmprocs(workers()); sleep(1)
+    rmprocs(workers()); sleep(2)
     p = vcat(map(z->z[1], pxy)...)
     x = hcat(map(z->z[2], pxy)...)
     y = hcat(map(z->z[3], pxy)...)
