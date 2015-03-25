@@ -82,6 +82,33 @@ tacl13hybrid = Int8[
 	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
 ] # tacl13hybrid
 
+# Variants of tacl13hybrid:
+
+tacl13words = Int8[
+-1 -1 4  # s0l
+-1 0 4	 # s0
+-1 1 4	 # s0r
+-2 -1 4	 # s1l
+-2 0 4	 # s1
+-2 1 4	 # s1r
+0 -1 4	 # n0l
+0 0 4	 # n0
+1 0 4	 # n1
+]
+
+tacl13tags = Int8[
+-1 -1 -4 # s0l
+-1 0 -4	 # s0
+-1 1 -4	 # s0r
+-2 -1 -4 # s1l
+-2 0 -4	 # s1
+-2 1 -4	 # s1r
+0 -1 -4	 # n0l
+0 0 -4	 # n0
+1 0 -4	 # n1
+]
+
+tacl13wordtag = [tacl13words; tacl13tags]
 
 # Goldberg&Nivre TACL13 ArcEager features from: 
 # tacl2013dynamicoracles/lefttoright/features:EagerZhangNivre2011Extractor
@@ -100,17 +127,17 @@ tacl13hybrid = Int8[
 acl11eager = Int8[
 	# # Single Words
 	# f("s0wp_%s" % (s0wp))
-	# f("s0w_%s"  % (s0w))
-	# f("s0p_%s"  % (s0p))
+-1 0 4	# f("s0w_%s"  % (s0w))
+-1 0 -4	# f("s0p_%s"  % (s0p))
 	# f("n0wp_%s" % (n0wp))
-	# f("n0w_%s"  % (n0w))
-	# f("n0p_%s"  % (n0p))
+0 0 4	# f("n0w_%s"  % (n0w))
+0 0 -4	# f("n0p_%s"  % (n0p))
 	# f("n1wp_%s" % (n1wp))
-	# f("n1w_%s"  % (n1w))
-	# f("n1p_%s"  % (n1p))
+1 0 4	# f("n1w_%s"  % (n1w))
+1 0 -4	# f("n1p_%s"  % (n1p))
 	# f("n2wp_%s" % (n2wp))
-	# f("n2w_%s"  % (n2w))
-	# f("n2p_%s"  % (n2p))
+2 0 4	# f("n2w_%s"  % (n2w))
+2 0 -4	# f("n2p_%s"  % (n2p))
 	# 
 	# # Pairs
 	# f("s0wp,n0wp_%s_%s" % (s0wp, n0wp))
@@ -125,13 +152,13 @@ acl11eager = Int8[
 	# # Tuples
 	# f("n0p,n1p,n2p_%s_%s_%s" % (n0p, n1p, n2p))
 	# f("s0p,n0p,n1p_%s_%s_%s" % (s0p, n0p, n1p))
-	# f("s0hp,s0p,n0p_%s_%s_%s" % (s0hp, s0p, n0p))
-	# f("s0p,s0lp,n0p_%s_%s_%s" % (s0p, s0lp, n0p))
-	# f("s0p,s0rp,n0p_%s_%s_%s" % (s0p, s0rp, n0p))
-	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp))
+	# f("s0hp,s0p,n0p_%s_%s_%s" % (s0hp, s0p, n0p)) => s0hp (handled in unigram section)
+	# f("s0p,s0lp,n0p_%s_%s_%s" % (s0p, s0lp, n0p)) => s0lp (handled in unigram section)
+	# f("s0p,s0rp,n0p_%s_%s_%s" % (s0p, s0rp, n0p)) => s0rp (handled in unigram section)
+	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp)) => n0lp (handled in unigram section)
 	# 
 	# # Distance
-	# f("s0wd_%s:%s" % (s0w, d))
+0 0 0	# f("s0wd_%s:%s" % (s0w, d)) => d
 	# f("s0pd_%s:%s" % (s0p, d))
 	# f("n0wd_%s:%s" % (n0w, d))
 	# f("n0pd_%s:%s" % (n0p, d))
@@ -139,55 +166,55 @@ acl11eager = Int8[
 	# f("s0p,n0p,d_%s:%s:%s" % (s0p, n0p, d))
 	# 
 	# # Valence
-	# f("s0wvr_%s:%s" % (s0w, s0vr))
+0 0 0	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
 	# f("s0pvr_%s:%s" % (s0p, s0vr))
-	# f("s0wvl_%s:%s" % (s0w, s0vl))
+0 0 0	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
 	# f("s0pvl_%s:%s" % (s0p, s0vl))
-	# f("n0wvl_%s:%s" % (n0w, n0vl))
+0 0 0	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
 	# f("n0pvl_%s:%s" % (n0p, n0vl))
 	# 
 	# # Unigrams
-	# f("s0hw_%s" % (s0hw))
-	# f("s0hp_%s" % (s0hp))
-	# f("s0L_%s" % (s0L))
+0 0 0	# f("s0hw_%s" % (s0hw))
+0 0 0	# f("s0hp_%s" % (s0hp))
+0 0 0	# f("s0L_%s" % (s0L))
 	# 
-	# f("s0lw_%s" % (s0lw))
-	# f("s0lp_%s" % (s0lp))
-	# f("s0lL_%s" % (s0lL))
+-1 -1 4	# f("s0lw_%s" % (s0lw))
+-1 -1 -4 # f("s0lp_%s" % (s0lp))
+0 0 0	# f("s0lL_%s" % (s0lL))
 	# 
-	# f("s0rw_%s" % (s0rw))
-	# f("s0rp_%s" % (s0rp))
-	# f("s0rL_%s" % (s0rL))
+-1 1 4	# f("s0rw_%s" % (s0rw))
+-1 1 -4	# f("s0rp_%s" % (s0rp))
+0 0 0	# f("s0rL_%s" % (s0rL))
 	# 
-	# f("n0lw_%s" % (n0lw))
-	# f("n0lp_%s" % (n0lp))
-	# f("n0lL_%s" % (n0lL))
+0 -1 4	# f("n0lw_%s" % (n0lw))
+0 -1 -4	# f("n0lp_%s" % (n0lp))
+0 0 0	# f("n0lL_%s" % (n0lL))
 	# 
 	# # Third-order
 	# #do we really need the non-grandparent ones?
-	# f("s0h2w_%s" % (s0h2w))
-	# f("s0h2p_%s" % (s0h2p))
-	# f("s0hL_%s"  % (s0hL))
-	# f("s0l2w_%s" % (s0l2w))
-	# f("s0l2p_%s" % (s0l2p))
-	# f("s0l2L_%s" % (s0l2L))
-	# f("s0r2w_%s" % (s0r2w))
-	# f("s0r2p_%s" % (s0r2p))
-	# f("s0r2L_%s" % (s0r2L))
-	# f("n0l2w_%s" % (n0l2w))
-	# f("n0l2p_%s" % (n0l2p))
-	# f("n0l2L_%s" % (n0l2L))
+0 0 0	# f("s0h2w_%s" % (s0h2w))
+0 0 0	# f("s0h2p_%s" % (s0h2p))
+0 0 0	# f("s0hL_%s"  % (s0hL))
+-1 -2 4	# f("s0l2w_%s" % (s0l2w))
+-1 -2 -4 # f("s0l2p_%s" % (s0l2p))
+0 0 0	# f("s0l2L_%s" % (s0l2L))
+-1 2 4	# f("s0r2w_%s" % (s0r2w))
+-1 2 -4	# f("s0r2p_%s" % (s0r2p))
+0 0 0	# f("s0r2L_%s" % (s0r2L))
+0 -2 4	# f("n0l2w_%s" % (n0l2w))
+0 -2 -4	# f("n0l2p_%s" % (n0l2p))
+0 0 0	# f("n0l2L_%s" % (n0l2L))
 	# f("s0p,s0lp,s0l2p_%s_%s_%s" % (s0p, s0lp, s0l2p))
 	# f("s0p,s0rp,s0r2p_%s_%s_%s" % (s0p, s0rp, s0r2p))
 	# f("s0p,s0hp,s0h2p_%s_%s_%s" % (s0p, s0hp, s0h2p))
 	# f("n0p,n0lp,n0l2p_%s_%s_%s" % (n0p, n0lp, n0l2p))
 	# 
 	# # Labels
-	# f("s0wsr_%s_%s" % (s0w, s0sr))
+0 0 0	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
 	# f("s0psr_%s_%s" % (s0p, s0sr))
-	# f("s0wsl_%s_%s" % (s0w, s0sl))
+0 0 0	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
 	# f("s0psl_%s_%s" % (s0p, s0sl))
-	# f("n0wsl_%s_%s" % (n0w, n0sl))
+0 0 0	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
 	# f("n0psl_%s_%s" % (n0p, n0sl))
 ] # tacl13eager
 
