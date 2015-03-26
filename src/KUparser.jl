@@ -11,7 +11,7 @@ typealias Corpus AbstractVector{Sentence}
 include("util.jl");	  export @date, evalparse, wdim, wcnt
 include("archybrid.jl");  # export ArcHybrid
 include("flist.jl");      export Features, Flist 	# these are feature templates
-include("features.jl");   export features, flen, fidx   # these extract features
+include("features.jl");   export features, flen         # these extract features
 include("gparser.jl");    export gparse
 include("bparser.jl");    export bparse
 include("oparser.jl");    export oparse
