@@ -1,3 +1,217 @@
+2015-03-26  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* ZN11:
+	> head stack features
+	Yes they are not in the paper because they did not work well. Basically I try to extract features from the root of each sub tree.
+	> encoding
+	I treated lengths by capping them to 8. If I remember correctly, I did not do any  binning. They can be found at depparser_macros.h
+	> set of labels
+	Yes you can treat them as a vector. my implementation packed everything into a integer.
+
+	+ Actuall #2 is wrong, this is from depparser_macros.h:
+	inline int encodeLinkDistance(const int &head_index, const int &dep_index) {
+	static int diff;
+	diff = head_index - dep_index;
+	assert(diff != 0);
+	if (diff<0)
+	diff=-diff;
+	if (diff>10) diff = 6;
+	else if (diff>5) diff = 5;
+	return diff;
+	}
+
+	+ He also has:
+	// The size of a sentence and the words
+	const unsigned MAX_SENTENCE_SIZE = 256 ;
+	const unsigned MAX_SENTENCE_SIZE_BITS = 8 ;
+
+	* TODO:
+	- Add 256 check to the code.
+	+ Implement distance.
+	+ Find max number of deps.
+	+ Implement heads.
+	- Seriously test new feature code.
+	- Rerun some old experiments.
+	- Implement arceager.
+	- Run acl11 experiments.
+	- Run conll07 experiments (arceager).
+	- Design better featureset for archybrid.
+
+2015-03-25  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Summary: CONLL07 ARCHYBRID EXPERIMENTS: comparing best test
+	result (should be test at best validation and should take
+	averages) to GN13 archybrid result.  score1 is the old result with
+	our fv022b feature set.  score2 is the new result with the
+	tacl13hybrid feature set from the paper where words are replaced
+	with word vectors and postags are replaced with context vectors.
+	Note that this time the training is labeled but the tacl13hybrid
+	features do not use the labels.
+
+	parser	score1	score2	GN13
+	oparser	.8699	.8675	.8643	03242000-optacl13.out
+	gparser	.8793	.8789	.8762	03250401-gptacl13.out
+	beam10	.8865	---	---
+
+	Things tried:
+	+ .8789 tacl13hybrid features
+	+ .8727 unlabeled training
+	+ .8709	just word features
+	+ ????? just postag features
+	+ ????? both word+pos features
+	+ .8659 no dropout
+
+
+	* Experiments: conll07 archybrid experiments.
+
+	+ 03260132-gptacl13w.out: use only word vecs:
+	$$480092 0.50531 gptacl13w  dyuret       r     03/25/2015 13:35:10 ilac.q@ilac-2-1.local
+	256	0.9738699	0.87087744
+
+	- use only context vecs: @@480093 0.50531 gptacl13p  dyuret       r     03/25/2015 13:35:10 ilac.q@ilac-2-0.local
+	gptacl13p.out: crashed twice!?
+
+	- use both everywhere:
+	@@480094 0.50531 gptacl13wp dyuret       r     03/25/2015 13:35:40 ilac.q@ilac-3-0.local
+	45	0.9608776	0.875075
+
+	+ 03261450-gptacl13nd.out: try no dropout:
+	$$480095 0.00000 gptacl13nd dyuret       qw    03/25/2015 13:38:48
+	26	0.9874197	0.8658805
+
+	+ 03260538-gptacl13nl.out: try unlabeled training:
+	$$480097 0.50531 gptacl13nl dyuret       qw    03/25/2015 13:46:17
+	228	0.98530364	0.8726764
+
+	x try multiple runs to see variance
+	x extend training to 2x best
+	x use dev set or fixed epochs
+	- use archybrid with acl11 features with labels
+
+	* acl11hybrid: dictionary.
+
+		paper		GN13		acl11		label
+		-----		----		-----		-----
+	single	S0wp		s0wp		STwt		StackWordTag 
+		S0w		s0w		STw		StackWord    
+		S0p		s0p		STt		StackTag     
+		N0wp		n0wp		N0wt		NextWordTag  
+		N0w		n0w		N0w		NextWord     
+		N0p		n0p		N0t		NextTag	     
+		N1wp		n1wp		N1wt		Next+1WordTag
+		N1w		n1w		N1w		Next+1Word   
+		N1p		n1p		N1t		Next+1Tag    
+		N2wp		n2wp		N2wt		Next+2WordTag
+		N2w		n2w		N2w		Next+2Word   
+		N2p		n2p		N2t		Next+2Tag    
+	???					HTw		HeadStackWord	
+						HTt		HeadStackTag	
+						HTwt		HeadStackWordTag
+	pair	S0wpN0wp	s0wp,n0wp	STwtN0wt	StackWordTagNextWordTag	
+		S0wpN0w		s0wp,n0w	STwtN0w		StackWordTagNextWord	
+		S0wN0wp		s0w,n0wp	STwN0wt		StackWordNextWordTag	
+		S0wpN0p		s0wp,n0p	STwtN0t		StackWordTagNextTag	
+		S0pN0wp		s0p,n0wp	STtN0wt		StackTagNextWordTag	
+		S0wN0w		s0w,n0w		STwN0w		StackWordNextWord	
+		S0pN0p		s0p,n0p		STtN0t		StackTagNextTag		
+		N0pN1p		n0p,n1p		N0tN1t		NextTagNext+1Tag	
+	three	N0pN1pN2p	n0p,n1p,n2p	N0tN1tN2t	NextTagTrigram		
+		S0pN0pN1p	s0p,n0p,n1p	STtN0tN1t	StackTagNextTagNext+1Tag
+		S0hpS0pN0p	s0hp,s0p,n0p	STHtSttN0t	StackHeadTagStackTagNextTag
+		S0pS0lpN0p	s0p,s0lp,n0p	STtSTLDtN0t	StackTagStackLDTagNextTag
+		S0pS0rpN0p	s0p,s0rp,n0p	STtSTRDtN0t	StackTagStackRDTagNextTag
+		S0pN0pN0lp	s0p,n0p,n0lp	STtN0tN0LDt	StackTagNextTagNextLDTag
+	???					HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
+	dist	S0wd		s0wd		STwd		StackWordDist	     
+		S0pd		s0pd		STtd		StackTagDist	     
+		N0wd		n0wd		N0wd		NextWordDist	     
+		N0pd		n0pd		N0td		NextTagDist	     
+		S0wN0wd		s0w,n0w,d	STwN0wd		StackWordNextWordDist
+		S0pN0pd		s0p,n0p,d	STtN0td		StackTagNextTagDist  
+	valency	S0wvr		s0wvr		STwra		StackWordRightArity
+		S0pvr		s0pvr		STtra		StackTagRightArity 
+		S0wvl		s0wvl		STwla		StackWordLeftArity 
+		S0pvl		s0pvl		STtla		StackTagLeftArity  
+		N0wvl		n0wvl		N0wla		NextWordRightArity ?? NextWordLeftArity
+		N0pvl		n0pvl		N0tla		NextTagRightArity  ?? NextTagLeftArity
+	unigram	S0hw		s0hw		STHw		StackHeadWord
+		S0hp		s0hp		STHt		StackHeadTag 
+		S0L		s0L		STi		StackLabel   
+		S0lw		s0lw		STLDw		StackLDWord 
+		S0lp		s0lp		STLDt		StackLDTag  
+		S0lL		s0lL		STLDi		StackLDLabel
+		S0rw		s0rw		STRDw		StackRDWord 
+		S0rp		s0rp		STRDt		StackRDTag  
+		S0rL		s0rL		STRDi		StackRDLabel
+		N0lw		n0lw		N0LDw		NextLDWord  
+		N0lp		n0lp		N0LDt		NextLDTag   
+		N0lL		n0lL		N0LDi		NextLDLabel 
+	third	S0h2w		s0h2w		STHHw		StackHeadHeadWord
+		S0h2p		s0h2p		STHHt		StackHeadHeadTag 
+		S0hL		s0hL		STHi		StackLabel ?? StackHeadLabel	 
+		S0l2w		s0l2w		STL2Dw		StackL2DWord	 
+		S0l2p		s0l2p		STL2Dt		StackL2DTag	 
+		S0l2L		s0l2L		STL2Di		StackL2DLabel	 
+		S0r2w		s0r2w		STR2Dw		StackR2DWord	 
+		S0r2p		s0r2p		STR2Dt		StackR2DTag	 
+		S0r2L		s0r2L		STR2Di		StackR2DLabel	 
+		N0l2w		n0l2w		N0L2Dw		NextL2DWord	 
+		N0l2p		n0l2p		N0L2Dt		NextL2DTag	 
+		N0l2L		n0l2L		N0L2Di		NextL2DLabel     
+		S0pS0lpS0l2p	s0p,s0lp,s0l2p	STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
+		S0pS0rpS0r2p	s0p,s0rp,s0r2p	STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
+		S0pS0hpS0h2p	s0p,s0hp,s0h2p	STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
+		N0pN0lpN0l2p	n0p,n0lp,n0l2p	N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextTagNextL2DTag
+	labset	S0wsr		s0wsr		STwrp		StackWordRightSetoftags
+		S0psr		s0psr		STtrp		StackTagRightSetoftags 
+		S0wsl		s0wsl		STwlp		StackWordLeftSetoftags 
+		S0psl		s0psl		STtlp		StackTagLeftSetoftags  
+		N0wsl		n0wsl		N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags  
+		N0psl		n0psl		N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags  
+	lcf					STl		StackLemma 
+						STc		StackCPOS  
+						STf		StackFeats 
+						N0l		NextLemma  
+						N0c		NextCPOS   
+						N0f		NextFeats  
+						N1l		Next+1Lemma
+						N1c		Next+1CPOS 
+						N1f		Next+1Feats
+
+2015-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* GN13: experiments with matching features: gptacl13 and optacl13.
+	+corpus: conll07 (deprel=19+ROOT)
+	+parser: archybrid (note that archybrid13 is slightly different)
+	?feats: tacl13hybrid (replaced form with word vector, postag with context vector)
+	=this is a pretty crappy feature set, should also try adding word vectors for all tokens
+	+training: 256 epochs static/dynamic oracle training.
+	+embedding: wikipedia2MUNK-100
+	+eval: including punctuation
+
+	* gptacl13: 3m32s/epoch
+	@@480081 0.50531 gptacl13   dyuret       r     03/24/2015 15:21:25 ilac.q@ilac-0-3.local
+	* optacl13: 3m33s/epoch
+	@@480080 0.50531 optacl13   dyuret       r     03/24/2015 15:20:10 ilac.q@ilac-2-1.local
+
+	* TODO:
+	- add acl11eager to flist.
+	- add acl11 adapted to hybrid?
+	- update features to have labels, labelsets, new encoding for valence and distance
+	+ s0hp, s0hw, (we don't have heads)
+	+ d (s0n0, 10+ encoded, we have 4+ encoding with (-1 0 3), 8bit encodings with +-7)
+	+ s0vl, s0vr (child count flat encoding, we have 3+ encoding)
+	+ s0L (deprel)
+	+ s0h2{w,p} grandparent
+	+ s0sr, s0sl right/left label set
+	- compare acl11 with goldberg implementation: encoding etc.
+	  depparser.cpp, depparser_weight.h, state.h
+	  under: src/common/depparser/implementations/arceager
+	- rewrite bparser with deprels.
+	- implement arceager, make the code parser generic.
+	- create better language for specifying flists.
+	- Make xy in pxy optional in parsers.
+
 2015-03-22  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* DEPRELS: Unfortunately they change a lot.
