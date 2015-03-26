@@ -29,16 +29,18 @@ typealias Features Vector{ASCIIString}
 function features(p::Parser, s::Sentence, flist::Features,
                   x::AbstractArray=Array(wtype(s),flen(p,s,flist),1))
     fill!(x, zero(eltype(x)))
-    nx = 0
-    nw = wdim(s) >> 1
     x1 = one(eltype(x))
+    nx = 0                      # last entry in x
+    nw = wdim(s) >> 1           # first half word, second half context
+    nd = p.ndeps
     for f in flist
         @assert in(f[1], "sn") "feature string should start with [sn]"
         (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2)
         (a,d) = (0,0)           # target word index and right distance
         if ((f[1] == 's') && (p.sptr - i >= 1))
             a = p.stack[p.sptr - i]
-            d = (i>0) ? (p.stack[p.sptr - i + 1] - a) : (p.wptr - a)
+            d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : 
+                 p.wptr <= p.nword ? (p.wptr - a) : 0)
         elseif ((f[1] == 'n') && (p.wptr + i <= p.nword))
             a = p.wptr + i
         end
@@ -64,26 +66,28 @@ function features(p::Parser, s::Sentence, flist::Features,
         end
         @assert n == length(f)
         fn = f[n]
-        @assert in(fn, "wpdLabAB")
-        if fn == 'w'
-            (a > 0) && copy!(sub(x, nx+1:(nx+nw)), sub(s.wvec, 1:nw, int(a))); nx+=nw
-        elseif fn == 'p'
-            (a > 0) && copy!(sub(x, nx+1:(nx+nw)), sub(s.wvec, nw+1:nw+nw, int(a))); nx+=nw
-        elseif fn == 'd'
-            (a > 0) && (d > 0) && (x[nx+(d>10?6:d>5?5:d)] = x1); nx+=6
-        elseif fn == 'L'
-            (a > 0) && (x[nx+1+p.deprel[a]] = x1); nx+=(p.ndeps+1) # 0 is ROOT/NA
-        elseif fn == 'a'
-            (a > 0) && (x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a])] = x1); nx+=10
-        elseif fn == 'b'
-            (a > 0) && (x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a])] = x1); nx+=10
-        elseif fn == 'A'
-            (a > 0) && (for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]]] = x1; end); nx+=p.ndeps
-        elseif fn == 'B'
-            (a > 0) && (for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]]] = x1; end); nx+=p.ndeps
-        else
-            error("Unknown feature $(fn)")
-        end
+        if (a > 0)
+            if fn == 'w'
+                copy!(sub(x, nx+1:(nx+nw)), sub(s.wvec, 1:nw, int(a)))
+            elseif fn == 'p'
+                copy!(sub(x, nx+1:(nx+nw)), sub(s.wvec, nw+1:nw+nw, int(a)))
+            elseif fn == 'd'
+                (d > 0) && (x[nx+(d>10?6:d>5?5:d)] = x1)
+            elseif fn == 'L'
+                x[nx+1+p.deprel[a]] = x1
+            elseif fn == 'a'
+                x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a])] = x1
+            elseif fn == 'b'
+                x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a])] = x1
+            elseif fn == 'A'
+                for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]]] = x1; end
+            elseif fn == 'B'
+                for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]]] = x1; end
+            else
+                error("Unknown feature $(fn)")
+            end
+        end # if (a > 0)
+        nx += flen1(fn, nw, nd)
     end
     @assert nx == length(x)
     return x
@@ -93,13 +97,21 @@ function flen(p::Parser, s::Sentence, flist::Features)
     nx = 0
     nw = wdim(s) >> 1
     nd = p.ndeps
-    fs = "wpdLabAB"
-    dx = [nw,nw,6,nd+1,10,10,nd,nd]
     for f in flist
-        i = search(fs, f[end])
-        @assert i>0
-        nx += dx[i]
+        nx += flen1(f[end], nw, nd)
     end
     return nx
+end
+
+function flen1(c::Char, nw::Integer,nd::Integer)
+    c == 'w' && return nw
+    c == 'p' && return nw
+    c == 'd' && return 6
+    c == 'L' && return(nd+1)
+    c == 'a' && return 10
+    c == 'b' && return 10
+    c == 'A' && return nd
+    c == 'B' && return nd
+    error("Unknown feature character $c")
 end
 
