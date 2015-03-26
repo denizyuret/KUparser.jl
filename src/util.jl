@@ -76,3 +76,4 @@ end
 
 wdim(s)=size(s.wvec,1)
 wcnt(s)=size(s.wvec,2)
+

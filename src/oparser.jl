@@ -31,7 +31,7 @@ function oparse(c::Corpus, f::Features, ndeps::Integer, ncpu::Integer)
     pxy = pmap(procs(d)) do x
         oparse(localpart(d), f, ndeps)
     end
-    rmprocs(workers()); sleep(2)
+    rmworkers()
     p = vcat(map(z->z[1], pxy)...)
     x = hcat(map(z->z[2], pxy)...)
     y = hcat(map(z->z[3], pxy)...)
