@@ -100,7 +100,7 @@ tacl13wordtag = [tacl13words; tacl13tags]
 # s0L: dependency label for s0 (NA for n0!)
 # s0sl,s0sr: set of dependency labels to the left/right of s0
 
-acl11eager = Int8[
+acl11eager = ASCIIString[
 	# # Single Words
 	# f("s0wp_%s" % (s0wp))
 "s0w"	# f("s0w_%s"  % (s0w))
