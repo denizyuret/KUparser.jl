@@ -78,11 +78,10 @@ function gparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatc
 end
 
 function initgparse(sent::Sentence, net::Net, feats::Features, ndeps::Integer)
-    (ndims, nword) = size(sent.wvec)
+    p = ArcHybrid(wcnt(sent),ndeps)
     xtype = eltype(net[1].w)
-    xrows = flen(ndims, feats)
-    xcols = 2 * (nword - 1)
-    p = ArcHybrid(nword,ndeps)
+    xrows = flen(p, sent, feats)
+    xcols = 2 * (p.nword - 1)
     x = Array(xtype, xrows, xcols)
     y = zeros(xtype, p.nmove, xcols)
     cost = Array(Pval,p.nmove)
@@ -97,7 +96,7 @@ function initgparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, n
     xcols = 2 * (nword - nsent)
     wvec1 = corpus[1].wvec
     wdims = size(wvec1,1)
-    xrows = flen(wdims, feats)  # TODO: flen and other features.jl fns may need ndeps!
+    xrows = flen(p[1], corpus[1], feats)
     xtype = eltype(wvec1)
     yrows = p[1].nmove
     x = Array(xtype, xrows, xcols)      # feature vectors
