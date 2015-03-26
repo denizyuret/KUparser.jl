@@ -117,8 +117,10 @@ function main()
     end
 
     feats=eval(parse("KUparser.Flist."*args["feats"]))
-    xrows=flen(wdim(data[1][1]), feats)
-    yrows=KUparser.ArcHybrid(1,length(deprel)).nmove # TODO: change when multiple parsers implemented
+    s1 = data[1][1]
+    p1 = KUparser.ArcHybrid(wcnt(s1),length(deprel)) # TODO: change when multiple parsers implemented
+    xrows=flen(p1, s1, feats)
+    yrows=p1.nmove 
 
     net=KUnet.newnet(KUnet.relu, [xrows; args["hidden"]; yrows]...)
     net[end].f=KUnet.logp
