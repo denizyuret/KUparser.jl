@@ -24,10 +24,10 @@
 # A: set of left dependency labels
 # B: set of right dependency labels
 
-typealias FeatureList Vector{ASCIIString}
+typealias Features Vector{ASCIIString}
 
-function featurevec(p::Parser, s::Sentence, flist::FeatureList,
-                    x::AbstractArray=Array(wtype(s),flen(p,s,flist),1))
+function features(p::Parser, s::Sentence, flist::Features,
+                  x::AbstractArray=Array(wtype(s),flen(p,s,flist),1))
     fill!(x, zero(eltype(x)))
     nx = 0
     nw = wdim(s) >> 1
@@ -89,7 +89,7 @@ function featurevec(p::Parser, s::Sentence, flist::FeatureList,
     return x
 end
 
-function flen(p::Parser, s::Sentence, flist::FeatureList)
+function flen(p::Parser, s::Sentence, flist::Features)
     nx = 0
     nw = wdim(s) >> 1
     nd = p.ndeps
