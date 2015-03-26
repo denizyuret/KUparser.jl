@@ -68,9 +68,9 @@ function features(p::Parser, s::Sentence, flist::Features,
         fn = f[n]
         if (a > 0)
             if fn == 'w'
-                copy!(sub(x, nx+1:(nx+nw)), sub(s.wvec, 1:nw, int(a)))
+                copy!(sub(x, nx+1:(nx+nw), 1), sub(s.wvec, 1:nw, int(a)))
             elseif fn == 'p'
-                copy!(sub(x, nx+1:(nx+nw)), sub(s.wvec, nw+1:nw+nw, int(a)))
+                copy!(sub(x, nx+1:(nx+nw), 1), sub(s.wvec, nw+1:nw+nw, int(a)))
             elseif fn == 'd'
                 (d > 0) && (x[nx+(d>10?6:d>5?5:d)] = x1)
             elseif fn == 'L'
