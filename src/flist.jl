@@ -1,5 +1,3 @@
-typealias Features Matrix{Int8}
-
 module Flist                    # feature matrices
 
 # Goldberg&Nivre TACL13 ArcHybrid features from: tacl2013dynamicoracles/lefttoright/features:HybridFeatures
@@ -10,22 +8,22 @@ module Flist                    # feature matrices
 # use word half of vector (c=+4) for form, context half of vector (c=-4) for tag
 # No need for feature combinations, we have a nonlinear model.
 
-tacl13hybrid = Int8[
+tacl13hybrid = ASCIIString[
 	# (1)
--1 0 4	# append("s0_%s" % s0)
--1 0 -4	# append("Ts0_%s" % Ts0)
+"s0w"	# append("s0_%s" % s0)
+"s0p"	# append("Ts0_%s" % Ts0)
         # append("Ts0s0_%s_%s" % (Ts0, s0))
 
--2 0 4	# append("s1_%s" % s1)
--2 0 -4	# append("Ts1_%s" % Ts1)
+"s1w"	# append("s1_%s" % s1)
+"s1p"	# append("Ts1_%s" % Ts1)
      	# append("Ts1s1_%s_%s" % (Ts1, s1))
 
-0 0 4	# append("w0_%s" % w0)
-0 0 -4	# append("Tw0_%s" % Tw0)
+"n0w"	# append("w0_%s" % w0)
+"n0p"	# append("Tw0_%s" % Tw0)
 	# append("Tw0w0_%s_%s" % (Tw0, w0))
 	# +hybrid
-1 0 4	# append("w1_%s" % w1)
-1 0 -4	# append("Tw1_%s" % Tw1)
+"n1w"	# append("w1_%s" % w1)
+"n1p"	# append("Tw1_%s" % Tw1)
 	# append("Tw1w1_%s_%s" % (Tw1, w1))
 
 	# (2)
@@ -54,11 +52,11 @@ tacl13hybrid = Int8[
 	# append("Ts1s0Tw0_%s_%s_%s" % (Ts1,s0,Tw0))
 	
 	# (4) rc -1  lc 1
--2 1 -4	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
+"s1rp"	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
 	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Ts0))
--2 -1 -4 # append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
--1 -1 -4 # append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
--1 1 -4	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
+"s1lp"	# append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
+"s0lp"	# append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
+"s0rp"	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
 	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Tlcs1, s0))
 	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Trcs0))
 	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Trcs1, s0))
@@ -68,7 +66,7 @@ tacl13hybrid = Int8[
 	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw0))
 	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw1))
 	# append("Ts0Tlcs0Tw0_%s_%s_%s" % (Ts0,Tlcs0,Tw0))
-0 -1 -4	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
+"n0lp"	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
 	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Tlcs0,w0))
 	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Trcs0,w0))
 	# append("Ts0w0Tlcw0_%s_%s_%s" % (Ts0,w0,Tlcw0))
@@ -84,30 +82,8 @@ tacl13hybrid = Int8[
 
 # Variants of tacl13hybrid:
 
-tacl13words = Int8[
--1 -1 4  # s0l
--1 0 4	 # s0
--1 1 4	 # s0r
--2 -1 4	 # s1l
--2 0 4	 # s1
--2 1 4	 # s1r
-0 -1 4	 # n0l
-0 0 4	 # n0
-1 0 4	 # n1
-]
-
-tacl13tags = Int8[
--1 -1 -4 # s0l
--1 0 -4	 # s0
--1 1 -4	 # s0r
--2 -1 -4 # s1l
--2 0 -4	 # s1
--2 1 -4	 # s1r
-0 -1 -4	 # n0l
-0 0 -4	 # n0
-1 0 -4	 # n1
-]
-
+tacl13words = ASCIIString["s0lw", "s0w", "s0rw", "s1lw", "s1w", "s1rw", "n0lw", "n0w", "n1w"]
+tacl13tags  = ASCIIString["s0lp", "s0p", "s0rp", "s1lp", "s1p", "s1rp", "n0lp", "n0p", "n1p"]
 tacl13wordtag = [tacl13words; tacl13tags]
 
 # Goldberg&Nivre TACL13 ArcEager features from: 
@@ -127,17 +103,17 @@ tacl13wordtag = [tacl13words; tacl13tags]
 acl11eager = Int8[
 	# # Single Words
 	# f("s0wp_%s" % (s0wp))
--1 0 4	# f("s0w_%s"  % (s0w))
--1 0 -4	# f("s0p_%s"  % (s0p))
+"s0w"	# f("s0w_%s"  % (s0w))
+"s0p"	# f("s0p_%s"  % (s0p))
 	# f("n0wp_%s" % (n0wp))
-0 0 4	# f("n0w_%s"  % (n0w))
-0 0 -4	# f("n0p_%s"  % (n0p))
+"n0w"	# f("n0w_%s"  % (n0w))
+"n0p"	# f("n0p_%s"  % (n0p))
 	# f("n1wp_%s" % (n1wp))
-1 0 4	# f("n1w_%s"  % (n1w))
-1 0 -4	# f("n1p_%s"  % (n1p))
+"n1w"	# f("n1w_%s"  % (n1w))
+"n1p"	# f("n1p_%s"  % (n1p))
 	# f("n2wp_%s" % (n2wp))
-2 0 4	# f("n2w_%s"  % (n2w))
-2 0 -4	# f("n2p_%s"  % (n2p))
+"n2w"	# f("n2w_%s"  % (n2w))
+"n2p"	# f("n2p_%s"  % (n2p))
 	# 
 	# # Pairs
 	# f("s0wp,n0wp_%s_%s" % (s0wp, n0wp))
@@ -158,7 +134,7 @@ acl11eager = Int8[
 	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp)) => n0lp (handled in unigram section)
 	# 
 	# # Distance
-0 0 0	# f("s0wd_%s:%s" % (s0w, d)) => d
+"s0d"	# f("s0wd_%s:%s" % (s0w, d)) => d
 	# f("s0pd_%s:%s" % (s0p, d))
 	# f("n0wd_%s:%s" % (n0w, d))
 	# f("n0pd_%s:%s" % (n0p, d))
@@ -166,57 +142,80 @@ acl11eager = Int8[
 	# f("s0p,n0p,d_%s:%s:%s" % (s0p, n0p, d))
 	# 
 	# # Valence
-0 0 0	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
+"s0b"	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
 	# f("s0pvr_%s:%s" % (s0p, s0vr))
-0 0 0	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
+"s0a"	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
 	# f("s0pvl_%s:%s" % (s0p, s0vl))
-0 0 0	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
+"n0a"	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
 	# f("n0pvl_%s:%s" % (n0p, n0vl))
 	# 
 	# # Unigrams
-0 0 0	# f("s0hw_%s" % (s0hw))
-0 0 0	# f("s0hp_%s" % (s0hp))
-0 0 0	# f("s0L_%s" % (s0L))
+"s0hw"	# f("s0hw_%s" % (s0hw))
+"s0hp"	# f("s0hp_%s" % (s0hp))
+"s0L"	# f("s0L_%s" % (s0L))
 	# 
--1 -1 4	# f("s0lw_%s" % (s0lw))
--1 -1 -4 # f("s0lp_%s" % (s0lp))
-0 0 0	# f("s0lL_%s" % (s0lL))
+"s0lw"	# f("s0lw_%s" % (s0lw))
+"s0lp"	# f("s0lp_%s" % (s0lp))
+"s0lL"	# f("s0lL_%s" % (s0lL))
 	# 
--1 1 4	# f("s0rw_%s" % (s0rw))
--1 1 -4	# f("s0rp_%s" % (s0rp))
-0 0 0	# f("s0rL_%s" % (s0rL))
+"s0rw"	# f("s0rw_%s" % (s0rw))
+"s0rp"	# f("s0rp_%s" % (s0rp))
+"s0rL"	# f("s0rL_%s" % (s0rL))
 	# 
-0 -1 4	# f("n0lw_%s" % (n0lw))
-0 -1 -4	# f("n0lp_%s" % (n0lp))
-0 0 0	# f("n0lL_%s" % (n0lL))
+"n0lw"	# f("n0lw_%s" % (n0lw))
+"n0lp"	# f("n0lp_%s" % (n0lp))
+"n0lL"	# f("n0lL_%s" % (n0lL))
 	# 
 	# # Third-order
 	# #do we really need the non-grandparent ones?
-0 0 0	# f("s0h2w_%s" % (s0h2w))
-0 0 0	# f("s0h2p_%s" % (s0h2p))
-0 0 0	# f("s0hL_%s"  % (s0hL))
--1 -2 4	# f("s0l2w_%s" % (s0l2w))
--1 -2 -4 # f("s0l2p_%s" % (s0l2p))
-0 0 0	# f("s0l2L_%s" % (s0l2L))
--1 2 4	# f("s0r2w_%s" % (s0r2w))
--1 2 -4	# f("s0r2p_%s" % (s0r2p))
-0 0 0	# f("s0r2L_%s" % (s0r2L))
-0 -2 4	# f("n0l2w_%s" % (n0l2w))
-0 -2 -4	# f("n0l2p_%s" % (n0l2p))
-0 0 0	# f("n0l2L_%s" % (n0l2L))
+"s0h2w"	# f("s0h2w_%s" % (s0h2w))
+"s0h2p"	# f("s0h2p_%s" % (s0h2p))
+"s0hL"	# f("s0hL_%s"  % (s0hL))
+"s0l2w"	# f("s0l2w_%s" % (s0l2w))
+"s0l2p"	# f("s0l2p_%s" % (s0l2p))
+"s0l2L"	# f("s0l2L_%s" % (s0l2L))
+"s0r2w"	# f("s0r2w_%s" % (s0r2w))
+"s0r2p"	# f("s0r2p_%s" % (s0r2p))
+"s0r2L"	# f("s0r2L_%s" % (s0r2L))
+"n0l2w"	# f("n0l2w_%s" % (n0l2w))
+"n0l2p"	# f("n0l2p_%s" % (n0l2p))
+"n0l2L"	# f("n0l2L_%s" % (n0l2L))
 	# f("s0p,s0lp,s0l2p_%s_%s_%s" % (s0p, s0lp, s0l2p))
 	# f("s0p,s0rp,s0r2p_%s_%s_%s" % (s0p, s0rp, s0r2p))
 	# f("s0p,s0hp,s0h2p_%s_%s_%s" % (s0p, s0hp, s0h2p))
 	# f("n0p,n0lp,n0l2p_%s_%s_%s" % (n0p, n0lp, n0l2p))
 	# 
 	# # Labels
-0 0 0	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
+"s0B"	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
 	# f("s0psr_%s_%s" % (s0p, s0sr))
-0 0 0	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
+"s0A"	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
 	# f("s0psl_%s_%s" % (s0p, s0sl))
-0 0 0	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
+"n0A"	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
 	# f("n0psl_%s_%s" % (n0p, n0sl))
 ] # tacl13eager
+
+
+
+# Old feature format before we switched to ints:
+# f::Features is a nx3 matrix whose rows determine which features to extract
+# Each row of f consists of the following three values:
+# 1. anchor word: 0:n0, 1:n1, 2:n2, ..., -1:s0, -2:s1, -3:s2, ...
+# 2. target word: 0:self, 1:rightmost child, 2:second rightmost, -1:leftmost, -2:second leftmost ...
+# 3. feature: One of the features listed below.
+#
+# 0:wvec (word+context if token, dim depends on encoding)
+# +-1: exists/doesn't (one bit)
+# +-2: right/left child count (4 bits, == encoding: 0,1,2,3+)
+# +3: distance to right (4 bits, == encoding: 1,2,3,4+, root is 4+)
+# -3: average of in-between tokens to the right (dim:wvec)
+# +-4: word/context half of vector (dim:wvec/2, only valid for token encoding, assumes first half=word, second half=context)
+# +-5: right/left child count (4 bits, >= encoding: >=1, >=2, >=3, >=4)
+# +-6: right/left child count (4 bits, <= encoding: <=0, <=1, <=2, <=3)
+# +7: distance to right, >= encoding (8 bits, >= encoding: >=2, >=3, >=4, >=6, >=8, >=12, >=16, >=20)
+# -7: distance to right, <= encoding (8 bits, <= encoding: <=1, <=2, <=3, <=4, <=6, <=8, <=12, <=16)
+# +-8: average of in-between word/context vectors to the right (dim:wvec/2)
+# +-9: head exists/doesn't (one bit)
+
 
 
 # 0.0418668 archybrid_conll07EnglishToken_wikipedia2MUNK-100_rbf376678_1014_cache.mat (trn/tst) (rbf-gamma:0.376747095368119)
