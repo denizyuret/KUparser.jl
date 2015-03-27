@@ -10,6 +10,7 @@ export Sentence, Corpus
 include("util.jl");	  export @date, evalparse, wdim, wcnt
 include("parser.jl");     export Parser
 include("archybrid.jl");
+include("arceager.jl");
 include("features.jl");   export features, flen         # these extract features
 include("flist.jl");      export Features, Flist 	# these are feature templates
 include("gparser.jl");    export gparse
