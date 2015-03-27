@@ -8,11 +8,10 @@ typealias ArcHybrid Parser{:ArcHybrid}
 # Moves are represented by integers 1..nmoves(p), 0 is not valid.
 # They correspond to SHIFT,L1,R1,L2,R2,...,L[ndeps],R[ndeps]
 
-@compat typealias Move Integer
 nmoves(p::ArcHybrid)=(1+p.ndeps<<1)
 isshift(p::ArcHybrid, m::Move)=(m==1)
-isleft(p::ArcHybrid, m::Move)=(m&1==0)
-isright(p::ArcHybrid, m::Move)=(m&1==1)
+isleft(p::ArcHybrid, m::Move)=((m>=2)&&(m&1==0))
+isright(p::ArcHybrid, m::Move)=((m>=3)&&(m&1==1))
 movelabel(p::ArcHybrid, m::Move)=convert(DepRel,m>>1)
 leftmove(p::ArcHybrid, lab::DepRel)=(lab<<1)
 rightmove(p::ArcHybrid, lab::DepRel)=(1+lab<<1)
