@@ -1,45 +1,54 @@
-# We define ArcHybrid, ArcEager etc. as immutable children of Parser
-# methods: move!, movecosts, anyvalidmoves
-# fields: state, nword, ndeps, nmove
-abstract Parser
+# We define Parser{T} as a parametric type where T is :ArcHybrid,
+# :ArcEager etc. to allow specialization of methods.  Thanks to
+# julia-users members Toivo Henningsson and Simon Danisch for suggesting
+# this design.
+
+typealias ParserType Symbol
+
+# Parser methods: arc!, copy!
+# Parser{T} methods: init!, move!, movecosts, anyvalidmoves, nmoves
 
 # Some utility types
-@compat typealias Pval UInt8    # Type representing sentence position
-@compat typealias Mval UInt8    # Type representing parser move
-@compat typealias Dval UInt8    # Type representing dependency label
-typealias Pvec AbstractVector{Pval}
-typealias Dvec AbstractVector{Dval}
-typealias Pmat AbstractMatrix{Pval}
-const Pinf=typemax(Pval)
-Pzeros(n::Integer...)=zeros(Pval, n...)
-Dzeros(n::Integer...)=zeros(Dval, n...)
+@compat typealias Position UInt8
+@compat typealias DepRel UInt8
+typealias Pvec AbstractVector{Position}
+typealias Dvec AbstractVector{DepRel}
+typealias Pmat AbstractMatrix{Position}
+const Pinf=typemax(Position)
+Pzeros(n::Integer...)=zeros(Position, n...)
+Dzeros(n::Integer...)=zeros(DepRel, n...)
 
 # Each parser has a ParserState field representing the stack, 
 # buffer, set of arcs etc. i.e. all the mutable stuff.
-type ParserState
-    wptr::Pval    # index of first word in buffer
-    sptr::Pval    # index of last word (top) of stack
-    stack::Pvec   # 1xn vector for stack of indices
-    head::Pvec    # 1xn vector of heads
-    deprel::Dvec  # 1xn vector of dependency labels
-    lcnt::Pvec    # lcnt(h): number of left deps for h
-    rcnt::Pvec    # rcnt(h): number of right deps for h
-    ldep::Pmat    # nxn matrix for left dependents
-    rdep::Pmat    # nxn matrix for right dependents
+type Parser{T}
+    nword::Position       # number of words in sentence
+    ndeps::DepRel         # number of dependency labels (excluding ROOT)
+    wptr::Position        # index of first word in buffer
+    sptr::Position        # index of last word (top) of stack
+    stack::Pvec           # 1xn vector for stack of indices
+    head::Pvec            # 1xn vector of heads
+    deprel::Dvec          # 1xn vector of dependency labels
+    lcnt::Pvec            # lcnt(h): number of left deps for h
+    rcnt::Pvec            # rcnt(h): number of right deps for h
+    ldep::Pmat            # nxn matrix for left dependents
+    rdep::Pmat            # nxn matrix for right dependents
     
-    function ParserState(nword::Integer)
-        @assert (nword <= (typemax(Pval)-1))    "nword > $(typemax(Pval)-1)"
-        p = new(1, 0, Pzeros(nword),           # wptr, sptr, stack
+    function Parser(nword::Integer, ndeps::Integer)
+        @assert (nword < typemax(Position)) "nword >= $(typemax(Position))"
+        @assert (ndeps < typemax(DepRel)) "ndeps >= $(typemax(DepRel))"
+        p = new(nword, ndeps,                  # nword, ndeps
+                1, 0, Pzeros(nword),           # wptr, sptr, stack
                 Pzeros(nword), Dzeros(nword),  # head, deprel
                 Pzeros(nword), Pzeros(nword),  # lcnt, rcnt
                 Pzeros(nword,nword), Pzeros(nword,nword)) # ldep, rdep
+        init!(p)
         return p
     end
 end # ParserState
 
 # arc! sets the head of d as h with label l
 
-function arc!(p::ParserState, h::Pval, d::Pval, l::Dval)
+function arc!(p::Parser, h::Position, d::Position, l::DepRel)
     p.head[d] = h
     p.deprel[d] = l
     if d < h
@@ -53,7 +62,9 @@ end # arc!
 
 # Extend copy! to copy ParserStates
 import Base.copy!
-function copy!(dst::ParserState, src::ParserState)
+function copy!(dst::Parser, src::Parser)
+    @assert dst.nword == src.nword
+    @assert dst.ndeps == src.ndeps
     dst.wptr = src.wptr
     dst.sptr = src.sptr
     copy!(dst.stack, src.stack)
@@ -63,16 +74,11 @@ function copy!(dst::ParserState, src::ParserState)
     copy!(dst.rcnt, src.rcnt)
     copy!(dst.ldep, src.ldep)
     copy!(dst.rdep, src.rdep)
+    dst
 end # copy!
 
-# Moves are represented by integers 1..nmove, 0 is not valid
-isshift(p,m)=(m==p.nmove)     # The last move is SHIFT
-isreduce(p,m)=(m==p.nmove-1)  # The penultimate move is REDUCE in ArcEager
-# The other moves are left/right dependency moves
-# Labels are represented by integers 1..ndeps
-const LEFT=1                  # Odd moves are LEFT
-const RIGHT=0                 # Even moves are RIGHT
-midx(d,l)=(l<<1-d)            # Move number from direction and label
-mdep(m)=((m+1)>>1)            # Dependency label of a move
-mdir(m)=(m&1)                 # Direction of a move
+import Base.isequal
+function isequal(a::Parser, b::Parser)
+    all(map(isequal, map(n->a.(n), fieldnames(a)), map(n->b.(n), fieldnames(a))))
+end
 
