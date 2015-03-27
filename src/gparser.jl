@@ -1,8 +1,8 @@
 # The greedy transition based parser parses the sentence using the
 # following steps:
 
-function gparse(sent::Sentence, net::Net, feats::Features, ndeps::Integer)
-    (parser,x,y,cost,score) = initgparse(sent,net,feats,ndeps)
+function gparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
+    (parser,x,y,cost,score) = initgparse(pt, sent,net,feats,ndeps)
     nx = 0
     while anyvalidmoves(parser)
         nx += 1; xx = sub(x,:,nx:nx)
@@ -19,8 +19,8 @@ end
 
 # We can parse a corpus using map:
 
-function gparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer)
-    pxy = map(s->gparse(s,net,feats,ndeps), corpus)
+function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer)
+    pxy = map(s->gparse(pt, s,net,feats,ndeps), corpus)
     p = map(z->z[1], pxy)
     x = hcat(map(z->z[2], pxy)...)
     y = hcat(map(z->z[3], pxy)...)
@@ -32,9 +32,9 @@ end
 # 1. We process multiple sentences to minibatch net input.
 #    This speeds up predict.
 
-function gparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
+function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
     (nbatch == 0 || nbatch > length(corpus)) && (nbatch = length(corpus))
-    (p,x,y,cost,score) = initgparse(corpus, net, feats, ndeps, nbatch)
+    (p,x,y,cost,score) = initgparse(pt, corpus, net, feats, ndeps, nbatch)
     nx = 0
     for s1 = 1:nbatch:length(corpus)
         s2 = min(length(corpus), s1+nbatch-1)
@@ -63,12 +63,12 @@ end
 # 2. We do multiple batches in parallel to utilize CPU cores.
 #    This speeds up features.
 
-function gparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer, ncpu::Integer)
+function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer, ncpu::Integer)
     Main.resetworkers(ncpu)
     d = distproc(corpus, workers()[1:ncpu])
     net = testnet(net)
     pxy = pmap(procs(d)) do x
-        gparse(localpart(d), copy(net, :gpu), feats, ndeps, nbatch)
+        gparse(pt, localpart(d), copy(net, :gpu), feats, ndeps, nbatch)
     end
     Main.rmworkers()
     p = vcat(map(z->z[1], pxy)...)
@@ -77,19 +77,20 @@ function gparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatc
     (p, x, y)
 end
 
-function initgparse(sent::Sentence, net::Net, feats::Features, ndeps::Integer)
+function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
     p = ArcHybrid(wcnt(sent),ndeps)
+    nmove = nmoves(p)
     xtype = eltype(net[1].w)
     xrows = flen(p, sent, feats)
     xcols = 2 * (p.nword - 1)
     x = Array(xtype, xrows, xcols)
-    y = zeros(xtype, p.nmove, xcols)
-    cost = Array(Pval,p.nmove)
-    score = Array(xtype, p.nmove, 1)
+    y = zeros(xtype, nmove, xcols)
+    cost = Array(Position,nmove)
+    score = Array(xtype, nmove, 1)
     (p, x, y, cost, score)
 end
 
-function initgparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
+function initgparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
     p = map(s->ArcHybrid(wcnt(s),ndeps), corpus)
     nsent = length(corpus)
     nword = sum(wcnt, corpus)
@@ -98,10 +99,10 @@ function initgparse(corpus::Corpus, net::Net, feats::Features, ndeps::Integer, n
     wdims = size(wvec1,1)
     xrows = flen(p[1], corpus[1], feats)
     xtype = eltype(wvec1)
-    yrows = p[1].nmove
+    yrows = nmoves(p[1])
     x = Array(xtype, xrows, xcols)      # feature vectors
     y = zeros(xtype, yrows, xcols)      # mincost moves, 1-of-k encoding
-    cost = Array(Pval, yrows)
+    cost = Array(Position, yrows)
     score = Array(xtype, yrows, xcols)  # predicted move scores
     (p,x,y,cost,score)
 end
