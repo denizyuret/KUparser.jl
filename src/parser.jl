@@ -17,6 +17,7 @@ typealias Pmat AbstractMatrix{Position}
 const Pinf=typemax(Position)
 Pzeros(n::Integer...)=zeros(Position, n...)
 Dzeros(n::Integer...)=zeros(DepRel, n...)
+typealias Move Integer
 
 # Each parser has a ParserState field representing the stack, 
 # buffer, set of arcs etc. i.e. all the mutable stuff.
