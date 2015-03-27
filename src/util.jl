@@ -73,8 +73,3 @@ function evalparse(parsers, sentences)
     return (uas, uas2, las, las2, uem, lem)
 end
 
-import Base.isequal
-function isequal(a::Parser, b::Parser)
-    all(map(isequal, map(n->a.(n), fieldnames(a)), map(n->b.(n), fieldnames(a))))
-end
-
