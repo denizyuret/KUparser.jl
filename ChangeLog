@@ -1,3 +1,53 @@
+2015-03-27  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/parser.jl: BEST WAY TO REPRESENT PARSERS WITH COMMON FIELDS
+	BUT DIFFERENT SETS OF MOVES 
+
+	I've been wrecking my brain to figure out the best way to do this
+	in Julia.  We have a set of objects (parsers in my case), with
+	common state elements and constructor (buffer, stack, a set of
+	arcs etc.), but different move sets (arceager, archybrid etc. see
+	this if interested).  Thus functions like validmoves(), move!()
+	etc. are of several different types.  So far I have considered:
+
+	1. Just define multiple composite types with different move()
+	methods (pro), listing the same fields and constructor for
+	each (con).
+
+	2. Define a single "state" type that has the necessary fields and
+	constructor (pro), include a "state" as a field in multiple
+	composite types requiring double reference (con: i.e. you need to
+	type parser.state.field instead of just parser.field).
+
+	3. Put the list of (common) fields in a file and include this file
+	in the definition of each composite type.  This prevents the
+	problem of repeating the same code, but makes me a bit uneasy.  It
+	also does not solve the constructor problem (I guess I can put the
+	body of the constructors in a common file and include it, but that
+	makes me even more uneasy).
+
+	4. Have a single composite type with a field that indicates the
+	"move policy".  Then have functions like validmoves(), move!()
+	etc. branch on this move policy.  But that's just throwing away
+	the beautiful function overloading machinery of Julia.
+
+	5. Any solutions using parametric types, singleton types etc.?
+
+	To see what the interface is:
+
+	gparser fields: nword (not necessary), nmove (could be a fn)
+	gparser methods: features, anyvalidmoves, move!, movecosts, flen
+	oparser fields: head and deprel (for debugging) nword, nmove (for init)
+	oparser methods: same as gparser
+	the list of p is returned, so its contents need to be accessible
+	+ could have head and deprel as functions as well
+	+ in fact probably best never to use fields
+	all parsers need to take the "parser type" as an argument
+	- make sure arceasy follows this pattern
+	- implement nolabel versions as parser types as well
+	bparser methods: same as gparser
+	bparser fields: nmove
+
 2015-03-26  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* ZN11:
@@ -26,7 +76,7 @@
 	const unsigned MAX_SENTENCE_SIZE_BITS = 8 ;
 
 	* TODO:
-	- Add 256 check to the code.
+	+ Add 256 check to the code.
 	+ Implement distance.
 	+ Find max number of deps.
 	+ Implement heads.
@@ -36,6 +86,11 @@
 	- Run acl11 experiments.
 	- Run conll07 experiments (arceager).
 	- Design better featureset for archybrid.
+	- Make latestop default for beamparser.
+
+	- Testing new features and running variance experiment:
+	@@480131 0.50531 gptacl13   dyuret       r     03/26/2015 19:34:40 ilac.q@ilac-2-0.local              1        
+	@@480132 0.50531 optacl13   dyuret       r     03/26/2015 19:34:55 ilac.q@ilac-2-1.local              1        
 
 2015-03-25  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -49,17 +104,17 @@
 	features do not use the labels.
 
 	parser	score1	score2	GN13
-	oparser	.8699	.8675	.8643	03242000-optacl13.out
-	gparser	.8793	.8789	.8762	03250401-gptacl13.out
+	oparser	.8699	.8675	.8643	03242000-optacl13.out (died at 78, best at 66)
+	gparser	.8793	.8789	.8762	03250401-gptacl13.out (died at 213, best at 169)
 	beam10	.8865	---	---
 
 	Things tried:
 	+ .8789 tacl13hybrid features
 	+ .8727 unlabeled training
 	+ .8709	just word features
-	+ ????? just postag features
 	+ ????? both word+pos features
 	+ .8659 no dropout
+	+ .7877 just postag features
 
 
 	* Experiments: conll07 archybrid experiments.
@@ -68,8 +123,10 @@
 	$$480092 0.50531 gptacl13w  dyuret       r     03/25/2015 13:35:10 ilac.q@ilac-2-1.local
 	256	0.9738699	0.87087744
 
-	- use only context vecs: @@480093 0.50531 gptacl13p  dyuret       r     03/25/2015 13:35:10 ilac.q@ilac-2-0.local
+	+ 03270146-gptacl13p.out: use only context vecs:
+	$$480093 0.50531 gptacl13p  dyuret       r     03/25/2015 13:35:10 ilac.q@ilac-2-0.local
 	gptacl13p.out: crashed twice!?
+	187	0.8904479	0.78772736
 
 	- use both everywhere:
 	@@480094 0.50531 gptacl13wp dyuret       r     03/25/2015 13:35:40 ilac.q@ilac-3-0.local
@@ -83,7 +140,8 @@
 	$$480097 0.50531 gptacl13nl dyuret       qw    03/25/2015 13:46:17
 	228	0.98530364	0.8726764
 
-	x try multiple runs to see variance
+	- try multiple runs to see variance
+	
 	x extend training to 2x best
 	x use dev set or fixed epochs
 	- use archybrid with acl11 features with labels
@@ -190,9 +248,9 @@
 	+eval: including punctuation
 
 	* gptacl13: 3m32s/epoch
-	@@480081 0.50531 gptacl13   dyuret       r     03/24/2015 15:21:25 ilac.q@ilac-0-3.local
+	$$480081 0.50531 gptacl13   dyuret       r     03/24/2015 15:21:25 ilac.q@ilac-0-3.local
 	* optacl13: 3m33s/epoch
-	@@480080 0.50531 optacl13   dyuret       r     03/24/2015 15:20:10 ilac.q@ilac-2-1.local
+	$$480080 0.50531 optacl13   dyuret       r     03/24/2015 15:20:10 ilac.q@ilac-2-1.local
 
 	* TODO:
 	- add acl11eager to flist.
@@ -257,7 +315,7 @@
 
 	parser	dev	test1	test2
 	beam10a	.9186	.9132	.9136	03201925-julia3_btrain_jl.out: using whole beam to train, quit at epoch=77
-	beam64	.9205	.9131	.9154	bparse64.out -- running at epoch=86
+	beam64	.9212	.9151	.9163	bparse64.out -- running at epoch=128
 	beam10l	.9211	.9169	.9171	03220927-bparselatestop.out: no earlystop, crashed at epoch=207
 	beam10	.9205	.9150	.9166	03220548-bparsedbg.out: earlystop
 
