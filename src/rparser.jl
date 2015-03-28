@@ -6,7 +6,8 @@ function rparse(pt::ParserType, s::Sentence, ndeps::Integer)
     while anyvalidmoves(p)
         movecosts(p, s.head, s.deprel, c)
         if rand() < 0.1
-            r = rand(find(c .< Pinf))
+            f = find(c .< Pinf)
+            r = f[rand(1:length(f))]
         else
             r = indmin(c)
         end
@@ -35,6 +36,6 @@ end
 function initrparse(pt::ParserType, s::Sentence, ndeps::Integer)
     (ndims, nword) = size(s.wvec)
     p = Parser{pt}(nword, ndeps)
-    c = Array(Position,nmoves(p))
+    c = Array(Position, p.nmove)
     (p, c)
 end
