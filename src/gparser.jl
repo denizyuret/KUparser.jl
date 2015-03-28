@@ -79,14 +79,13 @@ end
 
 function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
     p = Parser{pt}(wcnt(sent),ndeps)
-    nmove = nmoves(p)
     xtype = eltype(net[1].w)
     xrows = flen(p, sent, feats)
     xcols = 2 * (p.nword - 1)
     x = Array(xtype, xrows, xcols)
-    y = zeros(xtype, nmove, xcols)
-    cost = Array(Position,nmove)
-    score = Array(xtype, nmove, 1)
+    y = zeros(xtype, p.nmove, xcols)
+    cost = Array(Position,p.nmove)
+    score = Array(xtype, p.nmove, 1)
     (p, x, y, cost, score)
 end
 
@@ -99,7 +98,7 @@ function initgparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, n
     wdims = size(wvec1,1)
     xrows = flen(p[1], corpus[1], feats)
     xtype = eltype(wvec1)
-    yrows = nmoves(p[1])
+    yrows = p[1].nmove
     x = Array(xtype, xrows, xcols)      # feature vectors
     y = zeros(xtype, yrows, xcols)      # mincost moves, 1-of-k encoding
     cost = Array(Position, yrows)

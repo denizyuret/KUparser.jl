@@ -6,24 +6,25 @@
 typealias ParserType Symbol
 
 # Parser methods: arc!, copy!
-# Parser{T} methods: init!, move!, movecosts, anyvalidmoves, nmoves
+# Parser{T} methods: init!, move!, movecosts, anyvalidmoves
 
 # Some utility types
 @compat typealias Position UInt8
 @compat typealias DepRel UInt8
+@compat typealias Move Integer
 typealias Pvec AbstractVector{Position}
 typealias Dvec AbstractVector{DepRel}
 typealias Pmat AbstractMatrix{Position}
 const Pinf=typemax(Position)
 Pzeros(n::Integer...)=zeros(Position, n...)
 Dzeros(n::Integer...)=zeros(DepRel, n...)
-typealias Move Integer
 
 # Each parser has a ParserState field representing the stack, 
 # buffer, set of arcs etc. i.e. all the mutable stuff.
 type Parser{T}
     nword::Position       # number of words in sentence
     ndeps::DepRel         # number of dependency labels (excluding ROOT)
+    nmove::Move           # number of possible moves (set by init!)
     wptr::Position        # index of first word in buffer
     sptr::Position        # index of last word (top) of stack
     stack::Pvec           # 1xn vector for stack of indices
@@ -37,7 +38,7 @@ type Parser{T}
     function Parser(nword::Integer, ndeps::Integer)
         @assert (nword < typemax(Position)) "nword >= $(typemax(Position))"
         @assert (ndeps < typemax(DepRel)) "ndeps >= $(typemax(DepRel))"
-        p = new(nword, ndeps,                  # nword, ndeps
+        p = new(nword, ndeps, 0,               # nword, ndeps, nmove
                 1, 0, Pzeros(nword),           # wptr, sptr, stack
                 Pzeros(nword), Dzeros(nword),  # head, deprel
                 Pzeros(nword), Pzeros(nword),  # lcnt, rcnt

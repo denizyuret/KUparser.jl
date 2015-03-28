@@ -124,7 +124,7 @@ function main()
     pt = symbol(args["arctype"])
     p1 = KUparser.Parser{pt}(wcnt(s1),length(deprel))
     xrows=KUparser.flen(p1, s1, feats)
-    yrows=KUparser.nmoves(p1)
+    yrows=p1.nmove
 
     net=KUnet.newnet(KUnet.relu, [xrows; args["hidden"]; yrows]...)
     net[end].f=KUnet.logp

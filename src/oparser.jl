@@ -43,9 +43,26 @@ function initoparse(pt::ParserType, s::Sentence, f::Features, ndeps::Integer)
     xtype = wtype(s)
     xrows = flen(p, s, f)
     xcols = 2 * (p.nword - 1)
-    nmove = nmoves(p)
     x = Array(xtype, xrows, xcols)
-    y = zeros(xtype, nmove, xcols)
-    c = Array(Position,nmove)
+    y = zeros(xtype, p.nmove, xcols)
+    c = Array(Position, p.nmove)
     (p, x, y, c)
+end
+
+function oparse_dbg(pt::ParserType, s::Sentence, f::Features, ndeps::Integer)
+    (p, x, y, c) = initoparse(pt, s, f, ndeps)
+    nx = 0; cost = 0
+    while anyvalidmoves(p)
+        nx += 1
+        features(p, s, f, sub(x,:,nx:nx))
+        movecosts(p, s.head, s.deprel, c)
+        (bestcost,bestmove) = findmin(c)
+        cost += bestcost
+        y[bestmove, nx] = one(eltype(y))
+        move!(p, bestmove)
+        println("$((bestmove,int(bestcost))) $(int(p.stack[1:p.sptr])) $(p.wptr) $(int(c))")
+    end
+    @assert nx == size(x,2)
+    @assert cost == sum((p.head .!= s.head) | (p.deprel .!= s.deprel))
+    (p, x, y)
 end
