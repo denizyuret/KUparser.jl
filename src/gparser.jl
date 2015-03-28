@@ -2,7 +2,7 @@
 # following steps:
 
 function gparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
-    (parser,x,y,cost,score) = initgparse(pt, sent,net,feats,ndeps)
+    (parser,x,y,cost,score) = initgparse(pt,sent,net,feats,ndeps)
     nx = 0
     while anyvalidmoves(parser)
         nx += 1; xx = sub(x,:,nx:nx)
@@ -20,7 +20,7 @@ end
 # We can parse a corpus using map:
 
 function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer)
-    pxy = map(s->gparse(pt, s,net,feats,ndeps), corpus)
+    pxy = map(s->gparse(pt,s,net,feats,ndeps), corpus)
     p = map(z->z[1], pxy)
     x = hcat(map(z->z[2], pxy)...)
     y = hcat(map(z->z[3], pxy)...)
@@ -78,7 +78,7 @@ function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps
 end
 
 function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
-    p = ArcHybrid(wcnt(sent),ndeps)
+    p = Parser{pt}(wcnt(sent),ndeps)
     nmove = nmoves(p)
     xtype = eltype(net[1].w)
     xrows = flen(p, sent, feats)
@@ -91,7 +91,7 @@ function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, n
 end
 
 function initgparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
-    p = map(s->ArcHybrid(wcnt(s),ndeps), corpus)
+    p = map(s->Parser{pt}(wcnt(s),ndeps), corpus)
     nsent = length(corpus)
     nword = sum(wcnt, corpus)
     xcols = 2 * (nword - nsent)
