@@ -11,6 +11,7 @@ include("features.jl");   export Features
 include("archybrid.jl");
 include("arceager.jl");
 include("arceager13.jl");
+include("archybrid13.jl");
 include("gparser.jl");    export gparse
 include("bparser.jl");    export bparse
 include("oparser.jl");    export oparse
