@@ -22,7 +22,7 @@
 	This will give us 5 epochs in 50 mins or 10 mins/epoch.
 	- Maybe we should try learningRate=1 to speed things up?
 
-	@@480159 0.50531 bp10acl11e dyuret       r     03/28/2015 18:26:40 ilac.q@ilac-3-0.local              1        
+	@@480162 0.50531 bp10acl11e dyuret       r     03/28/2015 19:31:40 ilac.q@ilac-2-0.local              1        
 
 	* GN13: comparison using labeled parsers (cont. 2015-03-25)
 	+ using exact feature sets acl11eager and tacl13hybrid as far as I know
@@ -44,7 +44,7 @@ DATA:	64	0.98047125	0.8686788
 DATA:	65	0.98105574	0.8712772
 
 	* 03281640-opconll07eager.out:
-	@@480150 0.50531 opconll07e dyuret       r     03/28/2015 12:11:55 ilac.q@ilac-2-1.local              1        
+	$$480150 0.50531 opconll07e dyuret       r     03/28/2015 12:11:55 ilac.q@ilac-2-1.local              1        
 DATA:	1	0.8356036	0.82290626
 DATA:	2	0.8547718	0.8237058
 DATA:	4	0.87467223	0.8374975
