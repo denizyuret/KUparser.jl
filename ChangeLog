@@ -1,7 +1,22 @@
 2015-03-27  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* src/arceager.jl: Finished and tested arceager.  Passes the
+	movecosts test.  However gives different results on 9 sentences of
+	conll07.tst from archybrid.  Confirmed one to be non-projective.
+	They may prefer different projectivizations.  However on sentence
+	35 the errors are different, hybrid=3, eager=5.
+
+	It turns out the default move ordering matters when oracle parsing
+	corpora with nonprojective sentences.  Fixed the orders that gave
+	the best results (LRS for hybrid, DLRS for eager).
+
+	+ DEBUG. *julia*
+	+ fix gparser.
+	- fix bparser.
+	+ train.jl does not work with arceager. *ilac-julia*
+
 	* src/parser.jl: BEST WAY TO REPRESENT PARSERS WITH COMMON FIELDS
-	BUT DIFFERENT SETS OF MOVES 
+	BUT DIFFERENT SETS OF MOVES
 
 	I've been wrecking my brain to figure out the best way to do this
 	in Julia.  We have a set of objects (parsers in my case), with
@@ -33,6 +48,23 @@
 
 	5. Any solutions using parametric types, singleton types etc.?
 
+	Best response from Simon Danisch:
+	I'd vote for toivo's suggestion.
+	So this could be a design:
+
+	immutable Parser{Policy}
+	common
+	fields
+	end
+
+	#construction
+	parser = Parser{:policy1}(...)
+	#specialize the functions to a policy:
+	validmove(::Parser{:policy1}) = ...
+	validmove(::Parser{:policy2}) = ...
+	#define functions for all parsers
+	move!(::Parser) = ...
+
 	To see what the interface is:
 
 	gparser fields: nword (not necessary), nmove (could be a fn)
@@ -47,6 +79,11 @@
 	- implement nolabel versions as parser types as well
 	bparser methods: same as gparser
 	bparser fields: nmove
+	arc!: head, deprel, lcnt, ldep, rcnt, rdep
+	move!: nmove, sptr, wptr, stack
+	validmoves: nmove, nword, wptr, sptr, L1, R1
+	anyvalidmoves: wptr, sptr, nword
+	movecosts: nword, nmove, wptr, sptr, stack, L1, R1
 
 2015-03-26  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -81,16 +118,20 @@
 	+ Find max number of deps.
 	+ Implement heads.
 	- Seriously test new feature code.
-	- Rerun some old experiments.
-	- Implement arceager.
+	- Rerun some old experiments with larger epoch or lower dropout.
+	+ Implement arceager.
 	- Run acl11 experiments.
 	- Run conll07 experiments (arceager).
 	- Design better featureset for archybrid.
 	- Make latestop default for beamparser.
 
-	- Testing new features and running variance experiment:
-	@@480131 0.50531 gptacl13   dyuret       r     03/26/2015 19:34:40 ilac.q@ilac-2-0.local              1        
-	@@480132 0.50531 optacl13   dyuret       r     03/26/2015 19:34:55 ilac.q@ilac-2-1.local              1        
+	+ 03271009-gptacl13.out: Testing new features and running variance experiment:
+	$$480131 0.50531 gptacl13   dyuret       r     03/26/2015 19:34:40 ilac.q@ilac-2-0.local
+	233	0.985691	0.8772736 (compare to .8789)
+
+	+ 03271008-optacl13.out:
+	$$480132 0.50531 optacl13   dyuret       r     03/26/2015 19:34:55 ilac.q@ilac-2-1.local
+	234	0.9848177	0.86887866 (compare to .8675)
 
 2015-03-25  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -110,14 +151,18 @@
 
 	Things tried:
 	+ .8789 tacl13hybrid features
+	+ .8789 both word+pos features
 	+ .8727 unlabeled training
 	+ .8709	just word features
-	+ ????? both word+pos features
 	+ .8659 no dropout
 	+ .7877 just postag features
 
+	It seems like context vectors are a sufficient substitute for
+	postags, they are also necessary, labeled training helps, and
+	dropout helps a lot.
 
-	* Experiments: conll07 archybrid experiments.
+	* Experiments: conll07 archybrid experiments.  Most have not
+	converged.  We need longer experiments.
 
 	+ 03260132-gptacl13w.out: use only word vecs:
 	$$480092 0.50531 gptacl13w  dyuret       r     03/25/2015 13:35:10 ilac.q@ilac-2-1.local
@@ -128,9 +173,9 @@
 	gptacl13p.out: crashed twice!?
 	187	0.8904479	0.78772736
 
-	- use both everywhere:
-	@@480094 0.50531 gptacl13wp dyuret       r     03/25/2015 13:35:40 ilac.q@ilac-3-0.local
-	45	0.9608776	0.875075
+	+ 03270848-gptacl13wp.out: use both everywhere:
+	$$480094 0.50531 gptacl13wp dyuret       r     03/25/2015 13:35:40 ilac.q@ilac-3-0.local
+	241	0.98982024	0.8788727
 
 	+ 03261450-gptacl13nd.out: try no dropout:
 	$$480095 0.00000 gptacl13nd dyuret       qw    03/25/2015 13:38:48
@@ -140,10 +185,10 @@
 	$$480097 0.50531 gptacl13nl dyuret       qw    03/25/2015 13:46:17
 	228	0.98530364	0.8726764
 
-	- try multiple runs to see variance
-	
-	x extend training to 2x best
-	x use dev set or fixed epochs
+	+ try multiple runs to see variance
+
+	+ extend training to 2x best
+	+ use dev set or fixed epochs
 	- use archybrid with acl11 features with labels
 
 	* acl11hybrid: dictionary.
@@ -253,21 +298,21 @@
 	$$480080 0.50531 optacl13   dyuret       r     03/24/2015 15:20:10 ilac.q@ilac-2-1.local
 
 	* TODO:
-	- add acl11eager to flist.
+	+ add acl11eager to flist.
 	- add acl11 adapted to hybrid?
-	- update features to have labels, labelsets, new encoding for valence and distance
+	+ update features to have labels, labelsets, new encoding for valence and distance
 	+ s0hp, s0hw, (we don't have heads)
 	+ d (s0n0, 10+ encoded, we have 4+ encoding with (-1 0 3), 8bit encodings with +-7)
 	+ s0vl, s0vr (child count flat encoding, we have 3+ encoding)
 	+ s0L (deprel)
 	+ s0h2{w,p} grandparent
 	+ s0sr, s0sl right/left label set
-	- compare acl11 with goldberg implementation: encoding etc.
+	+ compare acl11 with goldberg implementation: encoding etc.
 	  depparser.cpp, depparser_weight.h, state.h
 	  under: src/common/depparser/implementations/arceager
 	- rewrite bparser with deprels.
-	- implement arceager, make the code parser generic.
-	- create better language for specifying flists.
+	+ implement arceager, make the code parser generic.
+	+ create better language for specifying flists.
 	- Make xy in pxy optional in parsers.
 
 2015-03-22  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -351,18 +396,18 @@
 	but better check feature specs.
 
 	* TODO: parser and training
-	- ** add deprel labels as features! **: features.jl, archybrid.jl
-	-- output two variables (move+label) or one (movelabel)?
-	- check features and encodings of zhang&nivre11.
+	+ ** add deprel labels as features! **: features.jl, archybrid.jl
+	- output two variables (move+label) or one (movelabel)?
+	+ check features and encodings of zhang&nivre11.
 	- use oparser for fselect.  faster if only test at the end.
 	- need fselect again for labeled parser.
 	- try previous moves as features? (rnn idea)
 	- try arceasy (better on Goldberg&Nivre13) arceager (Zhang&Nivre11).
-	- train.jl: write pepochs option to get nbeam=64 to work.
+	+ train.jl: write pepochs option to get nbeam=64 to work.
 	- train.jl: implement earlystop for efficiency (Zhang does it)
-	- train.jl: longer training (stop if 2x best epoch)
+	+ train.jl: longer training (stop if 2x best epoch)
 	- train.jl: save models
-	- train.jl: compute eval.py (wordacc) score.
+	+ train.jl: compute eval.py (wordacc) score.
 	= can we use rnn's to learn parser-action sequences? prepare
 	  ordered data for ozan.
 	= better vectors: fastsubs and scode on bigger better data.  which
