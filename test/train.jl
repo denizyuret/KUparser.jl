@@ -33,7 +33,7 @@ function parse_commandline()
         "--epochs"
         help = "Number of epochs to train"
         arg_type = Int
-        default = 256
+        default = 0
         "--pepochs"
         help = "Number of epochs between parsing"
         arg_type = Int
@@ -152,8 +152,10 @@ function main()
         pxy = nothing
     end
     accuracy = Array(Float32, length(data))
+    (bestscore,bestepoch)=(0,0)
+    epochs = (args["epochs"] > 0 ? args["epochs"] : typemax(args["epochs"]))
     
-    for epoch=1:args["epochs"]
+    for epoch=1:epochs
         @show epoch
         (p,x,y) = trn
         @date KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
@@ -174,6 +176,16 @@ function main()
                 pxy = nothing
             end
             println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
+
+            # If epochs is not specified, stop when the best epoch was
+            # in the first half of training.  The best epoch is based
+            # on the dev set data[2].  If there is no dev set fall
+            # back on the training set, data[1].
+            if epochs == typemax(epochs)
+                score = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
+                (score > bestscore) && ((bestscore,bestepoch)=(score,epoch))
+                (epoch > 2*bestepoch) && break
+            end
         end
     end
 end
