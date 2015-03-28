@@ -158,6 +158,7 @@ function main()
     for epoch=1:epochs
         @show epoch
         (p,x,y) = trn
+        @show map(size, (x, y))
         @date KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
         if epoch % args["pepochs"] == 0
             (args["parser"] != "oparser") && (trn=nothing)
@@ -165,8 +166,8 @@ function main()
             for i=1:length(data)
                 if in(args["parser"], ["oparser", "gparser"])
                     @date pxy = gparse(pt, data[i], net, feats, ndeps, args["pbatch"], args["ncpu"])
-#                elseif (args["parser"] == "bparser")
-#                    @date pxy = bparse(pt, data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
+                elseif (args["parser"] == "bparser")
+                    @date pxy = bparse(pt, data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
                 else
                     error("Unknown parser "*args["parser"])
                 end
