@@ -1,3 +1,79 @@
+2015-03-28  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* ZN11: Time and space
+
+	Space: Need ncpu x pbatch x nbeam < 7680 to fit in K20 memory
+	ncpu	pbatch	nbeam	mem/cpu	acl11dev
+	12	30	10	305MiB	80 secs (including 15 secs cpu initialization)
+	12	40	10	310MiB	76 secs
+	12	50	10	325MiB	72 secs
+	12	10	64	335MiB	267 secs
+	12	64	10	335MiB	72 secs
+	12	80	10	350MiB	69 secs
+	12	100	10	365MiB	69 secs
+	12	128	10	390MiB	out of memory (this is when proc1 has 277MiB, it has more like 700 during training)
+
+	Timing oparse: 0.07ms/w = 66s/epoch
+	Timing KUnet.train: 2565x20000x24 net, 950028 words, 290s/epoch = 5mins
+	Timing nbeam=10: 1.5ms/w = 1425s/epoch = 24mins
+	Timing nbeam=64, 6.3ms/w = 5985s/epoch = 100mins
+
+	Recommended: ncpu=12, pbatch=32 (to be on the safe side), nbeam=10, pepochs=5.
+	This will give us 5 epochs in 50 mins or 10 mins/epoch.
+	- Maybe we should try learningRate=1 to speed things up?
+
+	@@480159 0.50531 bp10acl11e dyuret       r     03/28/2015 18:26:40 ilac.q@ilac-3-0.local              1        
+
+	* GN13: comparison using labeled parsers (cont. 2015-03-25)
+	+ using exact feature sets acl11eager and tacl13hybrid as far as I know
+	- still not using exact archybrid13 and arceager13
+	- still not using a dev set to determine when to quit
+	- still not taking averages
+	- still no easyfirst
+	- try much larger learningRate (lr=1 worked well during debugging with conll07.tst)
+
+	* 03281848-gpconll07eager.out:
+	$$480149 0.50531 gpconll07e dyuret       r     03/28/2015 12:02:55 ilac.q@ilac-2-0.local              1        
+DATA:	1	0.8374577	0.82490504
+DATA:	2	0.84297526	0.8139117
+DATA:	4	0.8828344	0.8454927
+DATA:	8	0.9080867	0.8538877
+DATA:	16	0.93488634	0.8694783
+DATA:	32	0.96121573	0.8762742	*** (.8869 in GN13)
+DATA:	64	0.98047125	0.8686788
+DATA:	65	0.98105574	0.8712772
+
+	* 03281640-opconll07eager.out:
+	@@480150 0.50531 opconll07e dyuret       r     03/28/2015 12:11:55 ilac.q@ilac-2-1.local              1        
+DATA:	1	0.8356036	0.82290626
+DATA:	2	0.8547718	0.8237058
+DATA:	4	0.87467223	0.8374975
+DATA:	8	0.8972889	0.8518889
+DATA:	16	0.9231615	0.8620828
+DATA:	21	0.9355335	0.8684789	*** (.8610 in GN13)
+DATA:	32	0.9519026	0.85748553
+DATA:	43	0.96290195	0.85968417
+
+	@@480151 0.50531 opconll07h dyuret       r     03/28/2015 12:12:25 ilac.q@ilac-0-0.local              1        
+DATA:	1	0.843506	0.8297022
+DATA:	2	0.85940933	0.8392964
+DATA:	4	0.87632257	0.8462922
+DATA:	8	0.89458835	0.8496902
+DATA:	16	0.9145694	0.85908455
+DATA:	32	0.93615603	0.86707973
+DATA:	64	0.96023047	0.86987805
+DATA:	79	0.9661533	0.878273	*** (.8643 in GN13)
+DATA:	100	0.9728219	0.87007797
+
+	@@480160 0.50531 gpconll07h dyuret       r     03/28/2015 18:58:10 ilac.q@ilac-2-1.local              1        
+DATA:	1	0.84406805	0.8257046
+DATA:	2	0.83588797	0.81571054
+DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
+
+	x This keeps crashing without error message at epoch=3?
+	$$480152 0.50531 gpconll07h dyuret       r     03/28/2015 12:12:40 ilac.q@ilac-3-0.local              1        
+	$$480153 0.50531 gpconll07h dyuret       r     03/28/2015 12:48:40 ilac.q@ilac-3-1.local              1        
+
 2015-03-27  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* src/arceager.jl: Finished and tested arceager.  Passes the
@@ -360,7 +436,7 @@
 
 	parser	dev	test1	test2
 	beam10a	.9186	.9132	.9136	03201925-julia3_btrain_jl.out: using whole beam to train, quit at epoch=77
-	beam64	.9212	.9151	.9163	bparse64.out -- running at epoch=128
+	beam64	.9212	.9151	.9165	bparse64.out -- running at epoch=162
 	beam10l	.9211	.9169	.9171	03220927-bparselatestop.out: no earlystop, crashed at epoch=207
 	beam10	.9205	.9150	.9166	03220548-bparsedbg.out: earlystop
 
@@ -406,7 +482,7 @@
 	+ train.jl: write pepochs option to get nbeam=64 to work.
 	- train.jl: implement earlystop for efficiency (Zhang does it)
 	+ train.jl: longer training (stop if 2x best epoch)
-	- train.jl: save models
+	+ train.jl: save models
 	+ train.jl: compute eval.py (wordacc) score.
 	= can we use rnn's to learn parser-action sequences? prepare
 	  ordered data for ozan.
@@ -541,9 +617,11 @@
 	8	0.9206171	0.90582544	0.9008715
 	16	0.93292725	0.9116833	0.9058465
 	32	0.9474447	0.9167186	0.91170347
-DATA:	59	0.96037275	0.92053246	0.9131148	*d*
-DATA:	82	0.9676999	0.9191365	0.91537297	*t*
-	86	0.9688483	0.9205075	0.91532004
+	64	0.96225166	0.91851336	0.9141204
+	113	0.97382075	0.92115563	0.9150907	*d*
+	128	0.9761996	0.9197597	0.9152671
+	156	0.9793417	0.91841364	0.9164667	*t*
+DATA:	162	0.9799469	0.9185383	0.9153906
 
 	* 03220927-bparselatestop.out: why is this different from static
 	oracle training?  we are rewarding mincost state/move pairs on the
