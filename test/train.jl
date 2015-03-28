@@ -12,7 +12,7 @@ function parse_commandline()
         required = true
         "--out"
         help = "JLD file for output trained network"
-        default = "out.jld"
+        default = ""
         "--nogpu"
         help = "Do not use gpu"
         action = :store_true
@@ -158,6 +158,7 @@ function main()
     for epoch=1:epochs
         @show epoch
         (p,x,y) = trn
+        @show map(size, (x, y))
         @date KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
         if epoch % args["pepochs"] == 0
             (args["parser"] != "oparser") && (trn=nothing)
@@ -165,8 +166,8 @@ function main()
             for i=1:length(data)
                 if in(args["parser"], ["oparser", "gparser"])
                     @date pxy = gparse(pt, data[i], net, feats, ndeps, args["pbatch"], args["ncpu"])
-#                elseif (args["parser"] == "bparser")
-#                    @date pxy = bparse(pt, data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
+                elseif (args["parser"] == "bparser")
+                    @date pxy = bparse(pt, data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
                 else
                     error("Unknown parser "*args["parser"])
                 end
@@ -177,13 +178,18 @@ function main()
             end
             println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
 
+            # Update best score and save best net
+            score = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
+            if (score > bestscore)
+                @show (bestscore,bestepoch)=(score,epoch)
+                !isempty(args["out"]) && save(args["out"], net)
+            end
+
             # If epochs is not specified, stop when the best epoch was
             # in the first half of training.  The best epoch is based
             # on the dev set data[2].  If there is no dev set fall
             # back on the training set, data[1].
             if epochs == typemax(epochs)
-                score = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
-                (score > bestscore) && ((bestscore,bestepoch)=(score,epoch))
                 (epoch > 2*bestepoch) && break
             end
         end

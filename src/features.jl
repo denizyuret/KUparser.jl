@@ -1,4 +1,4 @@
-# featurevec() returns a feature vector given a parser, a sentence,
+# features() returns a feature vector given a parser, a sentence,
 # and a FeatureList.  An optional last argument can provide the
 # preallocated output vector which should have length flen().
 #

@@ -3,11 +3,11 @@ module KUparser
 using Compat
 using KUnet
 
-include("util.jl");	  export @date, evalparse, 
+include("util.jl");	  export @date, evalparse
 include("sentence.jl");   export Sentence, Corpus, wdim, wcnt, wtype
-include("flist.jl");      export Features, Flist 	# these are feature templates
-include("features.jl");
 include("parser.jl");     
+include("flist.jl");      export Flist
+include("features.jl");   export Features
 include("archybrid.jl");
 include("arceager.jl");
 include("gparser.jl");    export gparse
