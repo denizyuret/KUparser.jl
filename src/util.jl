@@ -5,10 +5,6 @@ using KUnet
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
 
-wdim(s)=size(s.wvec,1)
-wcnt(s)=size(s.wvec,2)
-wtype(s)=eltype(s.wvec)
-
 # This is "distribute" with an extra procs argument:
 # will be fixed in Julia 0.4
 VERSION >= v"0.4-" && eval(Expr(:using,:DistributedArrays))
