@@ -67,6 +67,7 @@ import Base.copy!
 function copy!(dst::Parser, src::Parser)
     @assert dst.nword == src.nword
     @assert dst.ndeps == src.ndeps
+    @assert dst.nmove == src.nmove
     dst.wptr = src.wptr
     dst.sptr = src.sptr
     copy!(dst.stack, src.stack)
