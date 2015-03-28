@@ -1,138 +1,62 @@
 # archybrid.jl, Deniz Yuret, July 7, 2014: Transition based greedy arc-hybrid parser based on:
 # http://honnibal.wordpress.com/2013/12/18/a-simple-fast-algorithm-for-natural-language-dependency-parsing
 # Goldberg, Yoav; Nivre, Joakim. Training Deterministic Parsers with Non-Deterministic Oracles. TACL 2013.
-# Modified validmoves to output a single root-child.
+# Modified valid moves to output a single root-child.
 
-# TODO: think of other parser types with more moves.
-# if we standardize move numbers (REDUCE=4), only NMOVE differs
-# nmove can be a function.
-# cost, valid, move are different
-# arc and constructor and fields are the same:
-# how to use that?
-# also think of arceasy.
+typealias ArcHybrid Parser{:ArcHybrid}
 
-@compat typealias Pval UInt8    # Type representing sentence position
-@compat typealias Mval UInt8    # Type representing parser move
-@compat typealias Dval UInt8    # Type representing dependency label
-typealias Dvec AbstractVector{Dval}
-typealias Mvec AbstractVector{Mval}
-typealias Pvec AbstractVector{Pval}
-typealias Pmat AbstractMatrix{Pval}
-const Pinf=typemax(Pval)
-Pzeros(n::Integer...)=zeros(Pval, n...)
-Dzeros(n::Integer...)=zeros(Dval, n...)
-movedep(m::Mval)=(m>>1)         # 1..ndep for m>1
-movedir(m::Mval)=(m&1)          # 0=RIGHT 1=LEFT for m>1
-const SHIFT=convert(Mval,1)     # m=0 illegal, m=1 shift, m=2..nmove L/R moves
-const RIGHT=convert(Mval,0)     # even moves m=2,4,6,... are RIGHT
-const LEFT=convert(Mval,1)      # odd moves m=3,5,7,... are LEFT
-const R1=convert(Mval,SHIFT+1+RIGHT)
-const L1=convert(Mval,SHIFT+1+LEFT)
+# Moves are represented by integers 1..p.nmove, 0 is not valid.
+# They correspond to L1,R1,L2,R2,...,L[ndeps],R[ndeps],SHIFT
 
-type ArcHybrid <: Parser
-    nword::Pval   # number of words in sentence
-    ndeps::Dval   # number of dependency labels
-    nmove::Mval   # number of legal moves
-    wptr::Pval    # index of first word in buffer
-    sptr::Pval    # index of last word (top) of stack
-    stack::Pvec   # 1xn vector for stack of indices
-    head::Pvec    # 1xn vector of heads
-    deprel::Dvec  # 1xn vector of dependency labels
-    lcnt::Pvec    # lcnt(h): number of left deps for h
-    rcnt::Pvec    # rcnt(h): number of right deps for h
-    ldep::Pmat    # nxn matrix for left dependents
-    rdep::Pmat    # nxn matrix for right dependents
-    
-    function ArcHybrid(nword::Integer, ndeps::Integer)
-        @assert (nword <= (typemax(Pval)-1))    "nword > $(typemax(Pval)-1)"
-        @assert (ndeps <= (typemax(Mval)-1)>>1) "ndeps > $((typemax(Mval)-1)>>1)"
-        p = new(nword, ndeps, 1+2*ndeps,       # nword, ndeps, nmove
-                1, 0, Pzeros(nword),           # wptr, sptr, stack
-                Pzeros(nword), Dzeros(nword),  # head, deprel
-                Pzeros(nword), Pzeros(nword),  # lcnt, rcnt
-                Pzeros(nword,nword), Pzeros(nword,nword)) # ldep, rdep
-        move!(p, SHIFT)
-        return p
-    end
-end # ArcHybrid
+SHIFT(p::ArcHybrid)=p.nmove
+LMOVES(p::ArcHybrid)=(1:2:(p.nmove-2))
+RMOVES(p::ArcHybrid)=(2:2:(p.nmove-1))
+LMOVE(p::ArcHybrid, lab::DepRel)=(lab<<1-1)
+RMOVE(p::ArcHybrid, lab::DepRel)=(lab<<1)
+LABEL(p::ArcHybrid, m::Move)=convert(DepRel,(m+1)>>1)
 
-import Base.copy!
-function copy!(dst::ArcHybrid, src::ArcHybrid)
-    assert(dst.nword == src.nword)
-    assert(dst.ndeps == src.ndeps)
-    assert(dst.nmove == src.nmove)
-    dst.wptr = src.wptr
-    dst.sptr = src.sptr
-    copy!(dst.stack, src.stack)
-    copy!(dst.head, src.head)
-    copy!(dst.deprel, src.deprel)
-    copy!(dst.lcnt, src.lcnt)
-    copy!(dst.rcnt, src.rcnt)
-    copy!(dst.ldep, src.ldep)
-    copy!(dst.rdep, src.rdep)
-end # copy!
+# The mandatory first shift move is performed during initialization.  So
+# our initial state is [w1][w2,w3,...,wn].
+init!(p::ArcHybrid)=(p.nmove=(1+p.ndeps<<1);move!(p,SHIFT(p)))
 
-# arc! sets the head of d as h with label l
+# move!(p,m) executes the move m on parser p.
+# In the archybrid system we have three type of moves:
+# SHIFT[(σ, b|β, A)] = (σ|b, β, A)
+# RIGHT_lb[(σ|s1|s0, β, A)] = (σ|s1, β, A ∪ {(s1, lb, s0)})
+# LEFT_lb[(σ|s, b|β, A)] = (σ, b|β, A ∪ {(b, lb, s)})
 
-function arc!(p::ArcHybrid, h::Pval, d::Pval, l::Dval)
-    p.head[d] = h
-    p.deprel[d] = l
-    if d < h
-        p.lcnt[h] += 1
-        p.ldep[h, p.lcnt[h]] = d
-    else
-        p.rcnt[h] += 1
-        p.rdep[h, p.rcnt[h]] = d
-    end # if
-end # arc!
-
-# In the archybrid system:
-# A token starts life without any arcs in the buffer.
-# It becomes n0 after a number of shifts.
-# n0 acquires ldeps using lefts.
-# It becomes s0 using shift.
-# s0 acquires rdeps using shift+right.
-# Finally gets a head with left or right.
-
-function move!(p::ArcHybrid, op::Integer)
-    @assert (op > 0 && op <= p.nmove) "Move $op is not supported"
-    op = convert(Mval, op)
-    if op == SHIFT
+function move!(p::ArcHybrid, m::Move)
+    @assert (1 <= m <= p.nmove) "Move $m is not supported"
+    if m == SHIFT(p)
+        @assert (p.wptr <= p.nword)
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
-    elseif movedir(op) == RIGHT
-        arc!(p, p.stack[p.sptr-1], p.stack[p.sptr], movedep(op))
+    elseif in(m, RMOVES(p))
+        @assert (p.sptr >= 2)
+        arc!(p, p.stack[p.sptr-1], p.stack[p.sptr], LABEL(p,m))
         p.sptr -= 1
-    else # if movedir(op) == LEFT
-        arc!(p, p.wptr, p.stack[p.sptr], movedep(op))
+    else # in(m, LMOVES(p))
+        @assert ((p.sptr >= 1) && (p.wptr <= p.nword))
+        arc!(p, p.wptr, p.stack[p.sptr], LABEL(p,m))
         p.sptr -= 1
     end
 end # move!
 
-function validmoves(p::ArcHybrid, v::AbstractVector{Bool}=Array(Bool, p.nmove))
-    v[SHIFT] = (p.wptr <= p.nword)
-    right_ok = (p.sptr >= 2)
-    left_ok = ((p.sptr >= 1) && (p.wptr <= p.nword))
-    for m=L1:2:p.nmove; v[m] = left_ok; end
-    for m=R1:2:p.nmove; v[m] = right_ok; end
-    return v
-end # validmoves
+# anyvalidmoves(p) quickly tells us if we have any moves left
 
-function anyvalidmoves(p::ArcHybrid)
-    (p.wptr <= p.nword) || (p.sptr >= 2)
-end
+anyvalidmoves(p::ArcHybrid)=((p.wptr <= p.nword) || (p.sptr >= 2))
 
 # movecosts() counts gold arcs that become impossible after possible
-# transitions.  Tokens start their lifecycle in the buffer without
-# links.  They move to the top of the buffer (n0) with SHIFT moves.
-# There they acquire left dependents using LEFT moves.  After that a
-# single SHIFT moves them to the top of the stack (s0).  There they
-# acquire right dependents with SHIFT-RIGHT pairs.  Finally from s0
-# they acquire a head with a LEFT or RIGHT move.  Any token from the
-# buffer may become the head but only s1 from the stack may become a
-# left head.  The parser terminates with a single word at s0 whose
-# head is ROOT.
+# moves.  Tokens start their lifecycle in the buffer without links.
+# They move to the top of the buffer (n0) with SHIFT moves.  There they
+# acquire left dependents using LEFT moves.  After that a single SHIFT
+# moves them to the top of the stack (s0).  There they acquire right
+# dependents with SHIFT-RIGHT pairs.  Finally from s0 they acquire a
+# head with a LEFT or RIGHT move.  Any token from the buffer may become
+# the right head but only s1 from the stack may become a left head for
+# s0.  The parser terminates with a single word at s0 whose head is ROOT
+# (represented as head=deprel=0).
 #
 # 1. SHIFT moves n0 to s0: n0 cannot acquire left dependents after a
 # shift.  Also it can no longer get a head from the stack to the left
@@ -145,50 +69,49 @@ end
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, cost::Pvec=Array(Pval,p.nmove))
-    head = convert(Pvec, head)
-    deprel = convert(Dvec, deprel)
+function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray, 
+                   cost::Pvec=Array(Position,p.nmove))
     @assert (length(head) == p.nword)
     @assert (length(deprel) == p.nword)
     @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
-    n0 = p.wptr                                                 # n0 is top of buffer
-    if (n0 <= p.nword)                                          # shift is legal moving n0 to s0
+    n0 = p.wptr
+
+    if (n0 <= p.nword)                                          # SHIFT valid if n0, moving n0 to s0
         n0h = head[n0]                                          # n0h is the actual head of n0
-        cost[SHIFT] = (sum(head[p.stack[1:p.sptr]] .== n0) +	# no more left dependents for n0
-                       sum(p.stack[1:p.sptr-1] .== n0h) +       # no heads to the left of s0 for n0
-                       ((n0h == 0) && (p.sptr >= 1)))           # no root head for n0 if there is s0
+        cost[SHIFT(p)] = (sum(head[p.stack[1:p.sptr]] .== n0) +	# no more left dependents for n0
+                          sum(p.stack[1:p.sptr-1] .== n0h) +    # no heads to the left of s0 for n0
+                          ((n0h == 0) && (p.sptr >= 1)))        # no root head for n0 if there is s0
     end
-    if (p.sptr >= 1)                                            # left/right only valid if stack nonempty
+    if (p.sptr >= 1)                                            # LEFT/RIGHT only valid if stack nonempty
         s0 = p.stack[p.sptr]                                    # s0 is top of stack
         s0h = head[s0]                                          # s0h is the actual head of s0
-        s0b = sum(head[n0:end] .== s0)                          # num buffer words whose head is s0
+        s0r = sum(head[n0:end] .== s0)                          # s0r is the number of right children for s0
 
-        if (n0 <= p.nword)                                      # left is legal, making n0 head of s0
-            leftcost = (s0b +                                   # no more right children for s0
-                        ((s0h > n0) ||                          # no heads to the right of n0 for s0
-                         ((p.sptr == 1) && (s0h == 0)) ||       # no root head for s0 if alone
-                         ((p.sptr > 1) &&                       # no more s1 for head of s0
-                          (s0h == p.stack[p.sptr-1]))))
-            if (s0h != n0)
-                cost[L1:2:p.nmove] = leftcost                   # odd numbered moves >= 3 are left moves
+        if (n0 <= p.nword)                                      # LEFT valid if n0, making n0 head of s0
+            lcost = (s0r +                                      # no more right children for s0
+                     ((s0h > n0) ||                             # no heads to the right of n0 for s0
+                      ((p.sptr == 1) && (s0h == 0)) ||          # no root head for s0 if alone
+                      ((p.sptr > 1) &&                          # no more s1 for head of s0
+                       (s0h == p.stack[p.sptr-1]))))
+            if (s0h == n0)                                      # if we have the correct head
+                cost[LMOVES(p)] = lcost + 1                     # +1 for all the wrong labels
+                cost[LMOVE(p,deprel[s0])] -= 1                  # except for the correct label
             else
-                cost[L1:2:p.nmove] = leftcost + 1               # +1 for the wrong labels
-                cost[deprel[s0]<<1+LEFT] -= 1                   # except for the correct label
+                cost[LMOVES(p)] = lcost                         # if n0 is not the actual head we are done
             end
         end
-        if (p.sptr >= 2)                                        # right is legal making s1 head of s0
+        if (p.sptr >= 2)                                        # RIGHT valid if s1 making s1 head of s0
             s1 = p.stack[p.sptr-1]                              # s1 is the stack element before s0
-            rightcost = s0b + (s0h >= n0)                       # no more right head or dependent for s0
-            if (s0h != s1)
-                cost[R1:2:p.nmove] = rightcost                  # even numbered moves >= 2 are right moves
+            rcost = s0r + (s0h >= n0)                           # no more right head or dependent for s0
+            if (s0h == s1)                                      # if we have the correct head
+                cost[RMOVES(p)] = rcost + 1                     # +1 for all the wrong labels
+                cost[RMOVE(p,deprel[s0])] -= 1                  # except for the correct label
             else
-                cost[R1:2:p.nmove] = rightcost + 1              # +1 for the wrong labels
-                cost[deprel[s0]<<1+RIGHT] -= 1                  # except for the correct label
+                cost[RMOVES(p)] = rcost                         # if s1 is not the actual head we are done
             end
         end
     end
-    # @assert (validmoves(p) == (cost .< Pinf))
     return cost
 end # movecosts
 

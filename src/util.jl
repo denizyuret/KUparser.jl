@@ -5,10 +5,6 @@ using KUnet
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
 
-wdim(s)=size(s.wvec,1)
-wcnt(s)=size(s.wvec,2)
-wtype(s)=eltype(s.wvec)
-
 # This is "distribute" with an extra procs argument:
 # will be fixed in Julia 0.4
 VERSION >= v"0.4-" && eval(Expr(:using,:DistributedArrays))
@@ -71,10 +67,5 @@ function evalparse(parsers, sentences)
     uas2 = mean(phcat[isword] .== shcat[isword])
     las2 = mean((phcat[isword] .== shcat[isword]) & (pdcat[isword] .== sdcat[isword]))
     return (uas, uas2, las, las2, uem, lem)
-end
-
-import Base.isequal
-function isequal(a::Parser, b::Parser)
-    all(map(isequal, map(n->a.(n), fieldnames(a)), map(n->b.(n), fieldnames(a))))
 end
 
