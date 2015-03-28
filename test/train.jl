@@ -12,7 +12,7 @@ function parse_commandline()
         required = true
         "--out"
         help = "JLD file for output trained network"
-        default = "out.jld"
+        default = ""
         "--nogpu"
         help = "Do not use gpu"
         action = :store_true
@@ -178,13 +178,18 @@ function main()
             end
             println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
 
+            # Update best score and save best net
+            score = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
+            if (score > bestscore)
+                @show (bestscore,bestepoch)=(score,epoch)
+                !isempty(args["out"]) && save(args["out"], net)
+            end
+
             # If epochs is not specified, stop when the best epoch was
             # in the first half of training.  The best epoch is based
             # on the dev set data[2].  If there is no dev set fall
             # back on the training set, data[1].
             if epochs == typemax(epochs)
-                score = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
-                (score > bestscore) && ((bestscore,bestepoch)=(score,epoch))
                 (epoch > 2*bestepoch) && break
             end
         end
