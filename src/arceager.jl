@@ -15,17 +15,16 @@ typealias ArcEager Parser{:ArcEager}
 # RIGHT_lb[(σ|s, b|β, A)] = (σ|s|b, β, A∪{(s,lb,b)})
 # LEFT_lb[(σ|s, b|β, A)] = (σ, b|β, A∪{(b,lb,s)})
 
-# Moves are represented by integers 1..nmoves(p)
-# They correspond to SHIFT,REDUCE,L1,R1,L2,R2,..,L[ndeps],R[ndeps]
+# Moves are represented by integers 1..p.nmove
+# They correspond to REDUCE,L1,R1,L2,R2,..,L[ndeps],R[ndeps],SHIFT
 
-nmoves(p::ArcEager)=(2+p.ndeps<<1)
-isshift(p::ArcEager, m::Move)=(m==1)
-isreduce(p::ArcEager, m::Move)=(m==2)
-isleft(p::ArcEager, m::Move)=((m>=3)&&(m&1==1))
-isright(p::ArcEager, m::Move)=((m>=4)&&(m&1==0))
-movelabel(p::ArcEager, m::Move)=convert(DepRel,(m-1)>>1)
-leftmove(p::ArcEager, lab::DepRel)=(1+lab<<1)
-rightmove(p::ArcEager, lab::DepRel)=(2+lab<<1)
+REDUCE(p::ArcEager)=1
+SHIFT(p::ArcEager)=p.nmove
+LMOVES(p::ArcEager)=(2:2:(p.nmove-2))
+RMOVES(p::ArcEager)=(3:2:(p.nmove-1))
+LMOVE(p::ArcEager, l::DepRel)=(l<<1)
+RMOVE(p::ArcEager, l::DepRel)=(1+l<<1)
+LABEL(p::ArcEager, m::Move)=convert(DepRel,m>>1)
 
 # In GN13 the initial configuration has an empty stack, and a buffer
 # with special symbol ROOT to the right of all the words at w[n+1], i.e.
@@ -41,7 +40,7 @@ rightmove(p::ArcEager, lab::DepRel)=(2+lab<<1)
 # initialization so the initial configuration is [w1][w2,...,wn].  This
 # ensures 2n-2 moves for each sentence.
 
-init!(p::ArcEager)=move!(p,1)
+init!(p::ArcEager)=(p.nmove=(2+p.ndeps<<1);move!(p,SHIFT(p)))
 
 # GN13 has the following preconditions for moves: "There is a
 # precondition on the RIGHT and SHIFT transitions to be legal only when
@@ -75,24 +74,24 @@ left_ok(p::ArcEager) = ((p.sptr >= 1) && (p.wptr <= p.nword) && (p.head[p.stack[
 # only one before doing RIGHT on the last word.
 
 function move!(p::ArcEager, m::Integer)
-    @assert (1 <= m <= nmoves(p)) "Move $m is not supported"
-    if isshift(p,m)             
+    @assert (1 <= m <= p.nmove) "Move $m is not supported"
+    if m == SHIFT(p)
         @assert shift_ok(p)
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
-    elseif isreduce(p,m)        
+    elseif m == REDUCE(p)
         @assert reduce_ok(p)
         p.sptr -= 1
-    elseif isright(p,m)
+    elseif in(m, RMOVES(p))
         @assert right_ok(p)
-        arc!(p, p.stack[p.sptr], p.wptr, movelabel(p,m))
+        arc!(p, p.stack[p.sptr], p.wptr, LABEL(p,m))
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
-    else # isleft(p,m)
+    else # in(m, LMOVES(p))
         @assert left_ok(p)
-        arc!(p, p.wptr, p.stack[p.sptr], movelabel(p,m))
+        arc!(p, p.wptr, p.stack[p.sptr], LABEL(p,m))
         p.sptr -= 1
     end
 end # move!
@@ -120,11 +119,10 @@ anyvalidmoves(p::ArcEager)=((p.wptr <= p.nword) || ((p.sptr >= 1) && (p.head[p.s
 # after rdeps.
 
 function movecosts(p::ArcEager, head::AbstractArray, deprel::AbstractArray, 
-                   cost::Pvec=Array(Position,nmoves(p)))
-    nmove = nmoves(p)
+                   cost::Pvec=Array(Position,p.nmove))
     @assert (length(head) == p.nword)
     @assert (length(deprel) == p.nword)
-    @assert (length(cost) == nmove)
+    @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
     st = p.stack[1:p.sptr]
     n0 = p.wptr
@@ -135,34 +133,30 @@ function movecosts(p::ArcEager, head::AbstractArray, deprel::AbstractArray,
     n0h = (n0 <= nw ? head[n0] : 0)
     n0l = sum((head[st] .== n0) & (p.head[st] .== 0))
     s0r = sum(head[n0:end] .== s0)
-    SHIFT = 1
-    REDUCE = 2
-    LMOVES = 3:2:nmove
-    RMOVES = 4:2:nmove
 
     if shift_ok(p)                                              # SHIFT moves n0 to s
-        cost[SHIFT] = n0l + in(n0h, st)                         # n0 gets no more ldeps or lhead
+        cost[SHIFT(p)] = n0l + in(n0h, st)                      # n0 gets no more ldeps or lhead
     end
     if reduce_ok(p)                                             # REDUCE pops s0
-        cost[REDUCE] = s0r                                      # s0 gets no more rdeps
+        cost[REDUCE(p)] = s0r                                   # s0 gets no more rdeps
     end
     if right_ok(p)                                              # RIGHT adds (s0,n0) and shifts n0 to s
         rcost = (n0l + (n0h > n0) + (n0h == 0) +                # n0 gets no more ldeps, rhead, 0head,
                  in(n0h, p.stack[1:(p.sptr-1)]))                # or lhead<s0
         if n0h == s0                                            # if we have the correct head
-            cost[RMOVES] = rcost + 1                            # +1 for the wrong labels
-            cost[rightmove(p,deprel[n0])] -= 1                  # except for the correct label
+            cost[RMOVES(p)] = rcost + 1                         # +1 for the wrong labels
+            cost[RMOVE(p,deprel[n0])] -= 1                      # except for the correct label
         else
-            cost[RMOVES] = rcost                                # otherwise we are done
+            cost[RMOVES(p)] = rcost                             # otherwise we are done
         end
     end
     if left_ok(p)                                               # LEFT  adds (n0,s0) and reduces s0
         lcost = (s0r + (head[s0] > n0) + (head[s0] == 0))       # s0 gets no more rdeps, rhead>n0, 0head
         if (head[s0] == n0)                                     # if we have the correct head
-            cost[LMOVES] = lcost+1                              # +1 for the wrong labels
-            cost[leftmove(p,deprel[s0])] -= 1                   # except for the correct label
+            cost[LMOVES(p)] = lcost+1                           # +1 for the wrong labels
+            cost[LMOVE(p,deprel[s0])] -= 1                      # except for the correct label
         else
-            cost[LMOVES] = lcost                                # otherwise we are done
+            cost[LMOVES(p)] = lcost                             # otherwise we are done
         end
     end
     return cost
