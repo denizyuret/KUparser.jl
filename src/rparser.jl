@@ -39,3 +39,23 @@ function initrparse(pt::ParserType, s::Sentence, ndeps::Integer)
     c = Array(Position, p.nmove)
     (p, c)
 end
+
+function rparse_dbg(pt::ParserType, s::Sentence, ndeps::Integer)
+    dump(vcat([1:wcnt(s)]', s.head', s.deprel'))
+    (p, c) = initrparse(pt, s, ndeps)
+    cost = 0
+    while anyvalidmoves(p)
+        movecosts(p, s.head, s.deprel, c)
+        if rand() < 0.1
+            f = find(c .< Pinf)
+            r = f[rand(1:length(f))]
+        else
+            r = indmin(c)
+        end
+        cost += c[r]
+        move!(p, r)
+        println("$((r,int(c[r]),cost)) $(int(p.stack[1:p.sptr])) $(p.wptr) $(int(c))")
+    end
+    @assert cost == sum((p.head .!= s.head) | (p.deprel .!= s.deprel))
+    return p
+end
