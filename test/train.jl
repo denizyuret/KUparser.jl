@@ -19,6 +19,9 @@ function parse_commandline()
         "--parser"
         help = "Parsing algorithm to use: g(reedy)parser, b(eam)parser, or o(racle)parser for static training"
         default = "oparser"
+        "--arctype"
+        help = "Move set to use: ArcEager, ArcHybrid"
+        default = "ArcHybrid"
         "--feats"
         help = "Features to use from KUparser.Flist"
         default = "fv021a"
@@ -118,9 +121,10 @@ function main()
 
     feats=eval(parse("KUparser.Flist."*args["feats"]))
     s1 = data[1][1]
-    p1 = KUparser.ArcHybrid(wcnt(s1),length(deprel)) # TODO: change when multiple parsers implemented
-    xrows=flen(p1, s1, feats)
-    yrows=p1.nmove 
+    pt = symbol(args["arctype"])
+    p1 = KUparser.Parser{pt}(wcnt(s1),length(deprel))
+    xrows=KUparser.flen(p1, s1, feats)
+    yrows=KUparser.nmoves(p1)
 
     net=KUnet.newnet(KUnet.relu, [xrows; args["hidden"]; yrows]...)
     net[end].f=KUnet.logp
@@ -142,7 +146,7 @@ function main()
 
     trn = nothing
     for i=1:length(data)
-        @date pxy = oparse(data[i], feats, ndeps, args["ncpu"])
+        @date pxy = oparse(pt, data[i], feats, ndeps, args["ncpu"])
         @show evalparse(pxy[1], data[i])
         i == 1 && (trn = pxy)
         pxy = nothing
@@ -158,9 +162,9 @@ function main()
             @meminfo
             for i=1:length(data)
                 if in(args["parser"], ["oparser", "gparser"])
-                    @date pxy = gparse(data[i], net, feats, ndeps, args["pbatch"], args["ncpu"])
-                elseif (args["parser"] == "bparser")
-                    @date pxy = bparse(data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
+                    @date pxy = gparse(pt, data[i], net, feats, ndeps, args["pbatch"], args["ncpu"])
+#                elseif (args["parser"] == "bparser")
+#                    @date pxy = bparse(pt, data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
                 else
                     error("Unknown parser "*args["parser"])
                 end
