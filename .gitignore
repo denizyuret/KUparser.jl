@@ -8,6 +8,7 @@ foo*
 *_dbg.jl
 *.out.*
 log
+unused
 
 # Object files
 *.o
