@@ -124,25 +124,25 @@ function movecosts(p::ArcEager, head::AbstractArray, deprel::AbstractArray,
     @assert (length(deprel) == p.nword)
     @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
-    st = p.stack[1:p.sptr]
     n0 = p.wptr
     nw = p.nword
     s0 = (p.sptr >= 1 ? p.stack[p.sptr] : 0)
     s1 = (p.sptr > 1 ? p.stack[p.sptr-1] : 0)
     s0h = (s0 != 0 ? p.head[s0] : 0)
     n0h = (n0 <= nw ? head[n0] : 0)
-    n0l = sum((head[st] .== n0) & (p.head[st] .== 0))
-    s0r = sum(head[n0:end] .== s0)
+    n0l = 0; n0 <= nw && (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && p.head[si]==0 && (n0l+=1); end)
+    s0r = 0; s0 != 0  && (for i=n0:p.nword; head[i]==s0 && (s0r += 1); end)
 
     if shift_ok(p)                                              # SHIFT moves n0 to s
-        cost[SHIFT(p)] = n0l + in(n0h, st)                      # n0 gets no more ldeps or lhead
+        cost[SHIFT(p)] = (n0l +                                 # n0 gets no more ldeps
+                          (findprev(p.stack, n0h, p.sptr) > 0)) # or lhead
     end
     if reduce_ok(p)                                             # REDUCE pops s0
         cost[REDUCE(p)] = s0r                                   # s0 gets no more rdeps
     end
     if right_ok(p)                                              # RIGHT adds (s0,n0) and shifts n0 to s
         rcost = (n0l + (n0h > n0) + (n0h == 0) +                # n0 gets no more ldeps, rhead, 0head,
-                 in(n0h, p.stack[1:(p.sptr-1)]))                # or lhead<s0
+                 (findprev(p.stack, n0h, p.sptr-1) > 0))        # or lhead<s0
         if n0h == s0                                            # if we have the correct head
             cost[RMOVES(p)] = rcost + 1                         # +1 for the wrong labels
             cost[RMOVE(p,deprel[n0])] -= 1                      # except for the correct label
