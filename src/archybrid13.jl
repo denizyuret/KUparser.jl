@@ -112,16 +112,16 @@ function movecosts(p::ArcHybrid13, head::AbstractArray, deprel::AbstractArray,
     @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
     n0 = p.wptr                                                 # n0 is the next word in buffer
-    nw = p.nword
-    n0h = (n0 <= nw ? head[n0] : 0)                             # n0h is the actual head of n0
     s0 = (p.sptr > 0 ? p.stack[p.sptr] : 0)                     # s0 is top of stack
     s1 = (p.sptr > 1 ? p.stack[p.sptr-1] : 0)                   # s1 is the stack element before s0
-    s0h = (s0 > 0 ? head[s0] : 0)                               # s0h is the actual head of s0
-    s0r = (n0 > 0 ? sum(head[n0:nw] .== s0) : 0)                # s0r is the number of right children for s0
+    s0h = (s0 != 0 ? head[s0] : 0)                              # s0h is the actual head of s0
+    n0h = (n0 <= p.nword ? head[n0] : 0)                        # n0h is the actual head of n0
+    s0r = 0; s0 != 0  && (for i=n0:p.nword; head[i]==s0 && (s0r += 1); end) # s0r is the number of right children for s0
 
     if SHIFTOK(p)                                               # SHIFT valid if n0, moving n0 to s0
-        cost[SHIFT(p)] = (sum(head[p.stack[1:p.sptr]] .== n0) +	# no more left dependents for n0
-                          sum(p.stack[1:p.sptr-1] .== n0h) +    # no heads to the left of s0 for n0
+        n0l = 0; (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && (n0l+=1); end)
+        cost[SHIFT(p)] = (n0l +                                 # no more left dependents for n0
+                          (findprev(p.stack, n0h, p.sptr-1) > 0) + # no heads to the left of s0 for n0
                           ((n0h == 0) && (p.sptr > 0)))         # no root head for n0 if there is s0
     end
     if R0MOVEOK(p)                                              # R0MOVE pops a singleton s0
