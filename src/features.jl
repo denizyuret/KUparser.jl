@@ -28,10 +28,12 @@ typealias Features Vector{ASCIIString}
 
 function features(p::Parser, s::Sentence, flist::Features,
                   x::AbstractArray=Array(wtype(s),flen(p,s,flist),1))
-    fill!(x, zero(eltype(x)))
+    x0 = zero(eltype(x))
     x1 = one(eltype(x))
+    fill!(x, x0)
     nx = 0                      # last entry in x
-    nw = wdim(s) >> 1           # first half word, second half context
+    nwp = wdim(s)               # first half word, second half context
+    nw = nwp >> 1
     nd = p.ndeps
     for f in flist
         @assert in(f[1], "sn") "feature string should start with [sn]"
@@ -68,9 +70,9 @@ function features(p::Parser, s::Sentence, flist::Features,
         fn = f[n]
         if (a > 0)
             if fn == 'w'
-                copy!(sub(x, nx+1:(nx+nw), 1), sub(s.wvec, 1:nw, int(a)))
+                copy!(x, nx+1, s.wvec, (a-1)*nwp+1, nw)
             elseif fn == 'p'
-                copy!(sub(x, nx+1:(nx+nw), 1), sub(s.wvec, nw+1:nw+nw, int(a)))
+                copy!(x, nx+1, s.wvec, (a-1)*nwp+nw+1, nw)
             elseif fn == 'd'
                 (d > 0) && (x[nx+(d>10?6:d>5?5:d)] = x1)
             elseif fn == 'L'
