@@ -1,6 +1,127 @@
+2015-03-29  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Summary:
+
+	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
+	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
+	9314	9290	ZN11	x	9180	5012	4800
+	9212	9165	03290018-bparse64.out(113)
+	9211	9171	03220927-bparselatestop.out(129)
+	9205	9166	03220548-bparsedbg.out(193)
+	9186	9136	03201925-julia3_btrain_jl.out(77)
+	9170	9143	...bp10acl11eager.out(45/50)...
+	9158	9145	03240436-bpacl11.out(79)
+	9158	9140	03192351-gparsedbg.out(194)
+	9154	9129	03171146-julia3_gtrain_jl.out(93)
+	9142	9133	...bp10acl11eager13.out(30/35)...
+	9136	9109	03212217-gpacl11.out(184)
+	9116	9074	03200328-oparsedbg.out(254)
+	9099	9075	03160543-julia3_otrain_jl.out(128)
+	9093	9060	03212217-opacl11.out(210)
+
+	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
+	uas	las	exp
+	8762	8628	GN13
+	8827	x	...gpconll07hybrid13.out(93/110)...
+	8795	x	...gpconll07hybrid3.out(190/194)...
+	8793	x	03210908-gpconll07.out(133) (fv022b, no deprel)
+	8789	x	03270848-gptacl13wp.out(241) (all wp features)
+	8789	x	03250401-gptacl13.out(169)
+	8773	x	03271009-gptacl13.out(233)
+	8727	x	03260538-gptacl13nl.out(228) (no deprel)
+	8709	x	03260132-gptacl13w.out(256) (only w features)
+	8659	x	03261450-gptacl13nd.out(26) (no dropout)
+	7877	x	03270146-gptacl13p.out(187) (only p features)
+
+	con07-static-hybrid-GN13h
+	uas	las	exp
+	8643	8496	GN13
+	8783	x	03282213-opconll07hybrid.out(79)
+	8769	x	...opconll07hybrid13.out(90/104)...
+	8699	x	03210931-opconll07.out(170) (fv022b, no deprel)
+	8689	x	03271008-optacl13.out(234)
+	8675	x	03242000-optacl13.out(66)
+
+	con07-beam10-hybrid-GN13h
+	uas	las	exp
+	8865	x	03221208-bpconll07.out(54)
+
+	con07-static-eager-ZN11e
+	uas	las	exp
+	8610	8493	GN13
+	8685	x	03281640-opconll07eager.out(21)
+
+	con07-dynamic-eager-ZN11e
+	uas	las	exp
+	8869	8769	GN13
+	8799	x	03290106-gpconll07eager.out(22)
+	8788	x	...gpconll07eager13.out(39/53)...
+	8763	x	03281848-gpconll07eager.out(32)
+
+
 2015-03-28  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* ZN11: Time and space
+	* archybrid13.jl: This is identical to the GN13 implementation.
+	@@480169 0.50531 gpconll07h dyuret       r     03/28/2015 23:56:10 ilac.q@ilac-3-1.local              1        
+gpconll07hybrid13.out
+DATA:	1	0.8441778	0.8279033
+DATA:	2	0.83230513	0.8199081
+DATA:	4	0.86308396	0.84029585
+DATA:	8	0.8854879	0.8484909
+DATA:	16	0.9092243	0.85968417
+DATA:	32	0.9319865	0.8678793
+DATA:	64	0.95570713	0.86927843
+DATA:	93	0.96766937	0.8826704	***
+DATA:	110	0.9719262	0.8754747
+
+	@@480170 0.50531 opconll07h dyuret       qw    03/28/2015 23:56:36                                    1        
+opconll07hybrid13.out
+DATA:	1	0.84368515	0.82670397
+DATA:	2	0.85893685	0.8372976
+DATA:	4	0.8764592	0.84829104
+DATA:	8	0.89386505	0.8514891
+DATA:	16	0.9144238	0.856686
+DATA:	32	0.93653667	0.8646812
+DATA:	64	0.9596527	0.871677
+DATA:	90	0.969781	0.87687385	***
+DATA:	104	0.9736997	0.87227666
+
+	* arceager13.jl: This is identical to the GN13 implementation.
+	@@480168 0.50531 bp10acl11e dyuret       qw    03/28/2015 22:10:05                                    1        
+bp10acl11eager13.out
+DATA:	5	0.91694665	0.89882094	0.894397
+DATA:	10	0.93207145	0.9077448	0.9059699
+DATA:	15	0.94179016	0.9104121	0.90847504
+DATA:	20	0.9500162	0.9124311	0.9120034
+DATA:	25	0.95625395	0.9119825	0.9115447
+DATA:	30	0.9611717	0.91415113	0.91249734	***
+DATA:	35	0.9651421	0.9134033	0.9133265
+
+	@@480171 0.00000 gpconll07e dyuret       qw    03/29/2015 00:13:46                                    1        
+gpconll07eager13.out
+DATA:	1	0.8377936	0.82230663
+DATA:	2	0.8526624	0.8237058
+DATA:	4	0.88646203	0.85088944
+DATA:	8	0.91018265	0.86128324
+DATA:	16	0.9358134	0.87207675
+DATA:	32	0.9612292	0.87327605
+DATA:	39	0.9680746	0.8786728	***
+DATA:	53	0.9765279	0.8772736
+
+	@@480172 0.00000 opconll07e dyuret       qw    03/29/2015 00:13:48                                    1        
+
+	+bp10acl11eager13.out
+	+bp10acl11eager.out
+	+bparse64.out
+	-gpconll07eager13.out: out of memory
+	+gpconll07eager.out
+	+gpconll07hybrid13.out
+	+gpconll07hybrid3.out
+	-opconll07eager13.out: out of memory
+	-opconll07eager.out: crashed
+	+opconll07hybrid.out
+
+	* testbparser2.jl: Time and space for ZN11
 
 	Space: Need ncpu x pbatch x nbeam < 7680 to fit in K20 memory
 	ncpu	pbatch	nbeam	mem/cpu	acl11dev
@@ -15,18 +136,33 @@
 
 	Timing oparse: 0.07ms/w = 66s/epoch
 	Timing KUnet.train: 2565x20000x24 net, 950028 words, 290s/epoch = 5mins
+	!!! actually this is 448 seconds with dropout and adagrad ~ 8mins
 	Timing nbeam=10: 1.5ms/w = 1425s/epoch = 24mins
 	Timing nbeam=64, 6.3ms/w = 5985s/epoch = 100mins
 
 	Recommended: ncpu=12, pbatch=32 (to be on the safe side), nbeam=10, pepochs=5.
 	This will give us 5 epochs in 50 mins or 10 mins/epoch.
 	- Maybe we should try learningRate=1 to speed things up?
+	- They are using nbeam=64 we are using nbeam=10
+	+ acleager is not identical to acleager13
 
 	@@480162 0.50531 bp10acl11e dyuret       r     03/28/2015 19:31:40 ilac.q@ilac-2-0.local              1        
+bp10acl11eager.out
+DATA:	5	0.9163362	0.8975497	0.8949086	with punct
+	5	0.9237522	0.9075777	0.9035607	*** (.9314 .9290 in ZN11 nopunct nbeam=64)
+DATA:	10	0.9329146	0.90821844	0.90727544
+DATA:	15	0.94265956	0.9111599	0.90988636
+DATA:	20	0.95063406	0.9124062	0.9129384
+DATA:	25	0.95681393	0.91447514	0.9135206
+DATA:	30	0.96161795	0.91464967	0.9138205
+DATA:	35	0.96584314	0.91492385	0.9137323
+DATA:	40	0.9688472	0.9163198	0.91383815
+DATA:	45	0.97186923	0.9169928	0.9142968	***
+DATA:	50	0.97418284	0.915198	0.9141733
 
 	* GN13: comparison using labeled parsers (cont. 2015-03-25)
 	+ using exact feature sets acl11eager and tacl13hybrid as far as I know
-	- still not using exact archybrid13 and arceager13
+	+ still not using exact archybrid13 and arceager13
 	- still not using a dev set to determine when to quit
 	- still not taking averages
 	- still no easyfirst
@@ -43,6 +179,17 @@ DATA:	32	0.96121573	0.8762742	*** (.8869 in GN13)
 DATA:	64	0.98047125	0.8686788
 DATA:	65	0.98105574	0.8712772
 
+	* 03290106-gpconll07eager.out: Second run:
+	$$480164 0.50531 gpconll07e dyuret       r     03/28/2015 20:31:40 ilac.q@ilac-3-0.local              1        
+DATA:	1	0.8370031	0.8173096
+DATA:	2	0.8489071	0.81690985
+DATA:	4	0.8842317	0.85048974
+DATA:	8	0.90986246	0.8630822
+DATA:	16	0.93509233	0.86727965
+DATA:	22	0.9471867	0.8798721	*** (.8869 in GN13)
+DATA:	32	0.95996624	0.87807316
+DATA:	45	0.971288	0.87227666
+
 	* 03281640-opconll07eager.out:
 	$$480150 0.50531 opconll07e dyuret       r     03/28/2015 12:11:55 ilac.q@ilac-2-1.local              1        
 DATA:	1	0.8356036	0.82290626
@@ -54,7 +201,12 @@ DATA:	21	0.9355335	0.8684789	*** (.8610 in GN13)
 DATA:	32	0.9519026	0.85748553
 DATA:	43	0.96290195	0.85968417
 
-	@@480151 0.50531 opconll07h dyuret       r     03/28/2015 12:12:25 ilac.q@ilac-0-0.local              1        
+	Second run: opconll07eager.out
+	##480165 0.50531 opconll07e dyuret       r     03/28/2015 20:33:10 ilac.q@ilac-3-1.local              1        
+	@@480173 0.00000 opconll07e dyuret       qw    03/29/2015 00:15:41                                    1        	
+
+	* 03282213-opconll07hybrid.out:
+	$$480151 0.50531 opconll07h dyuret       r     03/28/2015 12:12:25 ilac.q@ilac-0-0.local              1        
 DATA:	1	0.843506	0.8297022
 DATA:	2	0.85940933	0.8392964
 DATA:	4	0.87632257	0.8462922
@@ -63,16 +215,22 @@ DATA:	16	0.9145694	0.85908455
 DATA:	32	0.93615603	0.86707973
 DATA:	64	0.96023047	0.86987805
 DATA:	79	0.9661533	0.878273	*** (.8643 in GN13)
-DATA:	100	0.9728219	0.87007797
+DATA:	128	0.9788523	0.8744753
+DATA:	159	0.9828203	0.8746752
 
 	@@480160 0.50531 gpconll07h dyuret       r     03/28/2015 18:58:10 ilac.q@ilac-2-1.local              1        
-DATA:	1	0.84406805	0.8257046
+gpconll07hybrid3.out
+DATA:	1	0.84406805	0.8257046	*** (.8762 in GN13)
 DATA:	2	0.83588797	0.81571054
-DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
+DATA:	4	0.8616822	0.838297
+DATA:	8	0.88582385	0.8502898
+DATA:	16	0.9098938	0.863282
+DATA:	32	0.93317556	0.8674795
+DATA:	64	0.9561214	0.875075
+DATA:	128	0.9758696	0.8714771
+DATA:	190	0.98406756	0.8794723	***
+DATA:	194	0.98414147	0.8794723
 
-	x This keeps crashing without error message at epoch=3?
-	$$480152 0.50531 gpconll07h dyuret       r     03/28/2015 12:12:40 ilac.q@ilac-3-0.local              1        
-	$$480153 0.50531 gpconll07h dyuret       r     03/28/2015 12:48:40 ilac.q@ilac-3-1.local              1        
 
 2015-03-27  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -88,7 +246,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 
 	+ DEBUG. *julia*
 	+ fix gparser.
-	- fix bparser.
+	+ fix bparser.
 	+ train.jl does not work with arceager. *ilac-julia*
 
 	* src/parser.jl: BEST WAY TO REPRESENT PARSERS WITH COMMON FIELDS
@@ -196,10 +354,10 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	- Seriously test new feature code.
 	- Rerun some old experiments with larger epoch or lower dropout.
 	+ Implement arceager.
-	- Run acl11 experiments.
-	- Run conll07 experiments (arceager).
+	= Run acl11 experiments.
+	= Run conll07 experiments (arceager).
 	- Design better featureset for archybrid.
-	- Make latestop default for beamparser.
+	+ Make latestop default for beamparser.
 
 	+ 03271009-gptacl13.out: Testing new features and running variance experiment:
 	$$480131 0.50531 gptacl13   dyuret       r     03/26/2015 19:34:40 ilac.q@ilac-2-0.local
@@ -223,7 +381,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	parser	score1	score2	GN13
 	oparser	.8699	.8675	.8643	03242000-optacl13.out (died at 78, best at 66)
 	gparser	.8793	.8789	.8762	03250401-gptacl13.out (died at 213, best at 169)
-	beam10	.8865	---	---
+	beam10	.8865	x	x
 
 	Things tried:
 	+ .8789 tacl13hybrid features
@@ -270,7 +428,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	* acl11hybrid: dictionary.
 
 		paper		GN13		acl11		label
-		-----		----		-----		-----
+		:----		:---		:----		:----
 	single	S0wp		s0wp		STwt		StackWordTag 
 		S0w		s0w		STw		StackWord    
 		S0p		s0p		STt		StackTag     
@@ -386,7 +544,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	+ compare acl11 with goldberg implementation: encoding etc.
 	  depparser.cpp, depparser_weight.h, state.h
 	  under: src/common/depparser/implementations/arceager
-	- rewrite bparser with deprels.
+	+ rewrite bparser with deprels.
 	+ implement arceager, make the code parser generic.
 	+ create better language for specifying flists.
 	- Make xy in pxy optional in parsers.
@@ -415,7 +573,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	parser	score	GN13
 	oparser	.8699	.8643	03210931-opconll07.out
 	gparser	.8793	.8762	03210908-gpconll07.out
-	beam10	.8865	---	03221208-bpconll07.out
+	beam10	.8865	___	03221208-bpconll07.out
 
 	+ acl11 experiments: ZN11 for comparison has word accuracy
 	dev=.9314 test=.9290.  Word accuracy (excluding punct) is about 1%
@@ -432,11 +590,11 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	+ conllWSJToken_wikipedia2MUNK-100 experiments: Different gold
 	head than acl11.  Latestop better than earlystop.
 	- How about train on all mincost state/move pairs (if multiple).
-	- beam64 too slow, get pepochs to work.
+	+ beam64 too slow, get pepochs to work.
 
 	parser	dev	test1	test2
 	beam10a	.9186	.9132	.9136	03201925-julia3_btrain_jl.out: using whole beam to train, quit at epoch=77
-	beam64	.9212	.9151	.9165	bparse64.out -- running at epoch=162
+	beam64	.9212	.9151	.9165	bparse64.out -- stopped at epoch=166
 	beam10l	.9211	.9169	.9171	03220927-bparselatestop.out: no earlystop, crashed at epoch=207
 	beam10	.9205	.9150	.9166	03220548-bparsedbg.out: earlystop
 
@@ -478,7 +636,8 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	- use oparser for fselect.  faster if only test at the end.
 	- need fselect again for labeled parser.
 	- try previous moves as features? (rnn idea)
-	- try arceasy (better on Goldberg&Nivre13) arceager (Zhang&Nivre11).
+	- try arceasy (better on Goldberg&Nivre13) 
+	+ Try arceager (Zhang&Nivre11).
 	+ train.jl: write pepochs option to get nbeam=64 to work.
 	- train.jl: implement earlystop for efficiency (Zhang does it)
 	+ train.jl: longer training (stop if 2x best epoch)
@@ -503,7 +662,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	- try local search around best feats
 	- feature select with acl11
 	- feature select with conll07
-	- features from ZN11 and GN13
+	+ features from ZN11 and GN13
 
 2015-03-20  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -609,8 +768,8 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	74	0.9711445121199407	0.9180397337786973	0.9135734951661845	*t*
 	77	0.9718000903088589	0.9186130568088342	0.9132030202526286	*d*
 
-	* bparse64.out: experiment with larger beams 1h22m/epoch
-	@@479988 0.50531 bparse64   dyuret       r     03/19/2015 09:48:25 ilac.q@ilac-1-0.local
+	* 03290018-bparse64.out: experiment with larger beams 1h22m/epoch
+	$$479988 0.50531 bparse64   dyuret       r     03/19/2015 09:48:25 ilac.q@ilac-1-0.local
 	1	0.88225925	0.8752399	0.87107474
 	2	0.8944715	0.8857093	0.8815892
 	4	0.9085364	0.8967271	0.8914861
@@ -621,7 +780,7 @@ DATA:	4	0.8616822	0.838297	*** (.8762 in GN13)
 	113	0.97382075	0.92115563	0.9150907	*d*
 	128	0.9761996	0.9197597	0.9152671
 	156	0.9793417	0.91841364	0.9164667	*t*
-DATA:	162	0.9799469	0.9185383	0.9153906
+	166	0.98041004	0.9195603	0.91507304	stopped
 
 	* 03220927-bparselatestop.out: why is this different from static
 	oracle training?  we are rewarding mincost state/move pairs on the
