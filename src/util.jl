@@ -5,6 +5,16 @@ using KUnet
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
 
+# findprev does not exist in v0.3
+if VERSION < v"0.4-"
+function findprev(A, v, start)
+    for i = start:-1:1
+        A[i] == v && return i
+    end
+    0
+end
+end
+
 # This is "distribute" with an extra procs argument:
 # will be fixed in Julia 0.4
 VERSION >= v"0.4-" && eval(Expr(:using,:DistributedArrays))
