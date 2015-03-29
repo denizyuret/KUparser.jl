@@ -18,13 +18,13 @@ typealias ArcEager Parser{:ArcEager}
 # Moves are represented by integers 1..p.nmove
 # They correspond to REDUCE,L1,R1,L2,R2,..,L[ndeps],R[ndeps],SHIFT
 
-REDUCE(p::ArcEager)=1
-SHIFT(p::ArcEager)=p.nmove
-LMOVES(p::ArcEager)=(2:2:(p.nmove-2))
-RMOVES(p::ArcEager)=(3:2:(p.nmove-1))
-LMOVE(p::ArcEager, l::DepRel)=(l<<1)
-RMOVE(p::ArcEager, l::DepRel)=(1+l<<1)
-LABEL(p::ArcEager, m::Move)=convert(DepRel,m>>1)
+@inline REDUCE(p::ArcEager)=1
+@inline SHIFT(p::ArcEager)=p.nmove
+@inline LMOVES(p::ArcEager)=(2:2:(p.nmove-2))
+@inline RMOVES(p::ArcEager)=(3:2:(p.nmove-1))
+@inline LMOVE(p::ArcEager, l::DepRel)=(l<<1)
+@inline RMOVE(p::ArcEager, l::DepRel)=(1+l<<1)
+@inline LABEL(p::ArcEager, m::Move)=convert(DepRel,m>>1)
 
 # In GN13 the initial configuration has an empty stack, and a buffer
 # with special symbol ROOT to the right of all the words at w[n+1], i.e.
@@ -55,10 +55,10 @@ init!(p::ArcEager)=(p.nmove=(2+p.ndeps<<1);move!(p,SHIFT(p)))
 # (1) avoid SHIFT on last buffer word unless the stack is empty.
 # (2) avoid RIGHT on last buffer word if multiple headless words in stack.
 
-shift_ok(p::ArcEager) = ((p.wptr < p.nword) || ((p.wptr == p.nword) && (p.sptr == 0)))
-right_ok(p::ArcEager) = ((p.sptr >= 1) && ((p.wptr < p.nword) || ((p.wptr == p.nword) && (1==sum(p.head[p.stack[1:p.sptr]].==0)))))
-reduce_ok(p::ArcEager) = ((p.sptr >= 1) && (p.head[p.stack[p.sptr]] != 0))
-left_ok(p::ArcEager) = ((p.sptr >= 1) && (p.wptr <= p.nword) && (p.head[p.stack[p.sptr]] == 0))
+@inline SHIFTOK(p::ArcEager) = ((p.wptr < p.nword) || ((p.wptr == p.nword) && (p.sptr == 0)))
+@inline RIGHTOK(p::ArcEager) = ((p.sptr >= 1) && ((p.wptr < p.nword) || ((p.wptr == p.nword) && (1==sum(p.head[p.stack[1:p.sptr]].==0)))))
+@inline REDUCEOK(p::ArcEager) = ((p.sptr >= 1) && (p.head[p.stack[p.sptr]] != 0))
+@inline LEFTOK(p::ArcEager) = ((p.sptr >= 1) && (p.wptr <= p.nword) && (p.head[p.stack[p.sptr]] == 0))
 
 # Proof: Buffer words never have heads, some stack words do.  As long as
 # we have words in the buffer we can recover a single root.  Once the
@@ -76,21 +76,21 @@ left_ok(p::ArcEager) = ((p.sptr >= 1) && (p.wptr <= p.nword) && (p.head[p.stack[
 function move!(p::ArcEager, m::Integer)
     @assert (1 <= m <= p.nmove) "Move $m is not supported"
     if m == SHIFT(p)
-        @assert shift_ok(p)
+        @assert SHIFTOK(p)
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
     elseif m == REDUCE(p)
-        @assert reduce_ok(p)
+        @assert REDUCEOK(p)
         p.sptr -= 1
     elseif in(m, RMOVES(p))
-        @assert right_ok(p)
+        @assert RIGHTOK(p)
         arc!(p, p.stack[p.sptr], p.wptr, LABEL(p,m))
         p.sptr += 1
         p.stack[p.sptr] = p.wptr
         p.wptr += 1
     else # in(m, LMOVES(p))
-        @assert left_ok(p)
+        @assert LEFTOK(p)
         arc!(p, p.wptr, p.stack[p.sptr], LABEL(p,m))
         p.sptr -= 1
     end
@@ -104,7 +104,7 @@ end # move!
 # so (p.head[p.stack[p.sptr]] != 0) is false
 # and LEFT is possible
 
-anyvalidmoves(p::ArcEager)=((p.wptr <= p.nword) || ((p.sptr >= 1) && (p.head[p.stack[p.sptr]] != 0)))
+@inline anyvalidmoves(p::ArcEager)=((p.wptr <= p.nword) || ((p.sptr >= 1) && (p.head[p.stack[p.sptr]] != 0)))
 
 
 # movecosts() counts gold arcs that become impossible after each move.
@@ -125,22 +125,21 @@ function movecosts(p::ArcEager, head::AbstractArray, deprel::AbstractArray,
     @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
     n0 = p.wptr
-    nw = p.nword
     s0 = (p.sptr >= 1 ? p.stack[p.sptr] : 0)
     s1 = (p.sptr > 1 ? p.stack[p.sptr-1] : 0)
     s0h = (s0 != 0 ? p.head[s0] : 0)
-    n0h = (n0 <= nw ? head[n0] : 0)
-    n0l = 0; n0 <= nw && (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && p.head[si]==0 && (n0l+=1); end)
+    n0h = (n0 <= p.nword ? head[n0] : 0)
+    n0l = 0; n0 <= p.nword && (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && p.head[si]==0 && (n0l+=1); end)
     s0r = 0; s0 != 0  && (for i=n0:p.nword; head[i]==s0 && (s0r += 1); end)
 
-    if shift_ok(p)                                              # SHIFT moves n0 to s
+    if SHIFTOK(p)                                              # SHIFT moves n0 to s
         cost[SHIFT(p)] = (n0l +                                 # n0 gets no more ldeps
                           (findprev(p.stack, n0h, p.sptr) > 0)) # or lhead
     end
-    if reduce_ok(p)                                             # REDUCE pops s0
+    if REDUCEOK(p)                                             # REDUCE pops s0
         cost[REDUCE(p)] = s0r                                   # s0 gets no more rdeps
     end
-    if right_ok(p)                                              # RIGHT adds (s0,n0) and shifts n0 to s
+    if RIGHTOK(p)                                              # RIGHT adds (s0,n0) and shifts n0 to s
         rcost = (n0l + (n0h > n0) + (n0h == 0) +                # n0 gets no more ldeps, rhead, 0head,
                  (findprev(p.stack, n0h, p.sptr-1) > 0))        # or lhead<s0
         if n0h == s0                                            # if we have the correct head
@@ -150,7 +149,7 @@ function movecosts(p::ArcEager, head::AbstractArray, deprel::AbstractArray,
             cost[RMOVES(p)] = rcost                             # otherwise we are done
         end
     end
-    if left_ok(p)                                               # LEFT  adds (n0,s0) and reduces s0
+    if LEFTOK(p)                                               # LEFT  adds (n0,s0) and reduces s0
         lcost = (s0r + (head[s0] > n0) + (head[s0] == 0))       # s0 gets no more rdeps, rhead>n0, 0head
         if (head[s0] == n0)                                     # if we have the correct head
             cost[LMOVES(p)] = lcost+1                           # +1 for the wrong labels
