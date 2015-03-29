@@ -107,12 +107,11 @@ function movecosts(p::ArcEager13, head::AbstractArray, deprel::AbstractArray,
     @assert (length(cost) == p.nmove)
     fill!(cost, Pinf)
     n0 = p.wptr
-    nw = p.nword
     s0 = (p.sptr >= 1 ? p.stack[p.sptr] : 0)
     s1 = (p.sptr > 1 ? p.stack[p.sptr-1] : 0)
     s0h = (s0 != 0 ? p.head[s0] : 0)
-    n0h = (n0 <= nw ? head[n0] : 0)
-    n0l = 0; n0 <= nw && (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && p.head[si]==0 && (n0l+=1); end)
+    n0h = (n0 <= p.nword ? head[n0] : 0)
+    n0l = 0; n0 <= p.nword && (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && p.head[si]==0 && (n0l+=1); end)
     s0r = 0; s0 != 0  && (for i=n0:p.nword; head[i]==s0 && (s0r += 1); end)
 
     if SHIFTOK(p)                                               # SHIFT moves n0 to s
