@@ -1,29 +1,40 @@
-# archybrid.jl, Deniz Yuret, July 7, 2014: Transition based greedy arc-hybrid parser based on:
-# http://honnibal.wordpress.com/2013/12/18/a-simple-fast-algorithm-for-natural-language-dependency-parsing
-# Goldberg, Yoav; Nivre, Joakim. Training Deterministic Parsers with Non-Deterministic Oracles. TACL 2013.
+# archybrid.jl, Deniz Yuret, March 29, 2015
+# Transition based greedy arc-hybrid parser based on:
+# [GN13]  Goldberg, Yoav; Nivre, Joakim. Training Deterministic Parsers with Non-Deterministic Oracles. TACL 2013.
+# [H13]   http://honnibal.wordpress.com/2013/12/18/a-simple-fast-algorithm-for-natural-language-dependency-parsing
+# [KGS11] Kuhlmann, Marco, Carlos Gómez-Rodríguez, and Giorgio Satta. Dynamic programming algorithms for transition-based dependency parsers. ACL 2011.
 # Modified valid moves to output a single root-child.
 
 typealias ArcHybrid Parser{:ArcHybrid}
 
-# Moves are represented by integers 1..p.nmove, 0 is not valid.
-# They correspond to L1,R1,L2,R2,...,L[ndeps],R[ndeps],SHIFT
+# In the arc-hybrid system (KGS11), a configuration c= (σ,β,A) consists of
+# a stack σ, a buffer β, and a set A of dependency arcs.
 
-SHIFT(p::ArcHybrid)=p.nmove
-LMOVES(p::ArcHybrid)=(1:2:(p.nmove-2))
-RMOVES(p::ArcHybrid)=(2:2:(p.nmove-1))
-LMOVE(p::ArcHybrid, lab::DepRel)=(lab<<1-1)
-RMOVE(p::ArcHybrid, lab::DepRel)=(lab<<1)
-LABEL(p::ArcHybrid, m::Move)=convert(DepRel,(m+1)>>1)
-
-# The mandatory first shift move is performed during initialization.  So
-# our initial state is [w1][w2,w3,...,wn].
-init!(p::ArcHybrid)=(p.nmove=(1+p.ndeps<<1);move!(p,SHIFT(p)))
-
-# move!(p,m) executes the move m on parser p.
-# In the archybrid system we have three type of moves:
+# We have three types of moves:
 # SHIFT[(σ, b|β, A)] = (σ|b, β, A)
 # RIGHT_lb[(σ|s1|s0, β, A)] = (σ|s1, β, A ∪ {(s1, lb, s0)})
 # LEFT_lb[(σ|s, b|β, A)] = (σ, b|β, A ∪ {(b, lb, s)})
+
+# Moves are represented by integers 1..p.nmove, 0 is not valid.
+# They correspond to L1,R1,L2,R2,...,L[ndeps],R[ndeps],SHIFT
+
+@inline SHIFT(p::ArcHybrid)=p.nmove
+@inline LMOVES(p::ArcHybrid)=(1:2:(p.nmove-2))
+@inline RMOVES(p::ArcHybrid)=(2:2:(p.nmove-1))
+
+# Dependency labels (deprel) are represented by integers 1..p.ndeps
+# The special ROOT deprel is represented by 0.
+
+@inline LMOVE(p::ArcHybrid, lab::DepRel)=(lab<<1-1)
+@inline RMOVE(p::ArcHybrid, lab::DepRel)=(lab<<1)
+@inline LABEL(p::ArcHybrid, m::Move)=convert(DepRel,(m+1)>>1)
+
+# The mandatory first shift move is performed during initialization.  So
+# our initial state is [w1][w2,w3,...,wn].
+
+init!(p::ArcHybrid)=(p.nmove=(1+p.ndeps<<1);move!(p,SHIFT(p)))
+
+# move!(p,m) executes the move m on parser p.
 
 function move!(p::ArcHybrid, m::Move)
     @assert (1 <= m <= p.nmove) "Move $m is not supported"
@@ -45,7 +56,7 @@ end # move!
 
 # anyvalidmoves(p) quickly tells us if we have any moves left
 
-anyvalidmoves(p::ArcHybrid)=((p.wptr <= p.nword) || (p.sptr >= 2))
+@inline anyvalidmoves(p::ArcHybrid)=((p.wptr <= p.nword) || (p.sptr >= 2))
 
 # movecosts() counts gold arcs that become impossible after possible
 # moves.  Tokens start their lifecycle in the buffer without links.
@@ -79,14 +90,15 @@ function movecosts(p::ArcHybrid, head::AbstractArray, deprel::AbstractArray,
 
     if (n0 <= p.nword)                                          # SHIFT valid if n0, moving n0 to s0
         n0h = head[n0]                                          # n0h is the actual head of n0
-        cost[SHIFT(p)] = (sum(head[p.stack[1:p.sptr]] .== n0) +	# no more left dependents for n0
-                          sum(p.stack[1:p.sptr-1] .== n0h) +    # no heads to the left of s0 for n0
-                          ((n0h == 0) && (p.sptr >= 1)))        # no root head for n0 if there is s0
+        n0l = 0; (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && (n0l+=1); end)
+        cost[SHIFT(p)] = (n0l +                                 # no more left dependents for n0
+                          (findprev(p.stack, n0h, p.sptr-1) > 0) + # no heads to the left of s0 for n0
+                          ((n0h == 0) && (p.sptr > 0)))         # no root head for n0 if there is s0
     end
     if (p.sptr >= 1)                                            # LEFT/RIGHT only valid if stack nonempty
         s0 = p.stack[p.sptr]                                    # s0 is top of stack
         s0h = head[s0]                                          # s0h is the actual head of s0
-        s0r = sum(head[n0:end] .== s0)                          # s0r is the number of right children for s0
+        s0r = 0; s0 != 0  && (for i=n0:p.nword; head[i]==s0 && (s0r += 1); end) # s0r is the number of right children for s0
 
         if (n0 <= p.nword)                                      # LEFT valid if n0, making n0 head of s0
             lcost = (s0r +                                      # no more right children for s0
