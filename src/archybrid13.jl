@@ -14,71 +14,54 @@ typealias ArcHybrid13 Parser{:ArcHybrid13}
 # RIGHT_lb[(σ|s1|s0, β, A)] = (σ|s1, β, A ∪ {(s1, lb, s0)})
 # LEFT_lb[(σ|s, b|β, A)] = (σ, b|β, A ∪ {(b, lb, s)})
 
-# Moves are represented by integers 1..p.nmove.
-# They correspond to R0,L1,R1,L2,R2,...,L[ndeps],R[ndeps],SHIFT
+# In (GN13) the initial configuration has an empty stack, and a buffer
+# with special symbol ROOT to the left of all the words.  We don't use
+# an explicit ROOT, instead we use REDUCE when there is a single
+# word in the stack to get the same effect.
 
-@inline SHIFT(p::ArcHybrid13)=p.nmove
-@inline R0MOVE(p::ArcHybrid13)=1
-@inline LMOVES(p::ArcHybrid13)=(2:2:(p.nmove-2))
-@inline RMOVES(p::ArcHybrid13)=(3:2:(p.nmove-1))
+# We comment out the definitions identical to the ones in parser.jl.
+
+# shift(p::Parser)=(p.stack[p.sptr+=1]=p.wptr; p.wptr+=1)
+# reduce(p::Parser)=(p.sptr-=1)
+# left(p::Parser, l::DepRel)=(arc!(p, p.wptr, p.stack[p.sptr], l); reduce(p))
+right(p::ArcHybrid13, l::DepRel)=(arc!(p, p.stack[p.sptr-1], p.stack[p.sptr], l); reduce(p))
+
+# Moves are represented by integers 1..p.nmove.
+# They correspond to REDUCE,L1,R1,L2,R2,...,L[ndeps],R[ndeps],SHIFT
+
+# reducemove(p::Parser)=1
+# leftmoves(p::Parser)=(2:2:(p.nmove-2))
+# rightmoves(p::Parser)=(3:2:(p.nmove-1))
+# shiftmove(p::Parser)=p.nmove
 
 # Dependency labels (deprel) are represented by integers 1..p.ndeps
 # The special ROOT deprel is represented by 0.
 
-@inline LMOVE(p::ArcHybrid13, lab::DepRel)=(lab<<1)
-@inline RMOVE(p::ArcHybrid13, lab::DepRel)=(1+lab<<1)
-@inline LABEL(p::ArcHybrid13, m::Move)=convert(DepRel,m>>1)
-
-# In (GN13) the initial configuration has an empty stack, and a buffer
-# with special symbol ROOT to the left of all the words.  We don't use
-# an explicit ROOT, instead we use the R0MOVE when there is a single
-# word in the stack to get the same effect.
+# leftmove(p::Parser,l::DepRel)=(l<<1)
+# rightmove(p::Parser,l::DepRel)=(1+l<<1)
+# label(p::Parser,m::Move)=convert(DepRel,m>>1)
 
 # The only legal first move is SHIFT.  The only legal last move is
-# R0MOVE (linking the last word to the ROOT).  We perform the first
+# REDUCE (linking the last word to the ROOT).  We perform the first
 # SHIFT during initialization so our initial state is [w1][w2,...,wn].
-# We don't perform the last R0MOVE so our final state is [wi][].  This
+# We don't perform the last REDUCE so our final state is [wi][].  This
 # ensures 2n-2 moves for each sentence.
 
-init!(p::ArcHybrid13)=(p.nmove=(2+p.ndeps<<1);move!(p,SHIFT(p)))
+# init!(p::Parser)=(p.nmove=(2+p.ndeps<<1);shift(p))
 
 # GN13 has the following preconditions for moves: "There is a
 # precondition on RIGHT to be legal only when the stack has at least two
 # elements, and on LEFT to be legal only when the stack is non-empty and
-# s != ROOT."  We introduce the special R0MOVE (similar to a REDUCE)
+# s != ROOT."  We introduce the additional REDUCE move
 # when the stack has a single word to represent the ROOT linkage.  We
-# terminate with the last word in stack, so R0MOVE has a precondition of
+# terminate with the last word in stack, so REDUCE has a precondition of
 # a non-empty buffer.
 
-@inline SHIFTOK(p::ArcHybrid13)=(p.wptr <= p.nword)
-@inline RIGHTOK(p::ArcHybrid13)=(p.sptr > 1)
-@inline LEFTOK(p::ArcHybrid13)=((p.sptr > 0) && (p.wptr <= p.nword))
-@inline R0MOVEOK(p::ArcHybrid13)=((p.sptr == 1) && (p.wptr <= p.nword))
-
-@inline anyvalidmoves(p::ArcHybrid13)=((p.wptr <= p.nword) || (p.sptr > 1))
-
-
-function move!(p::ArcHybrid13, m::Move)
-    @assert (1 <= m <= p.nmove) "Move $m is not supported"
-    if m == SHIFT(p)
-        @assert SHIFTOK(p)
-        p.sptr += 1
-        p.stack[p.sptr] = p.wptr
-        p.wptr += 1
-    elseif m == R0MOVE(p)
-        @assert R0MOVEOK(p)
-        p.sptr -= 1
-    elseif in(m, RMOVES(p))
-        @assert RIGHTOK(p)
-        arc!(p, p.stack[p.sptr-1], p.stack[p.sptr], LABEL(p,m))
-        p.sptr -= 1
-    else # in(m, LMOVES(p))
-        @assert LEFTOK(p)
-        arc!(p, p.wptr, p.stack[p.sptr], LABEL(p,m))
-        p.sptr -= 1
-    end
-end # move!
-
+shiftok(p::ArcHybrid13)=(p.wptr <= p.nword)
+rightok(p::ArcHybrid13)=(p.sptr > 1)
+leftok(p::ArcHybrid13)=((p.wptr <= p.nword) && (p.sptr > 0))
+reduceok(p::ArcHybrid13)=((p.sptr == 1) && (p.wptr <= p.nword))
+anyvalidmoves(p::ArcHybrid13)=((p.wptr <= p.nword) || (p.sptr > 1))
 
 # movecosts() counts gold arcs that become impossible after possible
 # moves.  Tokens start their lifecycle in the buffer without links.
@@ -105,49 +88,31 @@ end # move!
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function movecosts(p::ArcHybrid13, head::AbstractArray, deprel::AbstractArray, 
-                   cost::Pvec=Array(Position,p.nmove))
-    @assert (length(head) == p.nword)
-    @assert (length(deprel) == p.nword)
-    @assert (length(cost) == p.nmove)
-    fill!(cost, Pinf)
-    n0 = p.wptr                                                 # n0 is the next word in buffer
-    s0 = (p.sptr > 0 ? p.stack[p.sptr] : 0)                     # s0 is top of stack
-    s1 = (p.sptr > 1 ? p.stack[p.sptr-1] : 0)                   # s1 is the stack element before s0
-    s0h = (s0 != 0 ? head[s0] : 0)                              # s0h is the actual head of s0
-    s0r = 0; s0 != 0  && (for i=n0:p.nword; head[i]==s0 && (s0r += 1); end) # s0r is the number of right children for s0
+function movecosts(p::ArcHybrid13, head::AbstractArray, deprel::AbstractArray, cost::Pvec=Array(Position,p.nmove))
+    hybridcosts(p,head,deprel,cost)
+end
 
-    if SHIFTOK(p)                                               # SHIFT valid if n0, moving n0 to s0
-        n0h = (n0 <= p.nword ? head[n0] : 0)                    # n0h is the actual head of n0
-        n0l = 0; (for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && (n0l+=1); end)
-        cost[SHIFT(p)] = (n0l +                                 # no more left dependents for n0
-                          (findprev(p.stack, n0h, p.sptr-1) > 0) + # no heads to the left of s0 for n0
-                          ((n0h == 0) && (p.sptr > 0)))         # no root head for n0 if there is s0
-    end
-    if R0MOVEOK(p)                                              # R0MOVE pops a singleton s0
-        cost[R0MOVE(p)] = s0r + (s0h >= n0)                     # no more right head or dependent for s0
-    end
-    if RIGHTOK(p)                                               # RIGHT valid if s1 making s1 head of s0
-        rcost = s0r + (s0h >= n0)                               # no more right head or dependent for s0
-        if (s0h == s1)                                          # if we have the correct head
-            cost[RMOVES(p)] = rcost + 1                         # +1 for all the wrong labels
-            cost[RMOVE(p,deprel[s0])] -= 1                      # except for the correct label
-        else                                                    # 
-            cost[RMOVES(p)] = rcost                             # if s1 is not the actual head we are done
-        end
-    end
-    if LEFTOK(p)                                                # LEFT valid if n0, making n0 head of s0
-        lcost = (s0r +                                          # no more right children for s0
-                 ((s0h > n0) ||                                 # no heads to the right of n0 for s0
-                  ((p.sptr == 1) && (s0h == 0)) ||              # no root head for s0 if alone
-                  ((p.sptr > 1) && (s0h == s1))))               # no more s1 for head of s0
-        if (s0h == n0)                                          # if we have the correct head
-            cost[LMOVES(p)] = lcost + 1                         # +1 for all the wrong labels
-            cost[LMOVE(p,deprel[s0])] -= 1                      # except for the correct label
-        else                                                    #
-            cost[LMOVES(p)] = lcost                             # if n0 is not the actual head we are done
-        end
-    end
-    return cost
-end # movecosts
+function shiftcost(p::ArcHybrid13, head::AbstractArray, n0l::Integer, s0r::Integer)
+    # n0 gets no more ldeps or lhead<s0 or root head if there is s0
+    n0 = p.wptr; n0h = head[n0]
+    (n0l + (findprev(p.stack, n0h, p.sptr-1) > 0) + ((n0h==0) && (p.sptr>0)))
+end
+
+function reducecost(p::ArcHybrid13, head::AbstractArray, n0l::Integer, s0r::Integer)
+    # s0 gets no more rdeps or rhead
+    s0 = p.stack[p.sptr]; s0h = head[s0]
+    (s0r + (s0h >= p.wptr))
+end
+
+function leftcost(p::ArcHybrid13, head::AbstractArray, n0l::Integer, s0r::Integer)
+    # s0 gets no more rdeps, rhead>n0, s1 head or 0head if alone
+    s0 = p.stack[p.sptr]; s0h = head[s0]
+    (s0r + ((s0h > p.wptr) || ((p.sptr == 1) && (s0h == 0)) || ((p.sptr > 1) && (s0h == p.stack[p.sptr-1]))))
+end
+
+function rightcost(p::ArcHybrid13, head::AbstractArray, n0l::Integer, s0r::Integer)
+    # s0 gets no more rdeps or rhead
+    s0 = p.stack[p.sptr]; s0h = head[s0]
+    (s0r + (s0h >= p.wptr))
+end
 
