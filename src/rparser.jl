@@ -65,3 +65,12 @@ function rparse_dbg{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
     @assert cost == truecost(p,s)
     return p
 end
+
+function truecost(p::Parser, s::Sentence)
+    cost = 0
+    for i=1:p.nword
+        ((p.head[i] != s.head[i]) || (p.deprel[i] != s.deprel[i])) && (cost += 1)
+    end
+    return cost
+end
+
