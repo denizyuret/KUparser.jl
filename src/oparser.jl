@@ -8,27 +8,27 @@
 # ncpu::Integer: (optional) performs parallel processing
 # xy::Bool: (optional, default=false) causes training data to be returned in a tuple (p, x, y)
 
-function oparse(pt::ParserType, s::Sentence, f::Features, ndeps::Integer, xy::Bool=false)
-    p = Parser{pt}(wcnt(s), ndeps)
+function oparse{T<:Parser}(pt::Type{T}, s::Sentence, f::Features, ndeps::Integer, xy::Bool=false)
+    p = pt(wcnt(s), ndeps)
     oparse(p, s, f, ndeps, xy)
 end
 
-function oparse(pt::ParserType, c::Corpus, f::Features, ndeps::Integer, xy::Bool=false)
-    pa = map(s->Parser{pt}(wcnt(s), ndeps), c)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Features, ndeps::Integer, xy::Bool=false)
+    pa = map(s->pt(wcnt(s), ndeps), c)
     oparse(pa, c, f, ndeps, xy)
 end
 
-function oparse(pt::ParserType, c::Corpus, f::Features, ndeps::Integer, ncpu::Integer, xy::Bool=false)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Features, ndeps::Integer, ncpu::Integer, xy::Bool=false)
     @date Main.resetworkers(ncpu)
     sa = distribute(c)                                  # distributed sentence array
-    pa = map(s->Parser{pt}(wcnt(s), ndeps), sa)		# distributed parser array
+    pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
     if xy
         xtype = wtype(c[1])
         x = SharedArray(xtype, xsize(pa[1],c,f))        # shared x array
         y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
         fill!(y, zero(xtype))
         nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
-        p1 = Parser{pt}(1,ndeps)
+        p1 = pt(1,ndeps)
         for i=1:length(c)-1
             nx[i+1] = nx[i] + nmoves(p1, c[i])
         end
@@ -40,7 +40,7 @@ function oparse(pt::ParserType, c::Corpus, f::Features, ndeps::Integer, ncpu::In
             @spawnat p oparse(localpart(pa), localpart(sa), f, ndeps)
         end
     end
-    pa = convert(Vector{Parser{pt}}, pa)
+    pa = convert(Vector{pt}, pa)
     @date Main.rmworkers()
     return (xy ? (pa, sdata(x), sdata(y)) : pa)
 end
@@ -67,11 +67,11 @@ function oparse(p::Parser, s::Sentence, f::Features, ndeps::Integer,
     return (xy ? (p,x,y) : p)
 end
 
-function oparse(pa::AbstractArray, c::Corpus, f::Features, ndeps::Integer, 
-                xy::Bool=false, 
-                x::AbstractArray=(xy ? Array(wtype(c[1]),xsize(pa[1],c,f)): []), 
-                y::AbstractArray=(xy ? zeros(wtype(c[1]),ysize(pa[1],c))  : []),
-                nx::Integer=0)
+function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, f::Features, ndeps::Integer, 
+                           xy::Bool=false, 
+                           x::AbstractArray=(xy ? Array(wtype(c[1]),xsize(pa[1],c,f)): []), 
+                           y::AbstractArray=(xy ? zeros(wtype(c[1]),ysize(pa[1],c))  : []),
+                           nx::Integer=0)
     for i=1:length(c)
         oparse(pa[i], c[i], f, ndeps, xy, x, y, nx)
         xy && (nx += nmoves(pa[i], c[i]))
