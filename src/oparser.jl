@@ -5,7 +5,7 @@
 # s::Sentence or c::Corpus: input sentence(s), a single parser is returned for s, a vector of parsers for c
 # ndeps::Integer: number of dependency types
 # ncpu::Integer: (optional) performs parallel processing
-# feats::Fvec: (optional) specification of features, a (p,x,y) tuple returned if specified
+# feats::Fvec: (optional) specification of features, a (p,x,y) tuple returned if specified, only p if not
 
 
 function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats::Fvec=Feature[])
