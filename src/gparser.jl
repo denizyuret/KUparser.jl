@@ -1,7 +1,7 @@
 # The greedy transition based parser parses the sentence using the
 # following steps:
 
-function gparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
+function gparse(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer)
     (parser,x,y,cost,score) = initgparse(pt,sent,net,feats,ndeps)
     nx = 0
     while anyvalidmoves(parser)
@@ -19,7 +19,7 @@ end
 
 # We can parse a corpus using map:
 
-function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer)
+function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer)
     pxy = map(s->gparse(pt,s,net,feats,ndeps), corpus)
     p = map(z->z[1], pxy)
     x = hcat(map(z->z[2], pxy)...)
@@ -32,7 +32,7 @@ end
 # 1. We process multiple sentences to minibatch net input.
 #    This speeds up predict.
 
-function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
+function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbatch::Integer)
     (nbatch == 0 || nbatch > length(corpus)) && (nbatch = length(corpus))
     (p,x,y,cost,score) = initgparse(pt, corpus, net, feats, ndeps, nbatch)
     nx = 0
@@ -63,7 +63,7 @@ end
 # 2. We do multiple batches in parallel to utilize CPU cores.
 #    This speeds up features.
 
-function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer, ncpu::Integer)
+function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbatch::Integer, ncpu::Integer)
     Main.resetworkers(ncpu)
     d = distproc(corpus, workers()[1:ncpu])
     net = testnet(net)
@@ -77,7 +77,7 @@ function gparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps
     (p, x, y)
 end
 
-function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer)
+function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer)
     p = Parser{pt}(wcnt(sent),ndeps)
     xtype = eltype(net[1].w)
     xrows = flen(p, sent, feats)
@@ -89,7 +89,7 @@ function initgparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, n
     (p, x, y, cost, score)
 end
 
-function initgparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbatch::Integer)
+function initgparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbatch::Integer)
     p = map(s->Parser{pt}(wcnt(s),ndeps), corpus)
     nsent = length(corpus)
     nword = sum(wcnt, corpus)

@@ -3,22 +3,22 @@
 #
 # pt::ParserType: parser type: :ArcHybrid, :ArcEager, :ArcHybrid13, :ArcEager13
 # s::Sentence or c::Corpus: input sentence(s), a single parser is returned for s, a vector of parsers for c
-# f::Features: specification of features
+# f::Fvec: specification of features
 # ndeps::Integer: number of dependency types
 # ncpu::Integer: (optional) performs parallel processing
 # xy::Bool: (optional, default=false) causes training data to be returned in a tuple (p, x, y)
 
-function oparse{T<:Parser}(pt::Type{T}, s::Sentence, f::Features, ndeps::Integer, xy::Bool=false)
+function oparse{T<:Parser}(pt::Type{T}, s::Sentence, f::Fvec, ndeps::Integer, xy::Bool=false)
     p = pt(wcnt(s), ndeps)
     oparse(p, s, f, ndeps, xy)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Features, ndeps::Integer, xy::Bool=false)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Fvec, ndeps::Integer, xy::Bool=false)
     pa = map(s->pt(wcnt(s), ndeps), c)
     oparse(pa, c, f, ndeps, xy)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Features, ndeps::Integer, ncpu::Integer, xy::Bool=false)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Fvec, ndeps::Integer, ncpu::Integer, xy::Bool=false)
     @date Main.resetworkers(ncpu)
     sa = distribute(c)                                  # distributed sentence array
     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
@@ -45,7 +45,7 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, f::Features, ndeps::Integer, 
     return (xy ? (pa, sdata(x), sdata(y)) : pa)
 end
 
-function oparse(p::Parser, s::Sentence, f::Features, ndeps::Integer, 
+function oparse(p::Parser, s::Sentence, f::Fvec, ndeps::Integer, 
                 xy::Bool=false, 
                 x::AbstractArray=(xy ? Array(wtype(s),xsize(p,s,f)): []), 
                 y::AbstractArray=(xy ? zeros(wtype(s),ysize(p,s))  : []),
@@ -67,7 +67,7 @@ function oparse(p::Parser, s::Sentence, f::Features, ndeps::Integer,
     return (xy ? (p,x,y) : p)
 end
 
-function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, f::Features, ndeps::Integer, 
+function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, f::Fvec, ndeps::Integer, 
                            xy::Bool=false, 
                            x::AbstractArray=(xy ? Array(wtype(c[1]),xsize(pa[1],c,f)): []), 
                            y::AbstractArray=(xy ? zeros(wtype(c[1]),ysize(pa[1],c))  : []),
