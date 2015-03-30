@@ -1,4 +1,6 @@
 using HDF5,JLD,KUparser,Base.Test
+
+# All interfaces give the same result
 @date @load "conll07.tst.jld4"
 ft = Flist.acl11eager
 pt = :ArcEager
@@ -19,3 +21,13 @@ I2 = 1:size(x2,2)
 @test @show isequal(p5,p4)
 @date (p6,x6,y6)=oparse(pt, corpus, ft, ndeps, ncpu, true)
 @test @show isequal((p6,x6,y6), (p4,x4,y4))
+
+# Memory overload
+@date @load "acl11.trn.jld4"
+ft = Flist.acl11eager
+pt = :ArcEager13
+ncpu = 20
+ndeps = length(deprel)
+@date pxy7=oparse(pt, corpus, ft, ndeps, ncpu, true)
+@date pxy8=oparse(pt, corpus, ft, ndeps, true)
+@test @show isequal(pxy7, pxy8)
