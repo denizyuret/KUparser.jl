@@ -79,3 +79,4 @@ function evalparse(parsers, sentences)
     return (uas, uas2, las, las2, uem, lem)
 end
 
+pxyequal(a,b)=(isequal(a[1],b[1]) && isequal(sortcols(vcat(a[2],a[3])), sortcols(vcat(b[2],b[3]))))
