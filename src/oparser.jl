@@ -1,7 +1,7 @@
 # The oracle parser executes the moves that will lead to the best parse.
 # The public interface for oparse takes the following arguments:
 #
-# pt::ParserType: parser type: :ArcHybrid, :ArcEager, :ArcHybrid13, :ArcEager13
+# pt::ParserType: ArcHybridR1, ArcEagerR1, ArcHybrid13, ArcEager13
 # s::Sentence or c::Corpus: input sentence(s), a single parser is returned for s, a vector of parsers for c
 # ndeps::Integer: number of dependency types
 # ncpu::Integer: (optional) performs parallel processing
