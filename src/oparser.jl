@@ -24,7 +24,7 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer
     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
     if !isempty(feats)
         xtype = wtype(c[1])
-        x = SharedArray(xtype, xsize(pa[1],c,f))        # shared x array
+        x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
         y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
         fill!(y, zero(xtype))
         nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
@@ -33,7 +33,7 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer
             nx[i+1] = nx[i] + nmoves(p1, c[i])
         end
         @sync for p in procs(sa)
-            @spawnat p oparse(localpart(pa), localpart(sa), ndeps, feats, true, x, y, nx[localindexes(sa)[1][1]])
+            @spawnat p oparse(localpart(pa), localpart(sa), ndeps, feats, x, y, nx[localindexes(sa)[1][1]])
         end
     else
         @sync for p in procs(sa)
@@ -46,7 +46,7 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer
 end
 
 function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec=Feature[], 
-                x::AbstractArray=(isempty(feats) ? [] : Array(wtype(s),xsize(p,s,f))), 
+                x::AbstractArray=(isempty(feats) ? [] : Array(wtype(s),xsize(p,s,feats))), 
                 y::AbstractArray=(isempty(feats) ? [] : zeros(wtype(s),ysize(p,s))),
                 nx::Integer=0)
     c = Array(Position, p.nmove)
@@ -67,7 +67,7 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec=Feature[],
 end
 
 function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec=Feature[], 
-                           x::AbstractArray=(isempty(feats) ? [] : Array(wtype(c[1]),xsize(pa[1],c,f))), 
+                           x::AbstractArray=(isempty(feats) ? [] : Array(wtype(c[1]),xsize(pa[1],c,feats))), 
                            y::AbstractArray=(isempty(feats) ? [] : zeros(wtype(c[1]),ysize(pa[1],c))),
                            nx::Integer=0)
     for i=1:length(c)

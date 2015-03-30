@@ -27,16 +27,18 @@
 typealias Feature ASCIIString
 typealias Fvec Vector{Feature}
 
-function features(p::Parser, s::Sentence, flist::Fvec,
-                  x::AbstractArray=Array(wtype(s),flen(p,s,flist),1))
+function features(p::Parser, s::Sentence, feats::Fvec,
+                  x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
+                  xcol::Integer=1)
+    wrows = wdim(s)             # first half word, second half context
+    xrows = size(x, 1)
     x0 = zero(eltype(x))
     x1 = one(eltype(x))
-    fill!(x, x0)
+    x[:,xcol] = x0
     nx = 0                      # last entry in x
-    nwp = wdim(s)               # first half word, second half context
-    nw = nwp >> 1
+    nw = wrows >> 1
     nd = p.ndeps
-    for f in flist
+    for f in feats
         @assert in(f[1], "sn") "feature string should start with [sn]"
         (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2)
         (a,d) = (0,0)           # target word index and right distance
@@ -71,36 +73,36 @@ function features(p::Parser, s::Sentence, flist::Fvec,
         fn = f[n]
         if (a > 0)
             if fn == 'w'
-                copy!(x, nx+1, s.wvec, (a-1)*nwp+1, nw)
+                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nw)
             elseif fn == 'p'
-                copy!(x, nx+1, s.wvec, (a-1)*nwp+nw+1, nw)
+                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw)
             elseif fn == 'd'
-                (d > 0) && (x[nx+(d>10?6:d>5?5:d)] = x1)
+                (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1)
             elseif fn == 'L'
-                x[nx+1+p.deprel[a]] = x1
+                x[nx+1+p.deprel[a], xcol] = x1
             elseif fn == 'a'
-                x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a])] = x1
+                x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1
             elseif fn == 'b'
-                x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a])] = x1
+                x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a]), xcol] = x1
             elseif fn == 'A'
-                for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]]] = x1; end
+                for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]], xcol] = x1; end
             elseif fn == 'B'
-                for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]]] = x1; end
+                for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]], xcol] = x1; end
             else
                 error("Unknown feature $(fn)")
             end
         end # if (a > 0)
         nx += flen1(fn, nw, nd)
     end
-    @assert nx == length(x)
+    @assert nx == xrows
     return x
 end
 
-function flen(p::Parser, s::Sentence, flist::Fvec)
+function flen(p::Parser, s::Sentence, feats::Fvec)
     nx = 0
     nw = wdim(s) >> 1
     nd = p.ndeps
-    for f in flist
+    for f in feats
         nx += flen1(f[end], nw, nd)
     end
     return nx
@@ -118,3 +120,7 @@ function flen1(c::Char, nw::Integer,nd::Integer)
     error("Unknown feature character $c")
 end
 
+xsize(p::Parser, s::Sentence, f::Fvec)=(flen(p,s,f),nmoves(p,s))
+xsize(p::Parser, c::Corpus, f::Fvec)=(flen(p,c[1],f),nmoves(p,c))
+ysize(p::Parser, s::Sentence)=(nmoves(p),nmoves(p,s))
+ysize(p::Parser, c::Corpus)=(nmoves(p),nmoves(p,c))
