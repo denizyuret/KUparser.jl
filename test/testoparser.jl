@@ -22,10 +22,3 @@ I2 = 1:size(x2,2)
 @date (p6,x6,y6)=oparse(pt, corpus, ndeps, ncpu, ft)
 @test @show isequal((p6,x6,y6), (p4,x4,y4))
 
-# Memory overload
-@date @load "acl11.trn.jld4"
-ncpu = 20
-ndeps = length(deprel)
-@date pxy7=oparse(pt, corpus, ndeps, ncpu, ft)
-@date pxy8=oparse(pt, corpus, ndeps, ft)
-@test @show isequal(pxy7, pxy8)
