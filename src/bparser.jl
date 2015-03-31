@@ -1,205 +1,155 @@
-type Beam nbeam; sentence; parser; parser2; pscore; pscore2; cost; score; cparser; cmove; cscore; csorted; mincost; Beam()=new(); end
+# The public interface for bparse takes the following arguments:
+#
+# pt::ParserType: ArcHybridR1, ArcEagerR1, ArcHybrid13, ArcEager13
+# c::Corpus: array of input sentences
+# ndeps::Integer: number of dependency types
+# feats::Fvec: specification of features
+# net::Net: model used for move prediction
+# nbeam::Integer: beam size
+# nbatch::Integer: (optional) parse sentences in batches for efficiency
+# ncpu::Integer: (optional) perform parallel processing
+# xy::Bool: (keyword) return (p,x,y) tuple for training, by default only parsers returned.
 
-function bparse(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
-    b = Beam(pt, sent, net, feats, ndeps, nbeam)                # b.parser, b.pscore: candidate parsers and their scores
-    (f,x,y) = initfxy(pt, sent, net, feats, ndeps, nbeam)       # f,x:feature vectors, y:mincost moves
-    nx = 0                                                      # nx: number of columns filled in x and y
-    while true
-        anyvalidmoves(b.parser[1]) || break                     # assuming all parsers finish at the same time
-        (cmin,jmin,fmin) = (Pinf,0,0)                           # mincost, its move, its nf index
-        for i=1:b.nbeam                                         # b.nbeam: number of parsers on the beam
-            c = movecosts(b.parser[i], sent.head, sent.deprel, sub(b.cost,:,i))   # b.cost[j,i] is the cost of j'th move for i'th parser
-            cmini,jmini = findmin(c)
-            @assert (cmini < Pinf)
-            features(b.parser[i], sent, feats, sub(f,:,i))      # f[:,i] is the feature vector for the i'th parser
-            (cmini < cmin) && ((cmin,jmin,fmin) = (cmini,jmini,i))
-        end
-        @assert (cmin < Pinf)
-        copy!(sub(x,:,(nx+=1)),sub(f,:,fmin))                   # x: state vector on mincostpath
-        y[jmin,nx]=one(eltype(y))                               # y: correct move on mincostpath
-        predict(net, sub(f,:,1:b.nbeam), b.score)               # b.score[j,i] is the score for the j'th move of i'th parser
-        nc = 0                                                  # nc is the number of new candidates
-        for i=1:b.nbeam
-            for j=1:size(b.cost,1)
-                b.cost[j,i] == Pinf && continue
-                nc += 1
-                b.cparser[nc] = i                               # b.cparser[c] is the index of the c'th candidate parser
-                b.cmove[nc] = j                                 # b.cmove[c] is the move to be made from b.cparser[c]
-                b.cscore[nc] = b.pscore[i] + b.score[j,i]       # b.cscore[c] is the score for b.cparser[c]+b.cmove[c]
-            end                                                 
-        end
-        sortpermx(sub(b.csorted, 1:nc), sub(b.cscore, 1:nc); rev=true)
-        b.nbeam = min(nc,nbeam)                                 # b.nbeam is now the new beam size
-        for i=1:b.nbeam                                         # i is the index of the new parser
-            c=b.csorted[i]                                      # c is the index of the candidate
-            p=b.cparser[c]                                      # p is the index of the old parser
-            copy!(b.parser2[i], b.parser[p])                    
-            move!(b.parser2[i], b.cmove[c])                     # b.parser2[i] = b.parser[p] + b.cmove[c]
-            b.pscore2[i] = b.cscore[c]                          # b.pscore2[i] cumulative score for new b.parser2[i]
-        end
-        b.parser,b.parser2 = b.parser2,b.parser                 # we swap parsers and scores
-        b.pscore,b.pscore2 = b.pscore2,b.pscore                 # for next round
+
+# Single cpu version:
+function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
+                           nbeam::Integer, nbatch::Integer=1; xy::Bool=false)
+    pa = map(s->pt(wcnt(s), ndeps), c)
+    if !xy
+        bparse(pa, c, ndeps, feats, net, nbeam, nbatch)
+    else
+        xtype = wtype(c[1])
+        x = Array(xtype, xsize(pa[1], c, feats))
+        y = zeros(xtype, ysize(pa[1], c))
+        bparse(pa, c, ndeps, feats, net, nbeam, nbatch, x, y)
     end
-    @assert nx == size(x,2)
-    (b.parser[1], x, y)
+    (xy ? (pa, x, y) : pa)
 end
 
-function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
-    pxy = map(s->bparse(pt,s,net,feats,ndeps,nbeam), corpus)
-    p = map(z->z[1], pxy)
-    x = hcat(map(z->z[2], pxy)...)
-    y = hcat(map(z->z[3], pxy)...)
-    (p, x, y)
+# Multi cpu version:
+function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
+                           nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
+    @date Main.resetworkers(ncpu)
+    sa = distribute(c)                                  # distributed sentence array
+    pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
+    net = testnet(net)                                  # host copy of net for sharing
+    if !xy
+        @sync for p in procs(sa)
+            @spawnat p bparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbeam, nbatch)
+        end
+    else
+        xtype = wtype(c[1])
+        x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
+        y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
+        fill!(y, zero(xtype))
+        nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
+        p1 = pt(1,ndeps)
+        for i=1:length(c)-1
+            nx[i+1] = nx[i] + nmoves(p1, c[i])
+        end
+        @sync for p in procs(sa)
+            @spawnat p bparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbeam, nbatch, x, y, nx[localindexes(sa)[1][1]])
+        end
+    end
+    pa = convert(Vector{pt}, pa)
+    @date Main.rmworkers()
+    (xy ? (pa, sdata(x), sdata(y)) : pa)
 end
 
-function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer, nbatch::Integer)
+
+# Data structure for beam search:
+type Beam cmove; cost; cparser; cscore; csorted; nbeam; parser; parser2; pscore; pscore2; sentence; 
+    function Beam(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer)
+        @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer for beam parser"
+        b = new()
+        nword = wcnt(s)
+        ftype = wtype(s)
+        itype = typeof(nbeam)
+        ptype = typeof(p)
+        ncand = nbeam * p.nmove
+        b.cmove = Array(Move, ncand)
+        b.cost = Array(Position, p.nmove, nbeam)
+        b.cparser = Array(itype, ncand)
+        b.cscore = Array(ftype, ncand)
+        b.csorted = Array(itype, ncand)
+        b.nbeam = 1
+        b.parser  = [ptype(nword,ndeps) for i=1:nbeam]
+        b.parser2 = [ptype(nword,ndeps) for i=1:nbeam]
+        b.pscore  = Array(ftype, nbeam)
+        b.pscore2 = Array(ftype, nbeam)
+        b.pscore[1] = zero(ftype)
+        b.sentence = s
+        return b
+    end
+end
+
+# Here is the workhorse:
+function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer, nbatch::Integer,
+                           x::AbstractArray=[], y::AbstractArray=[], nx::Integer=0)
     (nbatch == 0 || nbatch > length(corpus)) && (nbatch = length(corpus))
-    (parsers,f,x,y,score) = initbatch(pt, corpus, net, feats, ndeps, nbeam, nbatch)
-    nx = 0                                                      # training data goes into x[1:nx], y[1:nx]
-    for s1=1:nbatch:length(corpus)                              # processing corpus[s1:s2]
-        s2=min(length(corpus), s1+nbatch-1)                      
-        batch = [Beam(pt, corpus[i], net, feats, ndeps, nbeam) for i=s1:s2] # initialize beam for each sentence
+    ftype = wtype(corpus[1])
+    frows = flen(p[1], corpus[1], feats)
+    fcols = nbeam * nbatch
+    f = Array(ftype, frows, fcols)
+    score = Array(ftype, p[1].nmove, fcols)
+
+    for s1=1:nbatch:length(corpus)                                              # processing corpus[s1:s2]
+        s2=min(length(corpus), s1+nbatch-1)                                     
+        batch = [Beam(p[i], corpus[i], ndeps, feats, net, nbeam) for i=s1:s2]   # initialize beam for each sentence
         while true                                              
-            nf = 0                                              # patterns go into f[1:nf]
-            for b in batch                                      # b is the beam for one sentence
-                anyvalidmoves(b.parser[1]) || continue          # assuming all parsers for a sentence finish at the same time
-                (cmin,jmin,fmin) = (Pinf,0,0)                   # mincost, its move, its nf index
-                for i=1:b.nbeam                                 # b.parser[i] is a parser state on b
-                    c = movecosts(b.parser[i], b.sentence.head, b.sentence.deprel, sub(b.cost,:,i)) # c[j]=b.cost[j,i] is the cost of move j from parser i
-                    cmini,jmini = findmin(c)
-                    @assert (cmini < Pinf)                      # we should have valid moves
-                    features(b.parser[i], b.sentence, feats, sub(f,:,(nf+=1))) # f[:,nf] is the feature vector for parser i
+            nf = 0                                                              # f[1:nf]: feature vectors for the whole batch s1:s2
+            for b in batch                                                      # b is the beam (multiple parser states) for one sentence in s1:s2
+                anyvalidmoves(b.parser[1]) || continue                          # assuming all parsers for a sentence finish at the same time
+                (cmin,jmin,fmin) = (Pinf,0,0)                                   # mincost, its move, its nf index
+                for i=1:b.nbeam                                                 # b.parser[i] is a parser state on b
+                    features(b.parser[i], b.sentence, feats, f, (nf+=1))	# f[:,nf] is the feature vector for b.parser[i]
+                    cost = movecosts(b.parser[i], b.sentence.head, 
+                                     b.sentence.deprel, sub(b.cost,:,i))        # cost[j]=b.cost[j,i] is the cost of move j from parser i
+                    cmini,jmini = findmin(cost)                                 # we only want to copy the mincost f column into x for each sentence
+                    @assert (cmini < Pinf)                                      # we should have valid moves
                     (cmini < cmin) && ((cmin,jmin,fmin) = (cmini,jmini,nf))
                 end # for i=1:b.nbeam
                 @assert (cmin < Pinf)
-                copy!(sub(x,:,(nx+=1)),sub(f,:,fmin))
-                y[jmin,nx]=one(eltype(y))
+                if !isempty(x)                                                  # if asked for x, copy mincost column from f
+                    copy!(x, nx*frows+1, f, (fmin-1)*frows+1, frows)
+                    nx += 1
+                    y[jmin,nx]=one(eltype(y))                                   # and set mincost y move to 1
+                end
             end # for b in batch (1)
-            nf == 0 && break                                     # no more valid moves for any sentence
-            predict(net, sub(f,:,1:nf), sub(score,:,1:nf))       # scores in score[1:nf]
-            mf = 0                                               # mf will count 1..nf during second pass
-            for b in batch                                       # collect candidates in second pass
+            nf == 0 && break                                                    # no more valid moves for any sentence
+            predict(net, sub(f,:,1:nf), sub(score,:,1:nf))                      # scores in score[1:nf]
+            nf1 = nf; nf = 0                                                    # nf will count 1..nf1 during second pass
+            for b in batch                                                      # collect candidates in second pass
                 anyvalidmoves(b.parser[1]) || continue
-                ncand = 0                                       # ncand is number of candidates for sentence beam b
+                nc = 0                                                          # nc is number of candidates for sentence beam b
                 for i=1:b.nbeam
                     @assert any(sub(b.cost,:,i) .< Pinf)
-                    mf += 1                                     # score[j,mf] should be the score for sentence b, parser i, move j
-                    for j=1:size(b.cost,1)
+                    nf += 1                                                     # score[j,nf] should be the score for sentence b, parser i, move j
+                    for j=1:size(b.cost,1)                                      # b.cost[j,i] is the cost of parser i, move j
                         b.cost[j,i] == Pinf && continue
-                        ncand += 1
-                        b.cparser[ncand] = i                        # b.cparser[c] is the index of the c'th candidate parser
-                        b.cmove[ncand] = j                          # b.cmove[c] is the move to be made from b.cparser[c]
-                        b.cscore[ncand] = b.pscore[i] + score[j,mf] # b.cscore[c] is the score for b.cparser[c]+b.cmove[c]
+                        nc += 1
+                        b.cparser[nc] = i                                       # b.cparser[nc] is the index of the nc'th candidate parser
+                        b.cmove[nc] = j                                         # b.cmove[nc] is the move to be made from b.cparser[nc]
+                        b.cscore[nc] = b.pscore[i] + score[j,nf]                # b.cscore[nc] is the score for b.cparser[nc]+b.cmove[nc]
                     end # for j=1:size(b.cost,1)
                 end # for i=1:b.nbeam (1)
-                @assert (ncand > 0) "No candidates found"
-                sortpermx(sub(b.csorted, 1:ncand), sub(b.cscore, 1:ncand); rev=true)
-                b.nbeam = min(ncand,nbeam)                      # b.nbeam is now the new beam size
-                for i=1:b.nbeam                                 # i is the index of the new parser
-                    c=b.csorted[i]                              # c is the index of the candidate
-                    p=b.cparser[c]                              # p is the index of the old parser
-                    copy!(b.parser2[i], b.parser[p])            # 
-                    move!(b.parser2[i], b.cmove[c])             # b.parser2[i] = b.parser[p] + b.cmove[c]
-                    b.pscore2[i] = b.cscore[c]                  # b.pscore2[i] cumulative score for new b.parser2[i]
-                end # for i=1:b.nbeam (2)
-                b.parser,b.parser2 = b.parser2,b.parser         # we swap parsers and scores
-                b.pscore,b.pscore2 = b.pscore2,b.pscore         # for next round
+                @assert (nc > 0) "No candidates found"
+                sortpermx(sub(b.csorted, 1:nc), sub(b.cscore, 1:nc); rev=true)
+                b.nbeam = min(nc,nbeam)                                         # b.nbeam is now the new beam size
+                for new=1:b.nbeam                                               # new is the index of the new parser
+                    idx=b.csorted[new]                                          # idx is the index of the new'th best candidate
+                    old=b.cparser[idx]                                          # old is the index of the parent parser
+                    copy!(b.parser2[new], b.parser[old])                        # copy the old parser
+                    move!(b.parser2[new], b.cmove[idx])                         # move the new parser
+                    b.pscore2[new] = b.cscore[idx]                              # b.pscore2[new] cumulative score for b.parser2[new]
+                end # for new=1:b.nbeam (2)
+                b.parser,b.parser2 = b.parser2,b.parser                         # we swap parsers and scores
+                b.pscore,b.pscore2 = b.pscore2,b.pscore                         # for next round
             end # for b in batch (2)
-            @assert (mf == nf) "$mf != $nf"
+            @assert (nf == nf1) "$nf != $nf1"
         end # while true
         for s=s1:s2
-            parsers[s] = batch[s-s1+1].parser[1]
+            copy!(p[s], batch[s-s1+1].parser[1])                                # copy the best parses to output
         end
     end # for s1=1:nbatch:length(corpus)
-    @assert nx == size(x,2)
-    return (parsers, x, y)
 end # function bparse
-
-
-function bparse(pt::ParserType, corpus::Corpus, net::Net, fmat::Fvec, ndeps::Integer, nbeam::Integer, nbatch::Integer, ncpu::Integer)
-    @date Main.resetworkers(ncpu)
-    d = distproc(corpus, workers()[1:ncpu])
-    net = testnet(net)
-    pxy = pmap(procs(d)) do x
-        bparse(pt, localpart(d), copy(net, :gpu), fmat, ndeps, nbeam, nbatch)
-    end
-    @date Main.rmworkers()
-    p = vcat(map(z->z[1], pxy)...)
-    x = hcat(map(z->z[2], pxy)...)
-    y = hcat(map(z->z[3], pxy)...)
-    (p, x, y)
-end
-
-function bparse1(pt::ParserType, corpus::Corpus, net::Net, fmat::Fvec, ndeps::Integer, nbeam::Integer, ncpu::Integer)
-    @date Main.resetworkers(ncpu)
-    d = distproc(corpus, workers()[1:ncpu])
-    net = testnet(net)
-    pxy = pmap(procs(d)) do x
-        bparse(pt, localpart(d), copy(net, :gpu), fmat, ndeps, nbeam)
-    end
-    @date Main.rmworkers()
-    p = vcat(map(z->z[1], pxy)...)
-    x = hcat(map(z->z[2], pxy)...)
-    y = hcat(map(z->z[3], pxy)...)
-    (p, x, y)
-end
-
-function initfxy(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
-    p = Parser{pt}(1,ndeps)
-    xcols = 2 * (wcnt(sent) - 1)
-    fcols = nbeam
-    xrows = flen(p, sent, feats)
-    yrows = p.nmove
-    xtype = eltype(net[1].w)
-    x = Array(xtype, xrows, xcols)
-    y = zeros(xtype, yrows, xcols)
-    f = Array(xtype, xrows, fcols)
-    return (f,x,y)
-end
-
-function initbatch(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer, nbatch::Integer)
-    # x,y collects mincostpath for the whole corpus
-    p = Parser{pt}(1,ndeps)
-    nsent = length(corpus)
-    nword = sum(map(wcnt, corpus))
-    xcols = 2 * (nword - nsent)
-    xrows = flen(p, corpus[1], feats)    
-    yrows = p.nmove
-    xtype = eltype(net[1].w)
-    x = Array(xtype, xrows, xcols)
-    y = zeros(xtype, yrows, xcols)
-    # f,score to be used locally for one beam/batch
-    fcols = nbeam * nbatch
-    f = Array(xtype, xrows, fcols)
-    score = Array(xtype, yrows, fcols)
-    parsers = Array(Parser{pt}, nsent)
-    return (parsers,f,x,y,score)
-end
-
-function Beam(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
-    @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer"
-    b = Beam()
-    nword = wcnt(sent)
-    b.parser  = [Parser{pt}(nword,ndeps) for i=1:nbeam]
-    b.parser2 = [Parser{pt}(nword,ndeps) for i=1:nbeam]
-    p = b.parser[1]
-    ncand = nbeam * p.nmove
-    itype = typeof(nbeam)
-    ftype = eltype(net[1].w)
-    fdims = flen(p, sent, feats)
-    b.pscore  = Array(ftype, nbeam)
-    b.pscore2 = Array(ftype, nbeam)
-    b.cost = Array(Position, p.nmove, nbeam)
-    b.score = Array(ftype, p.nmove, nbeam)
-    b.cparser = Array(itype, ncand)
-    b.cmove = Array(Move, ncand)
-    b.cscore = Array(ftype, ncand)
-    b.csorted = Array(itype, ncand)
-    b.pscore[1] = zero(ftype)
-    b.nbeam = 1
-    b.sentence = sent
-    b.mincost = minimum(movecosts(b.parser[1], b.sentence.head, b.sentence.deprel))
-    return b
-end
-
-
