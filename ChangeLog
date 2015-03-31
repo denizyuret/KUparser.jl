@@ -1,19 +1,10 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
-	* @@training-variants:
-	gp07h13: replicating 03291208-gpconll07hybrid13.out.
-	gp07h13k10: 10k hidden layer
-	gp07h13k44: 2x4096 hidden layers
-	gp07h13d25: dropout 0.2-0.5
-	gp07h13lr1: learningRate=1.0
-
- 480207 0.50531 gp07h13    dyuret       r     03/31/2015 10:07:10 ilac.q@ilac-1-0.local              1        
- 480208 0.50531 gp07h13k10 dyuret       r     03/31/2015 10:07:25 ilac.q@ilac-3-0.local              1        
- 480209 0.50531 gp07h13k44 dyuret       r     03/31/2015 10:07:25 ilac.q@ilac-2-1.local              1        
- 480210 0.50531 gp07h13d25 dyuret       r     03/31/2015 10:07:25 ilac.q@ilac-1-2.local              1        
- 480211 0.50531 gp07h13lr1 dyuret       r     03/31/2015 10:07:40 ilac.q@ilac-0-2.local              1        
-
-
+	* TODO:
+	- Explore training options.
+	- Explore feature options.
+	- Write paper.
+	
 	* Summary:
 
 	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
@@ -39,17 +30,18 @@
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8801	x	03292304-gpconll07hybrid3.out(226/453)
 	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
-	8789	x	...gp07h13k10.out(101/?)... (10k hidden unit)
+	8793	x	...gp07h13k10.out(134/?)... (10k hidden unit) @@480208
 	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
 	8789	x	03250401-gptacl13.out(169/213)
 	8773	x	03271009-gptacl13.out(233/256)
-	8733	x	...gp07h13.out(64/?)... (repeat of 03291208)
+	8733	x	...gp07h13.out(64/?)... (repeat of 03291208) @@480207
 	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
 	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
 	8709	x	03260132-gptacl13w.out(256/256) (only w features)
-	8666	x	...gp07h13k44.out(66/?)... (4k+4k hidden layers)
+	8685	x	...gp07h13d25.out(13/?)... (dropout 0.2 0.5) @@480215
+	8675	x	...gp07h13k44.out(74/?)... (4k+4k hidden layers) @@480209
 	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
-	8005	x	...gp07h13lr1.out(1/?)... (learningRate=1.0)
+	8005	x	...gp07h13lr1.out(1/?)... (learningRate=1.0) @@480211
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
 
 	con07-static-hybrid-GN13h
@@ -1305,7 +1297,7 @@ DATA:	194	0.98414147	0.8794723
 
 2014-10-16  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* Best points: (copied from vectorparser/ChangeLog)
+	* Best-points: (copied from vectorparser/ChangeLog)
 
 	corpus: conllWSJToken (trn02-21:39832s,950028w,1820392m;dev22:1700s,40117w,76834m;tst23:2416s,56684w,108536m)
 	arctype: archybrid (TODO: can archybrid13 be the same?)
