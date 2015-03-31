@@ -1,12 +1,18 @@
-2015-03-29  Deniz Yuret  <dyuret@ku.edu.tr>
+2015-03-31    <dyuret@ku.edu.tr>
 
-	* memory: Right now we spend four times the memory we need during
-	parsing to store the patterns for oparse.  This means we cannot
-	oparse in iui-5-0 with 1.8m moves, 2565 dims = 10k per x makes 18G
-	x matrix and 4 times that does not fit in the 64GB memory.  We
-	were already thinking of making x and y optional for parsers, so
-	we should implement that with pre-allocation.  Started working on
-	oparse.
+	* @@training-variants:
+	gp07h13: replicating 03291208-gpconll07hybrid13.out.
+	gp07h13k10: 10k hidden layer
+	gp07h13k44: 2x4096 hidden layers
+	gp07h13d25: dropout 0.2-0.5
+	gp07h13lr1: learningRate=1.0
+
+ 480207 0.50531 gp07h13    dyuret       r     03/31/2015 10:07:10 ilac.q@ilac-1-0.local              1        
+ 480208 0.50531 gp07h13k10 dyuret       r     03/31/2015 10:07:25 ilac.q@ilac-3-0.local              1        
+ 480209 0.50531 gp07h13k44 dyuret       r     03/31/2015 10:07:25 ilac.q@ilac-2-1.local              1        
+ 480210 0.50531 gp07h13d25 dyuret       r     03/31/2015 10:07:25 ilac.q@ilac-1-2.local              1        
+ 480211 0.50531 gp07h13lr1 dyuret       r     03/31/2015 10:07:40 ilac.q@ilac-0-2.local              1        
+
 
 	* Summary:
 
@@ -33,12 +39,17 @@
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8801	x	03292304-gpconll07hybrid3.out(226/453)
 	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
+	8789	x	...gp07h13k10.out(101/?)... (10k hidden unit)
 	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
 	8789	x	03250401-gptacl13.out(169/213)
 	8773	x	03271009-gptacl13.out(233/256)
+	8733	x	...gp07h13.out(64/?)... (repeat of 03291208)
 	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
+	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
 	8709	x	03260132-gptacl13w.out(256/256) (only w features)
+	8666	x	...gp07h13k44.out(66/?)... (4k+4k hidden layers)
 	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
+	8005	x	...gp07h13lr1.out(1/?)... (learningRate=1.0)
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
 
 	con07-static-hybrid-GN13h
@@ -68,6 +79,16 @@
 	uas	las	exp
 	8865	x	03221208-bpconll07.out(54/256)
 
+
+2015-03-29  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* memory: Right now we spend four times the memory we need during
+	parsing to store the patterns for oparse.  This means we cannot
+	oparse in iui-5-0 with 1.8m moves, 2565 dims = 10k per x makes 18G
+	x matrix and 4 times that does not fit in the 64GB memory.  We
+	were already thinking of making x and y optional for parsers, so
+	we should implement that with pre-allocation.  Started working on
+	oparse.
 
 2015-03-28  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -123,12 +144,12 @@ DATA:	53	0.9765279	0.8772736
 	+bp10acl11eager13.out
 	+bp10acl11eager.out
 	+bparse64.out
-	-gpconll07eager13.out: out of memory
+	+gpconll07eager13.out: out of memory
 	+gpconll07eager.out
 	+gpconll07hybrid13.out
 	+gpconll07hybrid3.out
-	-opconll07eager13.out: out of memory
-	-opconll07eager.out: crashed
+	+opconll07eager13.out: out of memory
+	+opconll07eager.out: crashed
 	+opconll07hybrid.out
 
 	* testbparser2.jl: Time and space for ZN11
@@ -362,12 +383,12 @@ DATA:	194	0.98414147	0.8794723
 	+ Find max number of deps.
 	+ Implement heads.
 	- Seriously test new feature code.
-	- Rerun some old experiments with larger epoch or lower dropout.
+	+ Rerun some old experiments with larger epoch or lower dropout.
 	+ Implement arceager.
 	= Run acl11 experiments.
 	= Run conll07 experiments (arceager).
-	- Design better featureset for archybrid.
 	+ Make latestop default for beamparser.
+	- train.jl: allow length(v)==2*length(net) for param spec each w,b
 
 	+ 03271009-gptacl13.out: Testing new features and running variance experiment:
 	$$480131 0.50531 gptacl13   dyuret       r     03/26/2015 19:34:40 ilac.q@ilac-2-0.local
@@ -433,7 +454,6 @@ DATA:	194	0.98414147	0.8794723
 
 	+ extend training to 2x best
 	+ use dev set or fixed epochs
-	- use archybrid with acl11 features with labels
 
 	* acl11hybrid: dictionary.
 
@@ -544,6 +564,8 @@ DATA:	194	0.98414147	0.8794723
 	* TODO:
 	+ add acl11eager to flist.
 	- add acl11 adapted to hybrid?
+	-- use archybrid with acl11 features with labels
+	-- Design better featureset for archybrid.
 	+ update features to have labels, labelsets, new encoding for valence and distance
 	+ s0hp, s0hw, (we don't have heads)
 	+ d (s0n0, 10+ encoded, we have 4+ encoding with (-1 0 3), 8bit encodings with +-7)
@@ -557,7 +579,7 @@ DATA:	194	0.98414147	0.8794723
 	+ rewrite bparser with deprels.
 	+ implement arceager, make the code parser generic.
 	+ create better language for specifying flists.
-	- Make xy in pxy optional in parsers.
+	+ Make xy in pxy optional in parsers.
 
 2015-03-22  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -599,7 +621,8 @@ DATA:	194	0.98414147	0.8794723
 
 	+ conllWSJToken_wikipedia2MUNK-100 experiments: Different gold
 	head than acl11.  Latestop better than earlystop.
-	- How about train on all mincost state/move pairs (if multiple).
+	x How about train on all mincost state/move pairs (if multiple):
+	loses the ability to get precise move count.
 	+ beam64 too slow, get pepochs to work.
 
 	parser	dev	test1	test2
@@ -650,6 +673,7 @@ DATA:	194	0.98414147	0.8794723
 	+ Try arceager (Zhang&Nivre11).
 	+ train.jl: write pepochs option to get nbeam=64 to work.
 	- train.jl: implement earlystop for efficiency (Zhang does it)
+	-- latestop seems to perform better?
 	+ train.jl: longer training (stop if 2x best epoch)
 	+ train.jl: save models
 	+ train.jl: compute eval.py (wordacc) score.
