@@ -1,10 +1,15 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
+	* iui-k40-memory: Each K40 has 11.5GB for a total of 23GB.  The
+	ZN11 setup takes in MB GPU memory:
+	  280*ncpu+0.1*ncpu*nbeam*nbatch
+	For ncpu=20, nbeam=64, nbatch=128 we hit the upper limit.
+
 	* TODO:
 	- Explore training options.
 	- Explore feature options.
 	- Write paper.
-	
+
 	* Summary:
 
 	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
@@ -33,13 +38,13 @@
 	8793	x	...gp07h13k10.out(134/?)... (10k hidden unit) @@480208
 	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
 	8789	x	03250401-gptacl13.out(169/213)
+	8783	x	...gp07h13.out(135/?)... (repeat of 03291208) @@480207
+	8781	x	...gp07h13d25.out(49/?)... (dropout 0.2 0.5) @@480215
 	8773	x	03271009-gptacl13.out(233/256)
-	8733	x	...gp07h13.out(64/?)... (repeat of 03291208) @@480207
+	8753	x	...gp07h13k44.out(135/?)... (4k+4k hidden layers) @@480209
 	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
 	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
 	8709	x	03260132-gptacl13w.out(256/256) (only w features)
-	8685	x	...gp07h13d25.out(13/?)... (dropout 0.2 0.5) @@480215
-	8675	x	...gp07h13k44.out(74/?)... (4k+4k hidden layers) @@480209
 	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
 	8005	x	...gp07h13lr1.out(1/?)... (learningRate=1.0) @@480211
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
