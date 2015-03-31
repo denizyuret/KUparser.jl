@@ -20,11 +20,11 @@ function parse_commandline()
         help = "Parsing algorithm to use: g(reedy)parser, b(eam)parser, or o(racle)parser for static training"
         default = "oparser"
         "--arctype"
-        help = "Move set to use: ArcEager, ArcHybrid"
-        default = "ArcHybrid"
+        help = "Move set to use: ArcEager{R1,13}, ArcHybrid{R1,13}"
+        default = "ArcEager13"
         "--feats"
         help = "Features to use from KUparser.Flist"
-        default = "fv021a"
+        default = "tacl13hybrid"
         "--hidden"
         help = "One or more hidden layer sizes"
         nargs = '+'
@@ -119,37 +119,37 @@ function main()
         end
     end
 
-    feats=eval(parse("KUparser.Flist."*args["feats"]))
+    feats = eval(parse("Flist."*args["feats"]))
+    pt = eval(parse(args["arctype"]))
     s1 = data[1][1]
-    pt = symbol(args["arctype"])
-    p1 = KUparser.Parser{pt}(wcnt(s1),length(deprel))
+    p1 = pt(wcnt(s1),length(deprel))
     xrows=KUparser.flen(p1, s1, feats)
     yrows=p1.nmove
 
-    net=KUnet.newnet(KUnet.relu, [xrows; args["hidden"]; yrows]...)
+    net=newnet(relu, [xrows; args["hidden"]; yrows]...)
     net[end].f=KUnet.logp
-    for k in [fieldnames(KUnet.UpdateParam); :dropout]
+    for k in [fieldnames(UpdateParam); :dropout]
         haskey(args, string(k)) || continue
         v = args[string(k)]
         if isempty(v)
             continue
         elseif length(v)==1
-            KUnet.setparam!(net, k, v[1])
+            setparam!(net, k, v[1])
         else 
             @assert length(v)==length(net) "$k should have 1 or $(length(net)) elements"
             for i=1:length(v)
-                KUnet.setparam!(net[i], k, v[i])
+                setparam!(net[i], k, v[i])
             end
         end
     end
     @show net
 
-    trn = nothing
-    for i=1:length(data)
-        @date pxy = oparse(pt, data[i], feats, ndeps, args["ncpu"])
-        @show evalparse(pxy[1], data[i])
-        i == 1 && (trn = pxy)
-        pxy = nothing
+    # Initialize training set using oparse on first corpus
+    @date (p,x,y) = oparse(pt, data[1], ndeps, args["ncpu"], feats)
+    @show evalparse(p, data[1]); p=nothing
+    for i=2:length(data)
+        @date p = oparse(pt, data[i], ndeps, args["ncpu"])
+        @show evalparse(p, data[i]); p=nothing
     end
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch)=(0,0)
@@ -157,24 +157,41 @@ function main()
     
     for epoch=1:epochs
         @show epoch
-        (p,x,y) = trn
         @show map(size, (x, y))
-        @date KUnet.train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
+        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
         if epoch % args["pepochs"] == 0
-            (args["parser"] != "oparser") && (trn=nothing)
             @meminfo
-            for i=1:length(data)
-                if in(args["parser"], ["oparser", "gparser"])
-                    @date pxy = gparse(pt, data[i], net, feats, ndeps, args["pbatch"], args["ncpu"])
-                elseif (args["parser"] == "bparser")
-                    @date pxy = bparse(pt, data[i], net, feats, ndeps, args["nbeam"], args["pbatch"], args["ncpu"])
-                else
-                    error("Unknown parser "*args["parser"])
+            if (args["parser"] == "oparser")
+                # We never change the training set with oparser, just report accuracy
+                for i=1:length(data)
+                    @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
+                    @show e = evalparse(p, data[i]); p=nothing
+                    accuracy[i] = e[1]  # e[1] is UAS including punct
                 end
-                @show e = evalparse(pxy[1], data[i])
-                accuracy[i] = e[1]
-                (args["parser"] != "oparser") && (i == 1) && (trn=pxy)
-                pxy = nothing
+            elseif (args["parser"] == "gparser")
+                # The first corpus gives us the new training set
+                p = x = y = nothing; gc()
+                @date (p,x,y) = gparse(pt, data[1], ndeps, feats, net, args["pbatch"], args["ncpu"]; xy=true)
+                @show e = evalparse(p, data[1]); p=nothing
+                accuracy[1] = e[1]
+                for i=2:length(data)
+                    @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
+                    @show e = evalparse(p, data[i]); p=nothing
+                    accuracy[i] = e[1]
+                end
+            elseif (args["parser"] == "bparser")
+                # The first corpus gives us the new training set
+                p = x = y = nothing; gc()
+                @date (p,x,y) = bparse(pt, data[1], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
+                @show e = evalparse(p, data[1]); p=nothing
+                accuracy[1] = e[1]
+                for i=2:length(data)
+                    @date p = bparse(pt, data[i], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"])
+                    @show e = evalparse(p, data[i]); p=nothing
+                    accuracy[i] = e[1]
+                end
+            else
+                error("Unknown parser "*args["parser"])
             end
             println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
 
@@ -190,7 +207,7 @@ function main()
             # on the dev set data[2].  If there is no dev set fall
             # back on the training set, data[1].
             if epochs == typemax(epochs)
-                (epoch > 2*bestepoch) && break
+                (epoch >= 2*bestepoch) && break
             end
         end
     end
