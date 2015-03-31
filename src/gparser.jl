@@ -65,8 +65,8 @@ function gparse{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec,
         while true
             nx0 = nx            
             for s=s1:s2
-                anyvalidmoves(p[s]) || continue; nx += 1
-                features(p[s], c[s], feats, sub(x, :, nx:nx))
+                anyvalidmoves(p[s]) || continue;
+                features(p[s], c[s], feats, x, (nx+=1))
             end
             (nx == nx0) && break
             nx1 = nx; nx = nx0; 
