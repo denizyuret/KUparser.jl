@@ -1,5 +1,3 @@
-#TODO: save output
-
 using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 
