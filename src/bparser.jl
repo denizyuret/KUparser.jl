@@ -1,6 +1,6 @@
 type Beam nbeam; sentence; parser; parser2; pscore; pscore2; cost; score; cparser; cmove; cscore; csorted; mincost; Beam()=new(); end
 
-function bparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer, nbeam::Integer)
+function bparse(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
     b = Beam(pt, sent, net, feats, ndeps, nbeam)                # b.parser, b.pscore: candidate parsers and their scores
     (f,x,y) = initfxy(pt, sent, net, feats, ndeps, nbeam)       # f,x:feature vectors, y:mincost moves
     nx = 0                                                      # nx: number of columns filled in x and y
@@ -44,7 +44,7 @@ function bparse(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps
     (b.parser[1], x, y)
 end
 
-function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbeam::Integer)
+function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
     pxy = map(s->bparse(pt,s,net,feats,ndeps,nbeam), corpus)
     p = map(z->z[1], pxy)
     x = hcat(map(z->z[2], pxy)...)
@@ -52,7 +52,7 @@ function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps
     (p, x, y)
 end
 
-function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbeam::Integer, nbatch::Integer)
+function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer, nbatch::Integer)
     (nbatch == 0 || nbatch > length(corpus)) && (nbatch = length(corpus))
     (parsers,f,x,y,score) = initbatch(pt, corpus, net, feats, ndeps, nbeam, nbatch)
     nx = 0                                                      # training data goes into x[1:nx], y[1:nx]
@@ -116,7 +116,7 @@ function bparse(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps
 end # function bparse
 
 
-function bparse(pt::ParserType, corpus::Corpus, net::Net, fmat::Features, ndeps::Integer, nbeam::Integer, nbatch::Integer, ncpu::Integer)
+function bparse(pt::ParserType, corpus::Corpus, net::Net, fmat::Fvec, ndeps::Integer, nbeam::Integer, nbatch::Integer, ncpu::Integer)
     @date Main.resetworkers(ncpu)
     d = distproc(corpus, workers()[1:ncpu])
     net = testnet(net)
@@ -130,7 +130,7 @@ function bparse(pt::ParserType, corpus::Corpus, net::Net, fmat::Features, ndeps:
     (p, x, y)
 end
 
-function bparse1(pt::ParserType, corpus::Corpus, net::Net, fmat::Features, ndeps::Integer, nbeam::Integer, ncpu::Integer)
+function bparse1(pt::ParserType, corpus::Corpus, net::Net, fmat::Fvec, ndeps::Integer, nbeam::Integer, ncpu::Integer)
     @date Main.resetworkers(ncpu)
     d = distproc(corpus, workers()[1:ncpu])
     net = testnet(net)
@@ -144,7 +144,7 @@ function bparse1(pt::ParserType, corpus::Corpus, net::Net, fmat::Features, ndeps
     (p, x, y)
 end
 
-function initfxy(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer, nbeam::Integer)
+function initfxy(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
     p = Parser{pt}(1,ndeps)
     xcols = 2 * (wcnt(sent) - 1)
     fcols = nbeam
@@ -157,7 +157,7 @@ function initfxy(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndep
     return (f,x,y)
 end
 
-function initbatch(pt::ParserType, corpus::Corpus, net::Net, feats::Features, ndeps::Integer, nbeam::Integer, nbatch::Integer)
+function initbatch(pt::ParserType, corpus::Corpus, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer, nbatch::Integer)
     # x,y collects mincostpath for the whole corpus
     p = Parser{pt}(1,ndeps)
     nsent = length(corpus)
@@ -176,7 +176,7 @@ function initbatch(pt::ParserType, corpus::Corpus, net::Net, feats::Features, nd
     return (parsers,f,x,y,score)
 end
 
-function Beam(pt::ParserType, sent::Sentence, net::Net, feats::Features, ndeps::Integer, nbeam::Integer)
+function Beam(pt::ParserType, sent::Sentence, net::Net, feats::Fvec, ndeps::Integer, nbeam::Integer)
     @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer"
     b = Beam()
     nword = wcnt(sent)
