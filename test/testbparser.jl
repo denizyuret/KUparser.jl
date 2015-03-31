@@ -1,48 +1,84 @@
-using HDF5,JLD,KUparser,Base.Test
-eqparse(a,b)=(isequal(a[1],b[1]) && isequal(sortcols(vcat(a[2],a[3])), sortcols(vcat(b[2],b[3]))))
-@date d = load("conll07.tst.jld4")
-corpus = d["corpus"]
-@show (ndeps,nbeam,nbatch,ncpu) = (length(d["deprel"]),10,20,5)
-@show f1 = Flist.tacl13hybrid
+using HDF5,JLD,KUparser,KUnet,Base.Test
+
+info("Loading data")
+@date @load "conll07.tst.jld4"
+@show ncpu = 10
+@show nbatch = 10
+@show ndeps = length(deprel)
+@show ft = Flist.acl11eager
+@show pt = ArcEager13
+p0 = pt(1,ndeps)
 s1 = corpus[1]
-p1 = KUparser.Parser{:ArcHybrid}(wcnt(s1), ndeps)
-net = KUnet.newnet(KUnet.relu, KUparser.flen(p1,s1,f1), 20000, p1.nmove; learningRate=1)
-net[end].f = KUnet.logp
-@date (p,x,y) = oparse(:ArcHybrid, corpus, f1, ndeps)
-@date for i=1:10; KUnet.train(net, x, y; batch=128, loss=KUnet.logploss); end
 
-@date g0 = gparse(:ArcHybrid, s1, net, f1, ndeps)
-@date b0 = bparse(:ArcHybrid, s1, net, f1, ndeps, 1)
-@test @show isequal(g0,b0)
+info("Let's train a reasonable model")
+net = newnet(relu, flen(p0,s1,ft), 20000, p0.nmove; learningRate=1)
+net[end].f = logp
+@date (p,x,y)=oparse(pt, corpus, ndeps, ft)
+@date train(net, x, y; loss=logploss)
 
-@date g1 = gparse(:ArcHybrid, corpus, net, f1, ndeps, nbatch)
-@show evalparse(g1[1], corpus)
-@show map(size,g1)
+info("Use gparser as reference for beam=1")
+@date gxy=(gp,gx,gy)=gparse(pt, corpus, ndeps, ft, net; xy=true)
+@show map(size, gxy)
+@show evalparse(gp, corpus)
 
-@date g2 = gparse(:ArcHybrid, corpus, net, f1, ndeps)
-@show isequal(g2,g1)
-@test @show eqparse(g2,g1)
-@date b2 = bparse(:ArcHybrid, corpus, net, f1, ndeps, 1)
-@test @show isequal(b2,g1)
+@show nbeam = 1
 
-@date b3 = bparse(:ArcHybrid, corpus, net, f1, ndeps, 1, nbatch)
-@test @show isequal(b3,g1)
-@date b4 = bparse(:ArcHybrid, corpus, net, f1, ndeps, 1, nbatch, ncpu)
-@show isequal(b4,g1)
-@test @show eqparse(b4,g1)
+info("nbeam=1 Single sentence")
+@date p1=bparse(pt, [s1], ndeps, ft, net, nbeam)
+@test @show isequal(p1[1],gp[1])
+@date (p2,x2,y2)=bparse(pt, [s1], ndeps, ft, net, nbeam; xy=true)
+I2 = 1:size(x2,2)
+@test @show isequal(p2[1],gp[1])
+@test @show isequal(x2,gx[:,I2])
+@test @show isequal(y2,gy[:,I2])
 
-@date b5 = bparse(:ArcHybrid, corpus, net, f1, ndeps, nbeam, nbatch)
-@show evalparse(b5[1], corpus)
-@show map(size, b5)
-@show eqparse(b5, g1)
-@date b6 = bparse(:ArcHybrid, corpus, net, f1, ndeps, nbeam, nbatch, ncpu)
-@show isequal(b6,b5)
-@test @show eqparse(b6,b5)
-@date b7 = bparse(:ArcHybrid, corpus, net, f1, ndeps, nbeam)
-@show isequal(b5,b7)
-@show isequal(b6,b7)
-@test @show eqparse(b5,b7)
-@date b8 = KUparser.bparse1(:ArcHybrid, corpus, net, f1, ndeps, nbeam, ncpu)
-@show isequal(b5,b8)
-@show isequal(b6,b8)
-@test @show isequal(b7,b8)
+info("nbeam=1 Multiple sentences")
+@date p3=bparse(pt, corpus, ndeps, ft, net, nbeam)
+@test @show isequal(p3,gp)
+@date pxy4=bparse(pt, corpus, ndeps, ft, net, nbeam; xy=true)
+@test @show isequal(pxy4,gxy)
+
+info("nbeam=1 Batch processing")
+@date p5=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch)
+@test @show isequal(p5,gp)
+@date pxy6=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch; xy=true)
+@test @show pxyequal(pxy6, gxy)
+
+info("nbeam=1 Multi-cpu processing")
+@date p7=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu)
+@test @show isequal(p7,gp)
+@date pxy8=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu; xy=true)
+@test @show pxyequal(pxy8, gxy)
+
+@show nbeam = 10
+
+info("nbeam=10 Single sentence")
+@date q1=bparse(pt, [s1], ndeps, ft, net, nbeam)
+@show evalparse(q1, [s1])
+@date (q2,x2,y2)=bparse(pt, [s1], ndeps, ft, net, nbeam; xy=true)
+@show map(size, (q2,x2,y2))
+@test @show isequal(q2,q1)
+
+info("nbeam=10 Multiple sentences")
+@date q3=bparse(pt, corpus, ndeps, ft, net, nbeam)
+@show evalparse(q3, corpus)
+@test @show isequal(q3[1],q1[1])
+@date qxy4=(q4,x4,y4)=bparse(pt, corpus, ndeps, ft, net, nbeam; xy=true)
+@show map(size, qxy4)
+@test @show isequal(q4, q3)
+I2 = 1:size(x2,2)
+@test @show isequal(x4[:,I2], x2)
+@test @show isequal(y4[:,I2], y2)
+
+info("nbeam=10 Batch processing")
+@date q5=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch)
+@test @show isequal(q5,q3)
+@date qxy6=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch; xy=true)
+@show map(size, qxy6)
+@test @show pxyequal(qxy6, qxy4)
+
+info("nbeam=10 Multi-cpu processing")
+@date q7=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu)
+@test @show isequal(q7,qxy6[1])
+@date qxy8=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu; xy=true)
+@test @show pxyequal(qxy8, qxy6)
