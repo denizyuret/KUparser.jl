@@ -70,7 +70,7 @@ function gparse{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec,
             end
             (nx == nx0) && break
             nx1 = nx; nx = nx0; 
-            KUnet.predict(net, sub(sdata(x), :, nx0+1:nx1), sub(score, :, 1:(nx1-nx0)))
+            predict(net, sub(sdata(x), :, nx0+1:nx1), sub(score, :, 1:(nx1-nx0)))
             for s=s1:s2
                 anyvalidmoves(p[s]) || continue; nx += 1
                 movecosts(p[s], c[s].head, c[s].deprel, cost)
