@@ -1,5 +1,13 @@
 2015-03-29  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* memory: Right now we spend four times the memory we need during
+	parsing to store the patterns for oparse.  This means we cannot
+	oparse in iui-5-0 with 1.8m moves, 2565 dims = 10k per x makes 18G
+	x matrix and 4 times that does not fit in the 64GB memory.  We
+	were already thinking of making x and y optional for parsers, so
+	we should implement that with pre-allocation.  Started working on
+	oparse.
+
 	* Summary:
 
 	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
@@ -9,10 +17,10 @@
 	9211	9171	03220927-bparselatestop.out(129/207)
 	9205	9166	03220548-bparsedbg.out(193/256)
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
-	9171	9152	...bp10acl11eager.out(55/?)...
+	9171	9152	03292013-bp10acl11eager.out(55/115)
+	9159	9142	03300736-bp10acl11eager13.out(75/155)
 	9158	9145	03240436-bpacl11.out(79/256)
 	9158	9140	03192351-gparsedbg.out(194/256)
-	9154	9146	...bp10acl11eager13.out(45/?)...
 	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
 	9136	9109	03212217-gpacl11.out(184/256)
 	9116	9074	03200328-oparsedbg.out(254/256)
@@ -22,8 +30,8 @@
 	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
-	8827	x	...gpconll07hybrid13.out(93/?)...
-	8795	x	...gpconll07hybrid3.out(190/?)...
+	8827	x	03291208-gpconll07hybrid13.out(93/187)
+	8801	x	03292304-gpconll07hybrid3.out(226/453)
 	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
 	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
 	8789	x	03250401-gptacl13.out(169/213)
@@ -36,8 +44,8 @@
 	con07-static-hybrid-GN13h
 	uas	las	exp
 	8643	8496	GN13
+	8823	x	03300624-opconll07hybrid13.out(242/485)
 	8783	x	03282213-opconll07hybrid.out(79/159)
-	8777	x	...opconll07hybrid13.out(118/?)...
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
 	8689	x	03271008-optacl13.out(234/256)
 	8675	x	03242000-optacl13.out(66/78)
@@ -45,7 +53,7 @@
 	con07-dynamic-eager-ZN11e
 	uas	las	exp
 	8869	8769	GN13
-	8807	x	...gpconll07eager13.out(56/?)...
+	8821	x	03292103-gpconll07eager13.out(93/187)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8763	x	03281848-gpconll07eager.out(32/65)
 
@@ -53,8 +61,8 @@
 	uas	las	exp
 	8610	8493	GN13
 	8685	x	03281640-opconll07eager.out(21/43)
-	x	x	...opconll07eager.job...
-	x	x	...opconll07eager13.job...
+	8681	x	03300220-opconll07eager13.out(102/139)
+	8649	x	03292324-opconll07eager.out(31/63)
 
 	con07-beam10-hybrid-GN13h
 	uas	las	exp
@@ -64,7 +72,7 @@
 2015-03-28  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* archybrid13.jl: This is identical to the GN13 implementation.
-	@@480169 0.50531 gpconll07h dyuret       r     03/28/2015 23:56:10 ilac.q@ilac-3-1.local              1        
+	$$480169 0.50531 gpconll07h dyuret       r     03/28/2015 23:56:10 ilac.q@ilac-3-1.local              1        
 gpconll07hybrid13.out
 DATA:	1	0.8441778	0.8279033
 DATA:	2	0.83230513	0.8199081
@@ -76,7 +84,7 @@ DATA:	64	0.95570713	0.86927843
 DATA:	93	0.96766937	0.8826704	***
 DATA:	110	0.9719262	0.8754747
 
-	@@480170 0.50531 opconll07h dyuret       qw    03/28/2015 23:56:36                                    1        
+	$$480170 0.50531 opconll07h dyuret       qw    03/28/2015 23:56:36                                    1        
 opconll07hybrid13.out
 DATA:	1	0.84368515	0.82670397
 DATA:	2	0.85893685	0.8372976
@@ -89,7 +97,7 @@ DATA:	90	0.969781	0.87687385	***
 DATA:	104	0.9736997	0.87227666
 
 	* arceager13.jl: This is identical to the GN13 implementation.
-	@@480168 0.50531 bp10acl11e dyuret       qw    03/28/2015 22:10:05                                    1        
+	$$480168 0.50531 bp10acl11e dyuret       qw    03/28/2015 22:10:05                                    1        
 bp10acl11eager13.out
 DATA:	5	0.91694665	0.89882094	0.894397
 DATA:	10	0.93207145	0.9077448	0.9059699
@@ -99,7 +107,7 @@ DATA:	25	0.95625395	0.9119825	0.9115447
 DATA:	30	0.9611717	0.91415113	0.91249734	***
 DATA:	35	0.9651421	0.9134033	0.9133265
 
-	@@480171 0.00000 gpconll07e dyuret       qw    03/29/2015 00:13:46                                    1        
+	$$480171 0.00000 gpconll07e dyuret       qw    03/29/2015 00:13:46                                    1        
 gpconll07eager13.out
 DATA:	1	0.8377936	0.82230663
 DATA:	2	0.8526624	0.8237058
@@ -110,7 +118,7 @@ DATA:	32	0.9612292	0.87327605
 DATA:	39	0.9680746	0.8786728	***
 DATA:	53	0.9765279	0.8772736
 
-	@@480172 0.00000 opconll07e dyuret       qw    03/29/2015 00:13:48                                    1        
+	$$480172 0.00000 opconll07e dyuret       qw    03/29/2015 00:13:48                                    1        
 
 	+bp10acl11eager13.out
 	+bp10acl11eager.out
@@ -148,7 +156,7 @@ DATA:	53	0.9765279	0.8772736
 	- They are using nbeam=64 we are using nbeam=10
 	+ acleager is not identical to acleager13
 
-	@@480162 0.50531 bp10acl11e dyuret       r     03/28/2015 19:31:40 ilac.q@ilac-2-0.local              1        
+	$$480162 0.50531 bp10acl11e dyuret       r     03/28/2015 19:31:40 ilac.q@ilac-2-0.local              1        
 bp10acl11eager.out
 DATA:	5	0.9163362	0.8975497	0.8949086	with punct
 	5	0.9237522	0.9075777	0.9035607	*** (.9314 .9290 in ZN11 nopunct nbeam=64)
@@ -205,7 +213,7 @@ DATA:	43	0.96290195	0.85968417
 
 	Second run: opconll07eager.out
 	##480165 0.50531 opconll07e dyuret       r     03/28/2015 20:33:10 ilac.q@ilac-3-1.local              1        
-	@@480173 0.00000 opconll07e dyuret       qw    03/29/2015 00:15:41                                    1        	
+	$$480173 0.00000 opconll07e dyuret       qw    03/29/2015 00:15:41                                    1        	
 
 	* 03282213-opconll07hybrid.out:
 	$$480151 0.50531 opconll07h dyuret       r     03/28/2015 12:12:25 ilac.q@ilac-0-0.local              1        
@@ -220,7 +228,7 @@ DATA:	79	0.9661533	0.878273	*** (.8643 in GN13)
 DATA:	128	0.9788523	0.8744753
 DATA:	159	0.9828203	0.8746752
 
-	@@480160 0.50531 gpconll07h dyuret       r     03/28/2015 18:58:10 ilac.q@ilac-2-1.local              1        
+	$$480160 0.50531 gpconll07h dyuret       r     03/28/2015 18:58:10 ilac.q@ilac-2-1.local              1        
 gpconll07hybrid3.out
 DATA:	1	0.84406805	0.8257046	*** (.8762 in GN13)
 DATA:	2	0.83588797	0.81571054
