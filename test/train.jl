@@ -205,7 +205,7 @@ function main()
             # on the dev set data[2].  If there is no dev set fall
             # back on the training set, data[1].
             if epochs == typemax(epochs)
-                (epoch >= 2*bestepoch) && break
+                (epoch >= 2*bestepoch >= 20) && break
             end
         end
     end
