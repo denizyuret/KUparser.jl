@@ -31,7 +31,7 @@ function parse_commandline()
         "--epochs"
         help = "Minimum number of epochs to train"
         arg_type = Int
-        default = 1
+        default = 100
         "--pepochs"
         help = "Number of epochs between parsing"
         arg_type = Int
@@ -39,7 +39,7 @@ function parse_commandline()
         "--ncpu"
         help = "Number of workers for multithreaded parsing"
         arg_type = Int
-        default = 1
+        default = 12
         "--pbatch"
         help = "Minibatch size for parsing"
         arg_type = Int
@@ -51,7 +51,7 @@ function parse_commandline()
         "--nbeam"
         help = "Beam size for bparser"
         arg_type = Int
-        default = 1
+        default = 10
         "--adagrad"
         help = "If nonzero apply adagrad using arg as epsilon"
         arg_type = Float32
