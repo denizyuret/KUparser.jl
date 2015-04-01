@@ -1,5 +1,10 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
+	* Renames:
+	Features -> Fvec
+	ArcEager -> ArcEagerR1
+	ArcHybrid -> ArcHybridR1
+
 	* iui-k40-memory: Each K40 has 11.5GB for a total of 23GB.  The
 	ZN11 setup takes in MB GPU memory:
 	  280*ncpu+0.1*ncpu*nbeam*nbatch
@@ -20,33 +25,36 @@
 	9205	9166	03220548-bparsedbg.out(193/256)
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
 	9171	9152	03292013-bp10acl11eager.out(55/115)
+	9162	9146	...bp64a11eR1.out(35/?)... @@480224 trn:7m30s prs:96m epoch:27m (5t1p)
 	9159	9142	03300736-bp10acl11eager13.out(75/155)
 	9158	9145	03240436-bpacl11.out(79/256)
 	9158	9140	03192351-gparsedbg.out(194/256)
 	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
+	9152	9139	...bp64a11e13.out(45/?)... @@480223 trn:7m30s prs:96m epoch:27m (5t1p)
 	9136	9109	03212217-gpacl11.out(184/256)
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
+	?	?	...bp64a11e13iui.out... @@3856 trn:6m30s prs:40m epoch:14m30s (5t1p)
 
 	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
+	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453)
+	8799	x	04010425-gp07h13d25.out(139/256) (dropout 0.2 0.5)
 	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
-	8793	x	...gp07h13k10.out(134/?)... (10k hidden unit) @@480208
+	8793	x	03311930-gp07h13k10.out(134/268) (10k hidden unit)
 	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
 	8789	x	03250401-gptacl13.out(169/213)
-	8783	x	...gp07h13.out(135/?)... (repeat of 03291208) @@480207
-	8781	x	...gp07h13d25.out(49/?)... (dropout 0.2 0.5) @@480215
 	8773	x	03271009-gptacl13.out(233/256)
-	8753	x	...gp07h13k44.out(135/?)... (4k+4k hidden layers) @@480209
+	8761	x	04010123-gp07h13k44.out(138/276) (4k+4k hidden layers)
 	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
 	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
 	8709	x	03260132-gptacl13w.out(256/256) (only w features)
 	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
-	8005	x	...gp07h13lr1.out(1/?)... (learningRate=1.0) @@480211
+	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0) ?????????????
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
 
 	con07-static-hybrid-GN13h
@@ -57,6 +65,10 @@
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
 	8689	x	03271008-optacl13.out(234/256)
 	8675	x	03242000-optacl13.out(66/78)
+
+	con07-beam10-hybrid-GN13h
+	uas	las	exp
+	8865	x	03221208-bpconll07.out(54/256)
 
 	con07-dynamic-eager-ZN11e
 	uas	las	exp
@@ -71,10 +83,6 @@
 	8685	x	03281640-opconll07eager.out(21/43)
 	8681	x	03300220-opconll07eager13.out(102/139)
 	8649	x	03292324-opconll07eager.out(31/63)
-
-	con07-beam10-hybrid-GN13h
-	uas	las	exp
-	8865	x	03221208-bpconll07.out(54/256)
 
 
 2015-03-29  Deniz Yuret  <dyuret@ku.edu.tr>

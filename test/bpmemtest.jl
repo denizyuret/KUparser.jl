@@ -17,3 +17,5 @@ nbeam = 64
 # ZN11 ArcEager13 setup takes in MB GPU memory:
 #   280*ncpu+0.1*ncpu*nbeam*nbatch
 # For ncpu=20, nbeam=64, nbatch=128 we hit the upper limit.
+
+# With that configuration 20cpu parse of acl11.trn takes 2336s.

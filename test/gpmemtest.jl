@@ -16,6 +16,7 @@ nbatch = 2000
 # The RAM usage goes up to 22GB according to free.
 
 # GPU mem:
+
 # For 12-cpu nbatch=500: main=673 children=320 (peak at 380MB)
 # (could unload main net for multi-cpu work.)
 # For 1-cpu nbatch=500: main<=717MB.
