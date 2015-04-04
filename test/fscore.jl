@@ -18,15 +18,9 @@ function fscore{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, fe
         error("Unknown parser: "*args["parser"])
     end
     net = nothing
-    @show e = evalparse(p, data[2]); p=nothing
+    @show e = evalparse(p, data[2])
+    p=nothing; gc()
     return e[1]  # e[1] is UAS including punct
-end
-
-function flip(a, x)
-    b = copy(a)
-    i = findfirst(b, x)
-    i == 0 ? push!(b, x) : deleteat!(b, i)
-    return b
 end
 
 function initnet{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, feats::Fvec, args::Dict)
@@ -35,6 +29,7 @@ function initnet{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, f
     xrows=KUparser.flen(p1, s1, feats)
     yrows=p1.nmove
     # Initialize net:
+    args["nogpu"] && KUnet.gpu(false)
     srand(42)
     net=newnet(relu, [xrows; args["hidden"]; yrows]...)
     net[end].f=KUnet.logp
@@ -53,5 +48,12 @@ function initnet{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, f
         end
     end
     return net
+end
+
+function flip(a, x)
+    b = copy(a)
+    i = findfirst(b, x)
+    i == 0 ? push!(b, x) : deleteat!(b, i)
+    return b
 end
 
