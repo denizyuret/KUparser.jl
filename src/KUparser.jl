@@ -10,9 +10,9 @@ typealias ParserType Symbol
 # include("arceager13.jl");
 # include("archybrid13.jl");
 
-include("util.jl");	  export @date, evalparse, pxyequal
+include("util.jl");	  export @date, evalparse, pxyequal, testnet
 include("sentence.jl");   export Sentence, Corpus, wdim, wcnt, wtype
-include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1
+include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1, Parser
 include("features.jl");   export Feature, Fvec, flen, xsize, ysize
 include("gparser.jl");    export gparse
 include("bparser.jl");    export bparse
