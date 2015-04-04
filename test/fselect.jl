@@ -2,6 +2,46 @@ using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 require("fscore.jl")
 
+function main()
+    args = parse_commandline()
+    (data, ndeps) = initdata(args)
+    open(args["cache"],"a") do f end # this creates the cachefile if it does not exist
+    pt = eval(parse(args["arctype"]))
+    allfeats = eval(parse("Flist."*args["allfeats"]))
+    bestfeats = eval(parse("Flist."*args["feats"]))
+    bestscore = getcache(args["cache"], bestfeats)
+    if bestscore < 0
+        bestscore = fscore(pt, data, ndeps, bestfeats, args)
+        updatecache(args["cache"], bestfeats, bestscore)
+    end
+
+    # Cycle through the features nworkers at a time
+    ftry = Array(Feature,nworkers())
+    updatedbest = true
+    while updatedbest
+        updatedbest = false; nf = 0
+        while (nf < length(allfeats))
+            nftry = 0
+            while (nf < length(allfeats) && nftry < length(ftry))
+                s = getcache(args["cache"], bestfeats, allfeats[nf+=1])
+                s < 0 && (ftry[nftry+=1] = allfeats[nf])
+            end
+            nftry == 0 && break
+            @everywhere gc()
+            scores = pmap(ftry[1:nftry]) do f
+                fscore(pt, data, ndeps, flip(bestfeats, f), args)
+            end
+            updatecache(args["cache"], bestfeats, ftry[1:nftry], scores)
+            (smax,imax) = findmax(scores)
+            if smax > bestscore
+                updatedbest = true
+                bestscore = smax
+                bestfeats = flip(bestfeats, ftry[imax])
+            end
+        end # while (nf < length(allfeats))
+    end # while updatedbest
+end
+                
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
@@ -44,10 +84,11 @@ function parse_commandline()
         # help = "Number of epochs between parsing"
         # arg_type = Int
         # default = 1
-        "--ncpu"
-        help = "Number of workers for multithreaded parsing"
-        arg_type = Int
-        default = 6
+        # We will just use whatever julia was started with
+        # "--ncpu"
+        # help = "Number of workers for multithreaded parsing"
+        # arg_type = Int
+        # default = 6
         "--pbatch"
         help = "Minibatch size for parsing"
         arg_type = Int
@@ -105,8 +146,9 @@ function parse_commandline()
     return args
 end
 
-function getcache(cachefile::String, feats::Fvec, f::Feature)
-    fkey = join(sort(flip(feats, f)), ' ')
+function getcache(cachefile::String, feats::Fvec, f::Feature="")
+    isempty(f) || (feats = flip(feats, f))
+    fkey = join(sort(feats), ' ')
     fval = -1.0
     open(cachefile) do fp
         for l in eachline(fp)
@@ -115,6 +157,13 @@ function getcache(cachefile::String, feats::Fvec, f::Feature)
         end
     end
     return fval
+end
+
+function updatecache(cachefile::String, feats::Fvec, score::Real)
+    open(cachefile, "a") do fp
+        fkey = join(sort(feats), ' ')
+        write(fp, "$score\t$fkey\n")
+    end
 end
 
 function updatecache(cachefile::String, feats::Fvec, toflip::Fvec, scores::AbstractArray)
@@ -146,46 +195,5 @@ function initdata(args::Dict)
     (data, ndeps)
 end
 
-function main()
-    args = parse_commandline()
-    args["nogpu"] && (KUnet.gpu(false); blas_set_num_threads(args["ncpu"]))
-    (data, ndeps) = initdata(args)
-    open(args["cache"],"a") do f end
-    pt = eval(parse(args["arctype"]))
-    allfeats = eval(parse("Flist."*args["allfeats"]))
-    bestfeats = eval(parse("Flist."*args["feats"]))
-    bestscore = fscore(pt, data, ndeps, bestfeats, args)
-    # TODO: check and put bestfeats in cache!
-    ftry = Array(Feature,args["ncpu"])
-    updatedbest = true
-
-    # Cycle through the features ncpu at a time
-    while updatedbest
-        updatedbest = false; nf = 0
-        while (nf < length(allfeats))
-            nftry = 0
-            while (nf < length(allfeats) && nftry < length(ftry))
-                s = getcache(args["cache"], bestfeats, allfeats[nf+=1])
-                s < 0 && (ftry[nftry+=1] = allfeats[nf])
-            end
-            nftry == 0 && break
-            gc()
-            @date Main.resetworkers(args["ncpu"])
-            require("fscore.jl")
-            scores = pmap(ftry[1:nftry]) do f
-                fscore(pt, data, ndeps, flip(bestfeats, f), args)
-            end
-            @date Main.rmworkers()
-            updatecache(args["cache"], bestfeats, ftry[1:nftry], scores)
-            (smax,imax) = findmax(scores)
-            if smax > bestscore
-                updatedbest = true
-                bestscore = smax
-                bestfeats = flip(bestfeats, ftry[imax])
-            end
-        end # while (nf < length(allfeats))
-    end # while updatedbest
-end
-                
 
 main()
