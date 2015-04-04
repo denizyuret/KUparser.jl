@@ -1,19 +1,38 @@
-2015-03-31    <dyuret@ku.edu.tr>
+2015-04-02    <dyuret@ku.edu.tr>
 
-	* Renames:
-	Features -> Fvec
-	ArcEager -> ArcEagerR1
-	ArcHybrid -> ArcHybridR1
+	* Latex-table:
 
-	* iui-k40-memory: Each K40 has 11.5GB for a total of 23GB.  The
-	ZN11 setup takes in MB GPU memory:
-	  280*ncpu+0.1*ncpu*nbeam*nbatch
-	For ncpu=20, nbeam=64, nbatch=128 we hit the upper limit.
+	ref	parser		feats		corpus	ref-uas		ku-uas1		ku-uas2
+	GN13	hybrid:static	hybrid13	conll07	.8643		.8823		?
+	GN13	hybrid:dynamic	hybrid13	conll07	.8762		.8827		?
+	GN13	eager:static	eager39		conll07	.8610		.8685		?
+	GN13	eager:dynamic	eager39		conll07	.8869		.8821		?
+	ZN11	eager:beam	eager39		ptb12	.9290		.9225		?
+	MCP05	mst1?		?		?	.9090		?		?
+	MP06	mst2,proj2?	?		?	.9150		?		?
+	E96	proj1/2?	?		?	?		?		?
+	C07	proj2+?		?		conll07	.9063		?		?
+	KC10	order3?		?		?	.9304		?		?
+	KCC08	semisup08?	?		?	.9316		?		?
+	SICC09	semisup09?	?		?	.9379		?		?
+	SIN11	semisup11?	?		?	.9422		?		?
+	BGL14	mst2/wvec?	?		?	.9269		?		?
 
-	* TODO:
-	- Explore training options.
-	- Explore feature options.
-	- Write paper.
+	Corpus questions: which converter?  which set of deprels?
+	Graph parsing variants: projective vs mst?  order?  semisupervised?
+	[GN13] Yoav Goldberg and Joakim Nivre. 2013. Training Deterministic Parsers with Non-Deterministic Oracles. TACL, vol 1, pp 403--414.
+	[ZN11] Yue Zhang and Joakim Nivre. 2011. Transition-based Dependency Parsing with Rich Non-local Features. In ACL '11.
+	[MCP05] Ryan McDonald, Koby Crammer and Fernando Pereira. 2005. Online Large-Margin Training of Dependency Parsers. In ACL '05.
+	[MP06] Ryan T McDonald and Fernando CN Pereira. 2006. Online Learning of Approximate Dependency Parsing Algorithms. In EACL '06.
+	[KC10] Koo, Terry, and Michael Collins. Efficient third-order dependency parsers. ACL '10.
+	[KCC08] Koo, Terry, Xavier Carreras, and Michael Collins. Simple Semi-supervised Dependency Parsing. In ACL '08.
+	[SICC09] Suzuki, Jun, et al. An empirical study of semi-supervised structured conditional models for dependency parsing. In EMNLP '09.
+	[SIN11] Suzuki, Jun, Hideki Isozaki, and Masaaki Nagata. Learning condensed feature representations from large unsupervised data sets for supervised learning. In ACL '11.
+	[C07] Carreras, Xavier. Experiments with a Higher-Order Projective Dependency Parser. EMNLP '07.
+	[E96] Jason Eisner. 1996. Three new probabilistic models for dependency parsing. In COLING-96
+	[BGL14] Mohit Bansal, Kevin Gimpel and Karen Livescu. 2014. Tailoring Continuous Word Representations for Dependency Parsing. ACL '14.
+
+2015-04-01    <dyuret@ku.edu.tr>
 
 	* Summary:
 
@@ -25,24 +44,24 @@
 	9205	9166	03220548-bparsedbg.out(193/256)
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
 	9171	9152	03292013-bp10acl11eager.out(55/115)
-	9162	9146	...bp64a11eR1.out(35/?)... @@480224 trn:7m30s prs:96m epoch:27m (5t1p)
+	9167	9153	...bp64a11eR1.out(55/?)... @@480224 trn:7m30s prs:96m epoch:27m (5t1p)
 	9159	9142	03300736-bp10acl11eager13.out(75/155)
 	9158	9145	03240436-bpacl11.out(79/256)
 	9158	9140	03192351-gparsedbg.out(194/256)
+	9156	9141	...bp64a11e13.out(65/?)... @@480223 trn:7m30s prs:96m epoch:27m (5t1p)
 	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
-	9152	9139	...bp64a11e13.out(45/?)... @@480223 trn:7m30s prs:96m epoch:27m (5t1p)
 	9136	9109	03212217-gpacl11.out(184/256)
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
-	?	?	...bp64a11e13iui.out... @@3856 trn:6m30s prs:40m epoch:14m30s (5t1p)
+	?	?	...bp64a11e13iui.out... @@3856 trn:6m30s prs:40m epoch:14m30s (5t1p) keeps crashing.. try single gpu?
 
 	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
-	8801	x	03292304-gpconll07hybrid3.out(226/453)
+	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
 	8799	x	04010425-gp07h13d25.out(139/256) (dropout 0.2 0.5)
 	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
 	8793	x	03311930-gp07h13k10.out(134/268) (10k hidden unit)
@@ -73,9 +92,14 @@
 	con07-dynamic-eager-ZN11e
 	uas	las	exp
 	8869	8769	GN13
+	8843	?	...gp07e13k44.out(95/?)... (4+4k hidden) @@480270
+	8839	?	...gp07e13k10.out(39/?)... (10k hidden) @@480269
 	8821	x	03292103-gpconll07eager13.out(93/187)
 	8799	x	03290106-gpconll07eager.out(22/45)
+	8795	?	...gp07e13d25.out(32/?... (dropout 0.2 0.5) @@480271
+	8785	?	...gp07e13.out(33/?)... (repl 03292103) @@480268
 	8763	x	03281848-gpconll07eager.out(32/65)
+	8779	?	...gp07e13l01.out(117/?)... (learningRate 0.1) @@480272
 
 	con07-static-eager-ZN11e
 	uas	las	exp
@@ -83,6 +107,46 @@
 	8685	x	03281640-opconll07eager.out(21/43)
 	8681	x	03300220-opconll07eager13.out(102/139)
 	8649	x	03292324-opconll07eager.out(31/63)
+
+2015-03-31    <dyuret@ku.edu.tr>
+
+	* TODO:
+	- Explore training options.
+	-- Try move+label nnet output?
+
+	- Run five experiments and report avg-std.
+
+	- Explore feature options.
+	  training epoch timing: conll07-tacl13hybrid: 120s, conll07-acl11eager: 220s, acl11-acl11eager: 448s
+	  tacl13hybrid has 13 features: [(s0,s1,n0,n1)(wp),(s1l,s1r,s0l,s0r,n0l)(p)]
+	  acl11eager has 39: [n0(wpAa),s0(wpLdAaBb),(n1,n2,s0h2)(wp),(n0l2,n0l,s0h,s0l2,s0l,s0r2,s0r)(wpL)]
+	  Nobody has heads in hybrid, si may have heads in eager.
+	  In both si have children, but only n0l in buffer.
+	  s1 is important in hybrid, so we should add its children.
+	  we should subtract heads and labels for all si,ni for hybrid.  So we have 54:
+	  hybrid54: [n0(wpAa),(s0,s1)(wpdAaBb),(n1,n2,s2)(wp),(n0l2,n0l,s0l2,s0l,s0r2,s0r,s1l2,s1l,s1r2,s1r)(wpL)]
+	  our previous best feature sets:
+	  fv021a: [n0(wpa),s0(wpb-),(s1,s0r)(wb),(n1,n0l)(wp),s2(w),s0l(wpb),(s1r,s2r)(a)]
+	  fv022b: [n0(wpa),s0(wpabH),s1(wpbdH),(n1,n0l)(wp),(s0r,s0l)(w),(s1l)(pb),(s2)(W)]
+
+	  For conll07/acl11 hybrid: start with tacl13hybrid or fv022b, do a search within hybrid54.
+	  For conll07/acl11 eager : start with acl11eager and do a search within (maybe add s1?)
+	  Each one level search means trying out 40-50 features.
+	  Per epoch is 100min for 120s, 180min for 220s, 360min for 448s.
+	  To finish one level in 24 hours we can do 14 epochs for 100min, 8 epochs for 180min, 4 epochs for 460 min.
+
+	- Write paper.
+
+	* Renames:
+	Fmats -> Flist
+	Features -> Fvec
+	ArcEager -> ArcEagerR1
+	ArcHybrid -> ArcHybridR1
+
+	* iui-k40-memory: Each K40 has 11.5GB for a total of 23GB.  The
+	ZN11 setup takes in MB GPU memory:
+	  280*ncpu+0.1*ncpu*nbeam*nbatch
+	For ncpu=20, nbeam=64, nbatch=128 we hit the upper limit.
 
 
 2015-03-29  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -1279,6 +1343,63 @@ DATA:	194	0.98414147	0.8794723
 	19	0.0069	0.0365	0.0380	0.0018	0.0336	0.0341	0.0115	0.0893	0.0921	0.0109	0.0795	0.0822
 	20	0.0069	0.0364	0.0380	0.0017	0.0337	0.0342	0.0113	0.0894	0.0927	0.0108	0.0796	0.0827
 
+2014-10-18  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* features: only 11 common, marked by '+' below.
+
+	>> c7 = load('archybrid_conll07EnglishToken_wikipedia2MUNK-100_rbf376678_1014_cache.mat');
+	>> c8 = load ('archybrid_conllWSJToken_wikipedia2MUNK-100_rbf333140_cache.mat');
+	>> [c71, c72, c73] = run_sort_bestfeats(c7.cache);
+	>> [c81, c82, c83] = run_sort_bestfeats(c8.cache);
+
+
+	fv022b/conll07				fv021a/conllWSJ
+
+	+[-208]    '-n0w'       '[0 0 4]'   	+[-157]    '-s0w'       '[-1 0 4]'  
+	+[-152]    '-s0w'       '[-1 0 4]'  	+[-141]    '-n0w'       '[0 0 4]'   
+	+[ -69]    '-s1w'       '[-2 0 4]'  	+[ -70]    '-s1w'       '[-2 0 4]'  
+	+[ -68]    '-n1w'       '[1 0 4]'   	+[ -55]    '-n1w'       '[1 0 4]'   
+	+[ -60]    '-n0l1w'     '[0 -1 4]'  	-[ -21]    '-s2w'       '[-3 0 4]'  
+	+[ -50]    '-n1c'       '[1 0 -4]'  	+[ -21]    '-s0l1w'     '[-1 -1 4]' 
+	+[ -40]    '-s0c'       '[-1 0 -4]' 	+[ -21]    '-s0c'       '[-1 0 -4]' 
+	+[ -34]    '-s0r1w'     '[-1 1 4]'  	+[ -18]    '-n0l1w'     '[0 -1 4]'  
+	+[ -33]    '-n0c'       '[0 0 -4]'  	+[ -18]    '-n1c'       '[1 0 -4]'  
+	-[ -32]    '-s0r<'      '[-1 0 6]'  	-[ -16]    '-s1r<'      '[-2 0 6]'  
+	-[ -31]    '-s1d>'      '[-2 0 7]'  	-[ -16]    '-s0r='      '[-1 0 2]'  
+	+[ -31]    '-s0l1w'     '[-1 -1 4]' 	+[ -15]    '-n0c'       '[0 0 -4]'  
+	-[ -28]    '-s1l1c'     '[-2 -1 -4]'	-[ -14]    '-n0l1-'     '[0 -1 -1]' 
+	-[ -28]    '-s0l1-'     '[-1 -1 -1]'	-[ -13]    '-s2r1l='    '[-3 1 -2]' 
+	+[ -28]    '-n0l1c'     '[0 -1 -4]' 	+[ -13]    '-s0r1w'     '[-1 1 4]'  
+	-[ -28]    '-s2aw'      '[-3 0 8]'  	-[ -11]    '-s1r1l='    '[-2 1 -2]' 
+	-[ -25]    '-n0l='      '[0 0 -2]'  	-[ -11]    '-s0l1r='    '[-1 -1 2]' 
+	-[ -22]    '-s1r1+'     '[-2 1 1]'  	-[  -9]    '-s0l1c'     '[-1 -1 -4]'
+	-[ -20]    '-s1c'       '[-2 0 -4]' 	-[  -9]    '-s0-'       '[-1 0 -1]' 
+	-[ -19]    '-s0h-'      '[-1 0 -9]' 	-[  -7]    '-s0r1r='    '[-1 1 2]'  
+	-[ -11]    '-s1h-'      '[-2 0 -9]' 	+[  -7]    '-n0l1c'     '[0 -1 -4]' 
+	-[  -4]    '-s1l1r>'    '[-2 -1 5]' 
+
+2014-10-16  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Best-points: (copied from vectorparser/ChangeLog)
+
+	corpus: conllWSJToken (trn02-21:39832s,950028w,1820392m;dev22:1700s,40117w,76834m;tst23:2416s,56684w,108536m)
+	arctype: archybrid (TODO: can archybrid13 be the same?)
+	embedding: wikipedia2MUNK-100
+	feats: fv021a
+	kernel: rbf
+	gamma: 0.333140404105682
+	devscore: 0.0325506937033084 (nsv=96326, single=0.0328500403467215)
+	test: (TODO)
+
+	corpus: conll07EnglishToken (trn:16588s,398439w,763702m;dev:1989s,48134w,92290m;trn+dev:18577s,446573w,855992m;tst:214s,5003w)
+	arctype: archybrid
+	embedding: wikipedia2MUNK-100 (TODO: other embeddings, bansal)
+	feats: fv022b (TODO: compare with wsj feats)
+	kernel: rbf
+	gamma: 0.376747095368119
+	tstscore: 0.0418668 (1-epoch full-trn/tst, nsv=57661)
+	test: (TODO: debug run_static_dynamic)
+
 2014-10-10  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* conll07-dev: trn/dev/tst results (copied from vectorparser/ChangeLog)
@@ -1307,25 +1428,3 @@ DATA:	194	0.98414147	0.8794723
 	18	0.0050	0.1202	0.1243
 	19	0.0048	0.1200	0.1239
 	20	0.0049	0.1199	0.1251
-
-2014-10-16  Deniz Yuret  <dyuret@ku.edu.tr>
-
-	* Best-points: (copied from vectorparser/ChangeLog)
-
-	corpus: conllWSJToken (trn02-21:39832s,950028w,1820392m;dev22:1700s,40117w,76834m;tst23:2416s,56684w,108536m)
-	arctype: archybrid (TODO: can archybrid13 be the same?)
-	embedding: wikipedia2MUNK-100
-	feats: fv021a
-	kernel: rbf
-	gamma: 0.333140404105682
-	devscore: 0.0325506937033084 (nsv=96326, single=0.0328500403467215)
-	test: (TODO)
-
-	corpus: conll07EnglishToken (trn:16588s,398439w,763702m;dev:1989s,48134w,92290m;trn+dev:18577s,446573w,855992m;tst:214s,5003w)
-	arctype: archybrid
-	embedding: wikipedia2MUNK-100 (TODO: other embeddings, bansal)
-	feats: fv022b (TODO: compare with wsj feats)
-	kernel: rbf
-	gamma: 0.376747095368119
-	tstscore: 0.0418668 (1-epoch full-trn/tst, nsv=57661)
-	test: (TODO: debug run_static_dynamic)
