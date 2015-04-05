@@ -7,7 +7,10 @@ function main()
     (data, ndeps) = initdata(args)
     open(args["cache"],"a") do f end # this creates the cachefile if it does not exist
     pt = eval(parse(args["arctype"]))
+    ftry = Array(Feature,nworkers())
     allfeats = eval(parse("Flist."*args["allfeats"]))
+
+    # Init bestfeats, bestscore to the feats specified in args
     bestfeats = eval(parse("Flist."*args["feats"]))
     bestscore = getcache(args["cache"], bestfeats)
     if bestscore < 0
@@ -15,11 +18,25 @@ function main()
         updatecache(args["cache"], bestfeats, bestscore)
     end
 
-    # Cycle through the features nworkers at a time
-    ftry = Array(Feature,nworkers())
+    # See if we can improve bestfeats with single feature flip steps
     updatedbest = true
     while updatedbest
-        updatedbest = false; nf = 0
+        updatedbest = false
+
+        # First check the cache to see if we already have a good step
+        scores = map(allfeats) do f
+            getcache(args["cache"], bestfeats, f)
+        end
+        (smax,imax) = findmax(scores)
+        if smax > bestscore
+            updatedbest = true
+            bestscore = smax
+            bestfeats = flip(bestfeats, allfeats[imax])
+            continue
+        end
+
+        # If not check steps not in cache, nworkers at a time
+        nf = 0
         while (nf < length(allfeats))
             nftry = 0
             while (nf < length(allfeats) && nftry < length(ftry))
