@@ -3,8 +3,7 @@ using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
 function fscore{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, feats::Fvec, args::Dict)
     # Assuming this is running on a worker, do not use ncpu when parsing.
     # Initialize training set using oparse on first corpus
-    @date (p,x,y) = oparse(pt, data[1], ndeps, feats)
-    @show evalparse(p, data[1]); p=nothing
+    @date (p,x,y) = oparse(pt, data[1], ndeps, feats); p=nothing
     net = initnet(pt, data, ndeps, feats, args)
     @date for i=1:args["epochs"]
         train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
@@ -17,9 +16,8 @@ function fscore{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, fe
     else
         error("Unknown parser: "*args["parser"])
     end
-    net = nothing
     @show e = evalparse(p, data[2])
-    p=nothing; gc()
+    net=p=nothing; gc()
     return e[1]  # e[1] is UAS including punct
 end
 
