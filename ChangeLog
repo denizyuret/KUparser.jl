@@ -1,3 +1,142 @@
+2015-04-05    <dyuret@ku.edu.tr>
+
+	* Summary: corpus-parser-arctype-feats where:
+	corpus in acl11, con07
+	parser in beam, dynamic, static
+	arctype in hybrid, eager
+
+	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
+	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
+	9314	9290	ZN11	x	9180	5012	4800
+	9212	9165	03290018-bparse64.out(113/166)
+	9211	9171	03220927-bparselatestop.out(129/207)
+	9205	9166	03220548-bparsedbg.out(193/256)
+	9186	9136	03201925-julia3_btrain_jl.out(77/77)
+	9171	9152	03292013-bp10acl11eager.out(55/115)
+	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
+	9159	9142	03300736-bp10acl11eager13.out(75/155)
+	9158	9145	03240436-bpacl11.out(79/256)
+	9158	9140	03192351-gparsedbg.out(194/256)
+	9156	9141	04030908-bp64a11e13.out(65/130) trn:7m30s prs:96m epoch:27m (5t1p)
+	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
+	9136	9109	03212217-gpacl11.out(184/256)
+	9116	9074	03200328-oparsedbg.out(254/256)
+	9099	9075	03160543-julia3_otrain_jl.out(128/256)
+	9093	9060	03212217-opacl11.out(210/256)
+
+
+	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
+	uas	las	exp
+	8762	8628	GN13
+	8827	x	03291208-gpconll07hybrid13.out(93/187)
+	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
+	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
+	8799	x	04010425-gp07h13d25.out(139/256) (dropout 0.2 0.5)
+	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
+	8793	x	03311930-gp07h13k10.out(134/268) (10k hidden unit)
+	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
+	8789	x	03250401-gptacl13.out(169/213)
+	8773	x	03271009-gptacl13.out(233/256)
+	8761	x	04010123-gp07h13k44.out(138/276) (4k+4k hidden layers)
+	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
+	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
+	8709	x	03260132-gptacl13w.out(256/256) (only w features)
+	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
+	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
+	7877	x	03270146-gptacl13p.out(187/256) (only p features)
+
+	con07-static-hybrid-GN13h
+	uas	las	exp
+	8643	8496	GN13
+	8823	x	03300624-opconll07hybrid13.out(242/485)
+	8783	x	03282213-opconll07hybrid.out(79/159)
+	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
+	8689	x	03271008-optacl13.out(234/256)
+	8675	x	03242000-optacl13.out(66/78)
+
+	con07-beam10-hybrid-GN13h
+	uas	las	exp
+	8865	x	03221208-bpconll07.out(54/256)
+
+	con07-dynamic-eager-ZN11e
+	uas	las	exp
+	8869	8769	GN13
+	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
+	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
+	8823	?	...gp07e13l01.out(190/351)... (learningRate 0.1) @@480272
+	8821	x	03292103-gpconll07eager13.out(93/187)
+	8799	x	03290106-gpconll07eager.out(22/45)
+	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
+	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
+	8763	x	03281848-gpconll07eager.out(32/65)
+
+	con07-static-eager-ZN11e
+	uas	las	exp
+	8610	8493	GN13
+	8685	x	03281640-opconll07eager.out(21/43)
+	8681	x	03300220-opconll07eager13.out(102/139)
+	8649	x	03292324-opconll07eager.out(31/63)
+
+
+	* 04050753-hybrid54.cache: optimizing ArcHybrid13 features on conll07.
+
+	tacl13hybrid	.8613	n0lp n0p      n0w n1p n1w     s0lp s0p s0rp s0w     s1lp s1rp s1p s1w
+	hybrid14	.8791	n0lp     n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp      s1p s1w
+
+	0.06356	-s0w	0.01119	+n0p
+	0.06276	-n1w	0.00080	+s1rp
+	0.05737	-n0w
+	0.02319	-s1w
+	0.01959	-s1B*
+	0.01659	-n0lp
+	0.01519	-s0lp
+	0.01439	-s0p
+	0.01279	-s0rp
+	0.01199	-s0d*
+	0.01199	-n1p
+	0.00999	-n0lw*
+	0.00979	-s1p
+	0.00919	-s1lp
+
+	- We should try to optimize acl11eager on conll07 with ArcEager13 as well.
+	- Rerun hybrid conll experiments.
+
+	* 04042125-acl11eager2.cache: unfortunately we cannot beat the
+	original feature set with single step moves:
+
+	acl11eager(39)	.8906
+	best38		.8899
+
+	But we do have a ranking of all 39 features by how much their
+	removal effects performance:
+
+	0.03849	n0w	0.00394	s0L	0.00307	n2w	0.00232	s0rw	
+	0.02894	s0w	0.00394	s0B	0.00284	s0h2w	0.00197	n0l2w	
+	0.02445	n1w	0.00364	n0lL	0.00282	s0lL	0.00162	s0rp	
+	0.00678	s0p	0.00359	s0r2p	0.00274	s0rL	0.00160	n0lp	
+	0.00481	s0l2p	0.00359	s0hw	0.00257	s0hp	0.00157	s0hL	
+	0.00439	n1p	0.00359	n0A	0.00252	n0l2L	0.00112	s0r2w	
+	0.00436	s0h2p	0.00354	s0lp	0.00244	s0A	0.00080	n0l2p	
+	0.00416	n2p	0.00327	s0r2L	0.00237	s0d	0.00072	s0lw	
+	0.00409	s0l2L	0.00327	s0l2w	0.00237	n0a	0.00067	n0lw	
+	0.00401	n0p	0.00317	s0a	0.00234	s0b	
+
+	- do we have overfitting because of no dropout (s0l2p?, s0h2p?)
+	- should we try features of s1?
+
+	* 04050905-acl11eager.cache: stopped early, same result as acl11eager2.
+
+
+2015-04-03    <dyuret@ku.edu.tr>
+
+	* fselect: feature selection.  up to ncpu=6 and pbatch=500 can be
+	supported on ilac with acl11eager (700MB per cpu).  TODO: feature
+	set for archybrid.
+
+ 480368 0.50531 hybrid54   dyuret       r     04/03/2015 23:02:25 ilac.q@ilac-0-3.local              1        
+ 480370 0.50531 acl11eager dyuret       qw    04/03/2015 23:04:42                                    1        
+   3969 0.60500 acl11eager2 dyuret       r     04/03/2015 23:07:22 iui.q@iui-5-0.local                1        
+
 2015-04-02    <dyuret@ku.edu.tr>
 
 	* Latex-table:
@@ -34,85 +173,13 @@
 
 2015-04-01    <dyuret@ku.edu.tr>
 
-	* Summary:
-
-	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
-	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
-	9314	9290	ZN11	x	9180	5012	4800
-	9212	9165	03290018-bparse64.out(113/166)
-	9211	9171	03220927-bparselatestop.out(129/207)
-	9205	9166	03220548-bparsedbg.out(193/256)
-	9186	9136	03201925-julia3_btrain_jl.out(77/77)
-	9171	9152	03292013-bp10acl11eager.out(55/115)
-	9167	9153	...bp64a11eR1.out(55/?)... @@480224 trn:7m30s prs:96m epoch:27m (5t1p)
-	9159	9142	03300736-bp10acl11eager13.out(75/155)
-	9158	9145	03240436-bpacl11.out(79/256)
-	9158	9140	03192351-gparsedbg.out(194/256)
-	9156	9141	...bp64a11e13.out(65/?)... @@480223 trn:7m30s prs:96m epoch:27m (5t1p)
-	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
-	9136	9109	03212217-gpacl11.out(184/256)
-	9116	9074	03200328-oparsedbg.out(254/256)
-	9099	9075	03160543-julia3_otrain_jl.out(128/256)
-	9093	9060	03212217-opacl11.out(210/256)
-	?	?	...bp64a11e13iui.out... @@3856 trn:6m30s prs:40m epoch:14m30s (5t1p) keeps crashing.. try single gpu?
-
-	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
-	uas	las	exp
-	8762	8628	GN13
-	8827	x	03291208-gpconll07hybrid13.out(93/187)
-	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
-	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
-	8799	x	04010425-gp07h13d25.out(139/256) (dropout 0.2 0.5)
-	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
-	8793	x	03311930-gp07h13k10.out(134/268) (10k hidden unit)
-	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
-	8789	x	03250401-gptacl13.out(169/213)
-	8773	x	03271009-gptacl13.out(233/256)
-	8761	x	04010123-gp07h13k44.out(138/276) (4k+4k hidden layers)
-	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
-	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
-	8709	x	03260132-gptacl13w.out(256/256) (only w features)
-	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
-	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0) ?????????????
-	7877	x	03270146-gptacl13p.out(187/256) (only p features)
-
-	con07-static-hybrid-GN13h
-	uas	las	exp
-	8643	8496	GN13
-	8823	x	03300624-opconll07hybrid13.out(242/485)
-	8783	x	03282213-opconll07hybrid.out(79/159)
-	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
-	8689	x	03271008-optacl13.out(234/256)
-	8675	x	03242000-optacl13.out(66/78)
-
-	con07-beam10-hybrid-GN13h
-	uas	las	exp
-	8865	x	03221208-bpconll07.out(54/256)
-
-	con07-dynamic-eager-ZN11e
-	uas	las	exp
-	8869	8769	GN13
-	8843	?	...gp07e13k44.out(95/?)... (4+4k hidden) @@480270
-	8839	?	...gp07e13k10.out(39/?)... (10k hidden) @@480269
-	8821	x	03292103-gpconll07eager13.out(93/187)
-	8799	x	03290106-gpconll07eager.out(22/45)
-	8795	?	...gp07e13d25.out(32/?... (dropout 0.2 0.5) @@480271
-	8785	?	...gp07e13.out(33/?)... (repl 03292103) @@480268
-	8763	x	03281848-gpconll07eager.out(32/65)
-	8779	?	...gp07e13l01.out(117/?)... (learningRate 0.1) @@480272
-
-	con07-static-eager-ZN11e
-	uas	las	exp
-	8610	8493	GN13
-	8685	x	03281640-opconll07eager.out(21/43)
-	8681	x	03300220-opconll07eager13.out(102/139)
-	8649	x	03292324-opconll07eager.out(31/63)
 
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
 	- Explore training options.
 	-- Try move+label nnet output?
+	-- cost function of nnet, cost fn of parser?
 
 	- Run five experiments and report avg-std.
 
