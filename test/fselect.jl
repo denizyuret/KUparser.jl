@@ -57,8 +57,9 @@ function main()
             end
         end # while (nf < length(allfeats))
     end # while updatedbest
+    info("$bestscore\t$(join(sort(bestfeats), ' '))")
 end
-                
+
 function parse_commandline()
     s = ArgParseSettings()
     @add_arg_table s begin
