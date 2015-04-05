@@ -1,5 +1,9 @@
 module Flist                    # feature matrices
 
+# Local best for conll07, ArcHybrid13, start=tacl13hybrid, all=hybrid54
+hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
+
+# Features that may be relevant for ArcHybrid13
 hybrid54 = ASCIIString[
 "n0w", "n0p", "n0A", "n0a",
 "s0w", "s0p", "s0A", "s0a", "s0B", "s0b", "s0d",
