@@ -4,6 +4,7 @@
 	corpus in acl11, con07
 	parser in beam, dynamic, static
 	arctype in hybrid, eager
+	feats in ZN11e (arc11eager), GN13h (tacl13hybrid), or other
 
 	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
 	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
@@ -23,11 +24,13 @@
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
-
+	fselect from eager21 running on @@3973@iui: started at 8880
+	compared to 8906 with eager39.
 
 	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
+	8847	x	...gp07h14(81/81) (feats=hybrid14) @@480373
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
@@ -49,6 +52,7 @@
 	uas	las	exp
 	8643	8496	GN13
 	8823	x	03300624-opconll07hybrid13.out(242/485)
+	8813	x	...op07h14(66/80) (feats=hybrid14) @@480374
 	8783	x	03282213-opconll07hybrid.out(79/159)
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
 	8689	x	03271008-optacl13.out(234/256)
@@ -63,12 +67,13 @@
 	8869	8769	GN13
 	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
 	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
-	8823	?	...gp07e13l01.out(190/351)... (learningRate 0.1) @@480272
+	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
+	fselect running @@aws: started with eager39=8619, curr=8631
 
 	con07-static-eager-ZN11e
 	uas	las	exp
@@ -83,20 +88,13 @@
 	tacl13hybrid	.8613	n0lp n0p      n0w n1p n1w     s0lp s0p s0rp s0w     s1lp s1rp s1p s1w
 	hybrid14	.8791	n0lp     n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp      s1p s1w
 
-	0.06356	-s0w	0.01119	+n0p
-	0.06276	-n1w	0.00080	+s1rp
-	0.05737	-n0w
-	0.02319	-s1w
-	0.01959	-s1B*
-	0.01659	-n0lp
-	0.01519	-s0lp
-	0.01439	-s0p
-	0.01279	-s0rp
-	0.01199	-s0d*
-	0.01199	-n1p
-	0.00999	-n0lw*
-	0.00979	-s1p
-	0.00919	-s1lp
+	0.06356	-s0w	0.01439	-s0p	0.01119	+n0p
+	0.06276	-n1w	0.01279	-s0rp	0.00080	+s1rp
+	0.05737	-n0w	0.01199	-s0d*	
+	0.02319	-s1w	0.01199	-n1p	
+	0.01959	-s1B*	0.00999	-n0lw*	
+	0.01659	-n0lp	0.00979	-s1p	
+	0.01519	-s0lp	0.00919	-s1lp	
 
 	- We should try to optimize acl11eager on conll07 with ArcEager13 as well.
 	- Rerun hybrid conll experiments.
