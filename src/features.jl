@@ -24,8 +24,8 @@
 # A: set of left dependency labels
 # B: set of right dependency labels
 
-typealias Feature ASCIIString
-typealias Fvec Vector{Feature}
+typealias Feature String
+typealias Fvec{T<:String} Vector{T}
 
 function features(p::Parser, s::Sentence, feats::Fvec,
                   x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 

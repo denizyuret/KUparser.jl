@@ -1,5 +1,19 @@
 module Flist                    # feature matrices
 
+# Local best for conll07, ArcHybrid13, start=tacl13hybrid, all=hybrid54
+hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
+
+# Features that may be relevant for ArcHybrid13
+hybrid54 = ASCIIString[
+"n0w", "n0p", "n0A", "n0a",
+"s0w", "s0p", "s0A", "s0a", "s0B", "s0b", "s0d",
+"s1w", "s1p", "s1A", "s1a", "s1B", "s1b", "s1d",
+"n1w", "n1p", "n2w", "n2p", "s2w", "s2p",
+"n0lw", "n0l2w", "s0lw", "s0l2w", "s0rw", "s0r2w", "s1lw", "s1l2w", "s1rw", "s1r2w",
+"n0lp", "n0l2p", "s0lp", "s0l2p", "s0rp", "s0r2p", "s1lp", "s1l2p", "s1rp", "s1r2p",
+"n0lL", "n0l2L", "s0lL", "s0l2L", "s0rL", "s0r2L", "s1lL", "s1l2L", "s1rL", "s1r2L"
+]
+
 # Goldberg&Nivre TACL13 ArcHybrid features from: tacl2013dynamicoracles/lefttoright/features:HybridFeatures
 # s0,s1,s2: stack word forms: a=-1,-2,-3 b=0 c=4
 # w0,w1: buffer word forms: a=0,1 b=0 c=4
