@@ -14,7 +14,7 @@ function main()
     bestfeats = eval(parse("Flist."*args["feats"]))
     bestscore = getcache(args["cache"], bestfeats)
     if bestscore < 0
-        bestscore = fscore(pt, data, ndeps, bestfeats, args)
+        bestscore = @fetchfrom workers()[1] fscore(pt, data, ndeps, bestfeats, args)
         updatecache(args["cache"], bestfeats, bestscore)
     end
 
