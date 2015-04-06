@@ -1,3 +1,10 @@
+2015-04-06    <dyuret@ku.edu.tr>
+
+	* 04060625-fs07e39e39.cache: fselect running at aws, 10 machines,
+	1h/epoch/machine. started with eager39=8619, best
+	eager36=8725. (rename acl11eager->eager39)
+
+
 2015-04-05    <dyuret@ku.edu.tr>
 
 	* Summary: corpus-parser-arctype-feats where:
@@ -24,13 +31,15 @@
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
-	fselect from eager21 running on @@3973@iui: started at 8880
-	compared to 8906 with eager39.
+	- fselect from eager21 running on @@3973@iui: started at e21=8880. compared to 8906 with eager39. curr23@50=8906. a11e21.cache. 20m/f.
+	- should we not use bparser during fselect?
+	- should we restart from an even smaller base? should we add s1? @@480378 (fs11e64e20.cache) not started.
+	- we should try hybrid on acl11. @@480377 (fs11h54h14.cache) start: h14=8931 curr15@5=8931 30m/f.
 
 	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
-	8847	x	...gp07h14(81/81) (feats=hybrid14) @@480373
+	8903	x	...gp07h14(314/?) (feats=hybrid14) @@480373
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
@@ -51,12 +60,13 @@
 	con07-static-hybrid-GN13h
 	uas	las	exp
 	8643	8496	GN13
+	8875	x	...op07h14(232/?) (feats=hybrid14) @@480374
 	8823	x	03300624-opconll07hybrid13.out(242/485)
-	8813	x	...op07h14(66/80) (feats=hybrid14) @@480374
 	8783	x	03282213-opconll07hybrid.out(79/159)
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
 	8689	x	03271008-optacl13.out(234/256)
 	8675	x	03242000-optacl13.out(66/78)
+	- should start fselect with something bigger than hybrid13
 
 	con07-beam10-hybrid-GN13h
 	uas	las	exp
@@ -73,7 +83,8 @@
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
-	fselect running @@aws: started with eager39=8619, curr=8631
+	?	?	gp07e36.out... (feats=eager36) @@480379
+	- should start with eager21 or the like. @@480376 fs07e39e21.cache. start e21=8623. best22@25=8649. compare to eager36=8725. 20m/f
 
 	con07-static-eager-ZN11e
 	uas	las	exp
@@ -81,6 +92,7 @@
 	8685	x	03281640-opconll07eager.out(21/43)
 	8681	x	03300220-opconll07eager13.out(102/139)
 	8649	x	03292324-opconll07eager.out(31/63)
+	?	?	op07e36.out... (feats=eager36) @@480380
 
 
 	* 04050753-hybrid54.cache: optimizing ArcHybrid13 features on conll07.
@@ -175,6 +187,10 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
+	- Leave postags as postags, compare with context vectors.
+
+	- Try the split experiment with two networks.
+	
 	- Explore training options.
 	-- Try move+label nnet output?
 	-- cost function of nnet, cost fn of parser?
