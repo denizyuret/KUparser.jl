@@ -1,9 +1,25 @@
 2015-04-06    <dyuret@ku.edu.tr>
 
-	* 04060625-fs07e39e39.cache: fselect running at aws, 10 machines,
-	1h/epoch/machine. started with eager39=8619, best
-	eager36=8725. (rename acl11eager->eager39)
+	* test/fselect.jl: FEATURE SELECTION EXPERIMENTS
 
+	corpus: c07, a11
+	parser: eager, hybrid
+	eager-all: eager39, eager64
+	eager-start: eager39, eager36, eager21, eager20
+	hybrid-all: hybrid54
+	hybrid-start: hybrid13, hybrid14, hybrid28
+	:rename acl11eager->eager39, tacl13hybrid->hybrid13.
+
+	Results:
+	fs07e39e21: e21=8623 -> e23@37=8679...  @@480376@fselect fs07e39e21.cache. should start with eager21 or the like.. start e21=8623. best22@25=8649. compare to eager36=8725. 20m/f
+	fs07e39e39: e39=8619 -> e36=8725 (04060625-fs07e39e39.cache)
+	fs07h54h13: h13=8613 -> h14=8791 (04050753-hybrid54.cache)
+	fs07h54h28: h28=8683 -> h28@01=8683... @@3976@fselect2
+	fs11e39e21: e21=8880 -> e23@62=8906... @@3973@fselect (a11e21.cache) fselect from eager21 running on : started at e21=8880. compared to 8906 with eager39. curr23@50=8906. a11e21.cache. 20m/f.
+	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache)
+	fs11e64e20: e20=8926 -> e20@01=8926... should we restart from an even smaller base? should we add s1? @@aws@virginia@04061319 (fs11e64e20.cache) ssh -i .aws/virginia.pem ec2-user@ec2-52-5-97-17.compute-1.amazonaws.com
+	fs11h54h14: h14=8931 -> h16@09=8949... we should try hybrid on acl11. @@480377@fselect (fs11h54h14.cache) start: h14=8931 curr15@5=8931 30m/f.
+	fs11h54h28: h28=8978 -> h27@11=8997... 04061102 started @@aws@california. ssh -i .aws/california.pem ec2-user@ec2-54-153-49-89.us-west-1.compute.amazonaws.com
 
 2015-04-05    <dyuret@ku.edu.tr>
 
@@ -31,15 +47,11 @@
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
-	- fselect from eager21 running on @@3973@iui: started at e21=8880. compared to 8906 with eager39. curr23@50=8906. a11e21.cache. 20m/f.
-	- should we not use bparser during fselect?
-	- should we restart from an even smaller base? should we add s1? @@480378 (fs11e64e20.cache) not started.
-	- we should try hybrid on acl11. @@480377 (fs11h54h14.cache) start: h14=8931 curr15@5=8931 30m/f.
 
 	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
-	8903	x	...gp07h14(314/?) (feats=hybrid14) @@480373
+	8903	x	...gp07h14(314/458) (feats=hybrid14) @@480373@test
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
@@ -60,13 +72,12 @@
 	con07-static-hybrid-GN13h
 	uas	las	exp
 	8643	8496	GN13
-	8875	x	...op07h14(232/?) (feats=hybrid14) @@480374
+	8887	x	...op07h14(377/486) (feats=hybrid14) @@480374@test
 	8823	x	03300624-opconll07hybrid13.out(242/485)
 	8783	x	03282213-opconll07hybrid.out(79/159)
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
 	8689	x	03271008-optacl13.out(234/256)
 	8675	x	03242000-optacl13.out(66/78)
-	- should start fselect with something bigger than hybrid13
 
 	con07-beam10-hybrid-GN13h
 	uas	las	exp
@@ -83,8 +94,8 @@
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
-	?	?	gp07e36.out... (feats=eager36) @@480379
-	- should start with eager21 or the like. @@480376 fs07e39e21.cache. start e21=8623. best22@25=8649. compare to eager36=8725. 20m/f
+	8719	x	gp07e36.out(14/15)... (feats=eager36) @@480379@test
+
 
 	con07-static-eager-ZN11e
 	uas	las	exp
@@ -92,7 +103,7 @@
 	8685	x	03281640-opconll07eager.out(21/43)
 	8681	x	03300220-opconll07eager13.out(102/139)
 	8649	x	03292324-opconll07eager.out(31/63)
-	?	?	op07e36.out... (feats=eager36) @@480380
+	?	?	op07e36.out... (feats=eager36) @@480380@test not started
 
 
 	* 04050753-hybrid54.cache: optimizing ArcHybrid13 features on conll07.
@@ -100,16 +111,13 @@
 	tacl13hybrid	.8613	n0lp n0p      n0w n1p n1w     s0lp s0p s0rp s0w     s1lp s1rp s1p s1w
 	hybrid14	.8791	n0lp     n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp      s1p s1w
 
-	0.06356	-s0w	0.01439	-s0p	0.01119	+n0p
-	0.06276	-n1w	0.01279	-s0rp	0.00080	+s1rp
-	0.05737	-n0w	0.01199	-s0d*	
-	0.02319	-s1w	0.01199	-n1p	
-	0.01959	-s1B*	0.00999	-n0lw*	
-	0.01659	-n0lp	0.00979	-s1p	
-	0.01519	-s0lp	0.00919	-s1lp	
-
-	- We should try to optimize acl11eager on conll07 with ArcEager13 as well.
-	- Rerun hybrid conll experiments.
+	0.06356	s0w	0.01439	s0p	0.01119	+n0p
+	0.06276	n1w	0.01279	s0rp	0.00080	+s1rp
+	0.05737	n0w	0.01199	s0d*	
+	0.02319	s1w	0.01199	n1p	
+	0.01959	s1B*	0.00999	n0lw*	
+	0.01659	n0lp	0.00979	s1p	
+	0.01519	s0lp	0.00919	s1lp	
 
 	* 04042125-acl11eager2.cache: unfortunately we cannot beat the
 	original feature set with single step moves:
@@ -131,8 +139,8 @@
 	0.00409	s0l2L	0.00327	s0l2w	0.00237	n0a	0.00067	n0lw	
 	0.00401	n0p	0.00317	s0a	0.00234	s0b	
 
-	- do we have overfitting because of no dropout (s0l2p?, s0h2p?)
-	- should we try features of s1?
+	+ do we have overfitting because of no dropout (s0l2p?, s0h2p?)
+	+ should we try features of s1?
 
 	* 04050905-acl11eager.cache: stopped early, same result as acl11eager2.
 
@@ -187,10 +195,12 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
+	- should we not use bparser during fselect?
+
 	- Leave postags as postags, compare with context vectors.
 
-	- Try the split experiment with two networks.
-	
+	- Try the split experiment with three networks (move, rlabel, llabel).
+
 	- Explore training options.
 	-- Try move+label nnet output?
 	-- cost function of nnet, cost fn of parser?
