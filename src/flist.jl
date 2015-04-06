@@ -1,5 +1,17 @@
 module Flist                    # feature matrices
 
+# best in conll07, ArcEager13, start=acl11eager, all=acl11eager, cache=fs07e39e39.cache
+eager36 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0b s0d s0h2p s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2p s0r2w s0rL s0rp s0rw s0w")
+
+# more complete set than acl11eager: added s1 features
+eager64 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0a s0b s0d s0h2p s0h2w s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2L s0r2p s0r2w s0rL s0rp s0rw s0w s1A s1B s1L s1a s1b s1d s1h2p s1h2w s1hL s1hp s1hw s1l2L s1l2p s1l2w s1lL s1lp s1lw s1p s1r2L s1r2p s1r2w s1rL s1rp s1rw s1w")
+
+eager20 = split("n0A n0a n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
+
+eager21 = split("n0w s0w n1w s0p s0l2p n1p s0h2p n2p s0l2L n0p s0L s0B n0lL s0r2p s0hw n0A s0lp s0r2L s0l2w s0a n2w")
+
+hybrid28 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
+
 # Local best for conll07, ArcHybrid13, start=tacl13hybrid, all=hybrid54
 hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
 
