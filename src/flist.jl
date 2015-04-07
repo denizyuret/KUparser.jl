@@ -1,5 +1,8 @@
 module Flist                    # feature matrices
 
+# local best in acl11, ArcEager13, start=hybrid28, all=hybrid54, cache=fs11h54h28.cache
+hybrid27 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
+
 # best in conll07, ArcEager13, start=acl11eager, all=acl11eager, cache=fs07e39e39.cache
 eager36 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0b s0d s0h2p s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2p s0r2w s0rL s0rp s0rw s0w")
 
