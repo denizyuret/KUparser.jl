@@ -12,7 +12,7 @@ typealias ParserType Symbol
 
 include("util.jl");	  export @date, evalparse, pxyequal, testnet
 include("sentence.jl");   export Sentence, Corpus, wdim, wcnt, wtype
-include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1, Parser
+include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1, Parser, reset!
 include("features.jl");   export Feature, Fvec, flen, xsize, ysize
 include("gparser.jl");    export gparse
 include("bparser.jl");    export bparse
