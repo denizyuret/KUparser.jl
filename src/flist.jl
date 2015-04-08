@@ -1,22 +1,34 @@
 module Flist                    # feature matrices
 
-# local best in acl11, ArcEager13, start=hybrid28, all=hybrid54, cache=fs11h54h28.cache
+# fs11h54h28 (8997): local best in acl11, ArcHybrid13, start=hybrid28, all=hybrid54
 hybrid27 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
 
-# best in conll07, ArcEager13, start=acl11eager, all=acl11eager, cache=fs07e39e39.cache
+# fs11e64e20 (8926): local best for acl11, ArcEager13, start=eager20, all=eager64
+eager20 = split("n0A n0a n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
+
+# fs11e39e21 (8906): local best for acl11, ArcEager13, start=eager21, all=eager39
+eager23 = split("n0A n0lL n0lp n0p n0w n1p n1w n2p n2w s0B s0L s0a s0b s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
+
+# fs07e39e39 (8725): local best in conll07, ArcEager13, start=acl11eager, all=acl11eager
 eager36 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0b s0d s0h2p s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2p s0r2w s0rL s0rp s0rw s0w")
+
+# fs07e39e21 (8705): Local best for conll07, ArcEager13, start=eager21, all=eager39
+eager20b = split("n0l2L n0lw n0p n0w n1w n2p n2w s0B s0L s0a s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
+
+# fs07e64e20 (8677): Local best for conll07, ArcEager13, start=eager20, all=eager64
+eager21b = split("n0A n0a n0l2L n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
+
+# fs07h54h13 (8791): Local best for conll07, ArcHybrid13, start=tacl13hybrid (aka hybrid13), all=hybrid54
+hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
 
 # more complete set than acl11eager: added s1 features
 eager64 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0a s0b s0d s0h2p s0h2w s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2L s0r2p s0r2w s0rL s0rp s0rw s0w s1A s1B s1L s1a s1b s1d s1h2p s1h2w s1hL s1hp s1hw s1l2L s1l2p s1l2w s1lL s1lp s1lw s1p s1r2L s1r2p s1r2w s1rL s1rp s1rw s1w")
 
-eager20 = split("n0A n0a n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
+# Manually constructed starting point
+eager21 = split("n0A n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0a s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
 
-eager21 = split("n0w s0w n1w s0p s0l2p n1p s0h2p n2p s0l2L n0p s0L s0B n0lL s0r2p s0hw n0A s0lp s0r2L s0l2w s0a n2w")
-
+# Manually constructed starting point
 hybrid28 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
-
-# Local best for conll07, ArcHybrid13, start=tacl13hybrid, all=hybrid54
-hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
 
 # Features that may be relevant for ArcHybrid13
 hybrid54 = ASCIIString[
@@ -114,6 +126,9 @@ tacl13hybrid = ASCIIString[
 tacl13words = ASCIIString["s0lw", "s0w", "s0rw", "s1lw", "s1w", "s1rw", "n0lw", "n0w", "n1w"]
 tacl13tags  = ASCIIString["s0lp", "s0p", "s0rp", "s1lp", "s1p", "s1rp", "n0lp", "n0p", "n1p"]
 tacl13wordtag = [tacl13words; tacl13tags]
+
+# Renamed:
+hybrid13 = tacl13hybrid
 
 # Goldberg&Nivre TACL13 ArcEager features from: 
 # tacl2013dynamicoracles/lefttoright/features:EagerZhangNivre2011Extractor
@@ -223,7 +238,9 @@ acl11eager = ASCIIString[
 	# f("n0psl_%s_%s" % (n0p, n0sl))
 ] # tacl13eager
 
-
+# Renamed:
+eager39 = acl11eager
+# fs11e39e39 (8906): eager39 also local best for acl11, ArcEager13, start=eager39, all=eager39
 
 # Old feature format before we switched to ints:
 # f::Features is a nx3 matrix whose rows determine which features to extract
