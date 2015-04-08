@@ -168,6 +168,7 @@ function main()
                 elseif (args["parser"] == "gparser")
                     # The first corpus gives us the new training set
                     if i==1
+                        y[:] = zero(eltype(y))
                         @date gparse(pa[i], data[i], ndeps, feats, net, args["pbatch"], x, y)
                     else
                         @date gparse(pa[i], data[i], ndeps, feats, net, args["pbatch"])
@@ -175,6 +176,7 @@ function main()
                 elseif (args["parser"] == "bparser")
                     # The first corpus gives us the new training set
                     if i==1
+                        y[:] = zero(eltype(y))
                         @date bparse(pa[i], data[i], ndeps, feats, net, args["nbeam"], args["pbatch"], x, y)
                     else
                         @date bparse(pa[i], data[i], ndeps, feats, net, args["nbeam"], args["pbatch"])
