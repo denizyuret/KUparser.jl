@@ -3,7 +3,7 @@
 	* test/fselect.jl: FEATURE SELECTION EXPERIMENTS
 
 	corpus: c07, a11
-	parser: eager, hybrid
+	parser: ArcEager13, ArcHybrid13
 	eager-all: eager39, eager64
 	eager-start: eager39, eager36, eager21, eager20
 	hybrid-all: hybrid54
@@ -11,15 +11,20 @@
 	:rename acl11eager->eager39, tacl13hybrid->hybrid13.
 
 	Results:
-	fs07e39e21: e21=8623 -> e23@37=8679...  @@480376@fselect fs07e39e21.cache. should start with eager21 or the like.. start e21=8623. best22@25=8649. compare to eager36=8725. 20m/f
-	fs07e39e39: e39=8619 -> e36=8725 (04060625-fs07e39e39.cache)
-	fs07h54h13: h13=8613 -> h14=8791 (04050753-hybrid54.cache)
-	fs07h54h28: h28=8683 -> h28@01=8683... @@3976@fselect2
-	fs11e39e21: e21=8880 -> e23@62=8906... @@3973@fselect (a11e21.cache) fselect from eager21 running on : started at e21=8880. compared to 8906 with eager39. curr23@50=8906. a11e21.cache. 20m/f.
-	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache)
-	fs11e64e20: e20=8926 -> e20@01=8926... should we restart from an even smaller base? should we add s1? @@aws@virginia@04061319 (fs11e64e20.cache) ssh -i .aws/virginia.pem ec2-user@ec2-52-5-97-17.compute-1.amazonaws.com
-	fs11h54h14: h14=8931 -> h16@09=8949... we should try hybrid on acl11. @@480377@fselect (fs11h54h14.cache) start: h14=8931 curr15@5=8931 30m/f.
-	fs11h54h28: h28=8978 -> h27@11=8997... 04061102 started @@aws@california. ssh -i .aws/california.pem ec2-user@ec2-54-153-49-89.us-west-1.compute.amazonaws.com
+
+	fs07h54h28: h28=8683 -> h28?@127=8797... @@3976@fselect2
+	fs07h54h13: h13=8613 -> h14=8791 (04050753-hybrid54.cache) ok
+
+	fs07e39e39: e39=8619 -> e36=8725 (04060625-fs07e39e39.cache) ok
+	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
+	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
+
+	fs11h54h28: h28=8978 -> h27@64=8997 (04071554-fs11h54h28.cache) ok
+	fs11h54h14: h14=8931 -> h21@75=8971... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
+
+	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
+	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
+	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache) ok
 
 2015-04-05    <dyuret@ku.edu.tr>
 
@@ -29,7 +34,8 @@
 	arctype in hybrid, eager
 	feats in ZN11e (arc11eager), GN13h (tacl13hybrid), or other
 
-	acl11-beam64-eager-ZN11e (only ZN11 scores exclude punct)
+	acl11-beam64-eager-ZN11e: uas1:no uas2:no
+	:(only ZN11 scores exclude punct)
 	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
 	9314	9290	ZN11	x	9180	5012	4800
 	9212	9165	03290018-bparse64.out(113/166)
@@ -47,11 +53,14 @@
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
+	9055	9045	bp64a11e20.out(10/10)... # @@3999@iui@test (feats=eager20) ...crashed/restarted.
+	?	?	bp64a11h27.out()... @@parcore@test (feats=hybrid27) ...crashed(128)/restarted(32).
 
-	con07-dynamic-hybrid-GN13h (no averaging or dev set in my results)
+	con07-dynamic-hybrid-GN13h: uas1:ok uas2:ok
+	:(no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
-	8903	x	...gp07h14(314/458) (feats=hybrid14) @@480373@test
+	8903	x	04061328-gp07h14.out(314/458) (feats=hybrid14)
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
@@ -69,10 +78,10 @@
 	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
 
-	con07-static-hybrid-GN13h
+	con07-static-hybrid-GN13h: uas1:ok uas2:ok
 	uas	las	exp
 	8643	8496	GN13
-	8887	x	...op07h14(377/486) (feats=hybrid14) @@480374@test
+	8887	x	04070512-op07h14.out(377/754) (feats=hybrid14)
 	8823	x	03300624-opconll07hybrid13.out(242/485)
 	8783	x	03282213-opconll07hybrid.out(79/159)
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
@@ -83,27 +92,33 @@
 	uas	las	exp
 	8865	x	03221208-bpconll07.out(54/256)
 
-	con07-dynamic-eager-ZN11e
+	con07-dynamic-eager-ZN11e: uas1:no uas2:no
 	uas	las	exp
 	8869	8769	GN13
 	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
 	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
 	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
+	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
-	8719	x	gp07e36.out(14/15)... (feats=eager36) @@480379@test
+	?	?	gp07e20.out... @@480422@test
+	?	?	gp07e20b.out... @@480423@test
+	?	?	gp07e21.out... @@480424@test
+	?	?	gp07e21b.out... @@480425@test
+	?	?	gp07e23.out... @@480426@test
+	?	?	gp07e36.out... @@480427@test
+	?	?	gp07e39.out... @@480428@test
 
-
-	con07-static-eager-ZN11e
+	con07-static-eager-ZN11e: uas1:ok uas2:no
 	uas	las	exp
 	8610	8493	GN13
 	8685	x	03281640-opconll07eager.out(21/43)
 	8681	x	03300220-opconll07eager13.out(102/139)
+	8675	x	04070709-op07e36.out(28/100) (feats=eager36)
 	8649	x	03292324-opconll07eager.out(31/63)
-	?	?	op07e36.out... (feats=eager36) @@480380@test not started
 
 
 	* 04050753-hybrid54.cache: optimizing ArcHybrid13 features on conll07.
@@ -195,6 +210,8 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
+	- figure out eval.pl vs discounting punct pos for acl11.
+	- figure out fixed epoch vs dev set for conll07.
 	- should we not use bparser during fselect?
 
 	- Leave postags as postags, compare with context vectors.
