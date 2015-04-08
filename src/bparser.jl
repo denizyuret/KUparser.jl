@@ -29,6 +29,7 @@ end
 # Multi cpu version:
 function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
                            nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
+    ncpu == 1 && return bparse(pt, c, ndeps, feats, net, nbeam, nbatch; xy=xy)
     @date Main.resetworkers(ncpu)
     sa = distribute(c)                                  # distributed sentence array
     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
