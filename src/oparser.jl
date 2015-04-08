@@ -19,6 +19,7 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec=F
 end
 
 function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats::Fvec=Feature[])
+    ncpu == 1 && return oparse(pt, c, ndeps, feats)
     @date Main.resetworkers(ncpu)
     sa = distribute(c)                                  # distributed sentence array
     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
