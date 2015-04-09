@@ -25,6 +25,7 @@ end
 
 function gparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
                            nbatch::Integer, ncpu::Integer; xy::Bool=false)
+    ncpu == 1 && return gparse(pt, c, ndeps, feats, net, nbatch; xy=xy)
     @date Main.resetworkers(ncpu)
     sa = distribute(c)                                  # distributed sentence array
     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
