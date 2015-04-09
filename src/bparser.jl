@@ -113,6 +113,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                 if !isempty(x)                                                  # if asked for x, copy mincost column from f
                     copy!(x, nx*frows+1, f, (fmin-1)*frows+1, frows)
                     nx += 1
+                    y[:,nx]=zero(eltype(y))
                     y[jmin,nx]=one(eltype(y))                                   # and set mincost y move to 1
                 end
             end # for b in batch (1)
