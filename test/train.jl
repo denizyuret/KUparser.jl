@@ -160,7 +160,7 @@ function main()
     while true
         @show epoch += 1
         @show map(size, (x, y))
-        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
+        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         if epoch % args["pepochs"] == 0
             @meminfo
             if (args["parser"] == "oparser")

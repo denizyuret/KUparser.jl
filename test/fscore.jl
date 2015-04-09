@@ -6,7 +6,7 @@ function fscore{T<:Parser}(pt::Type{T}, data::Vector{Corpus}, ndeps::Integer, fe
     @date (p,x,y) = oparse(pt, data[1], ndeps, feats); p=nothing
     net = initnet(pt, data, ndeps, feats, args)
     @date for i=1:args["epochs"]
-        train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
+        train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
     end
     x = y = nothing
     if (args["parser"] == "gparser")

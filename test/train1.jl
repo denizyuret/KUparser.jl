@@ -166,7 +166,7 @@ function main()
     
     while true
         @show epoch += 1
-        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss)
+        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         if epoch % args["pepochs"] == 0
             for i=1:length(data)
                 @show i
