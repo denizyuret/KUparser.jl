@@ -57,6 +57,7 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec=Feature[],
         totalcost += bestcost
         if !isempty(feats)
             features(p, s, feats, x, (nx+=1))
+            y[:, nx] = zero(eltype(y))
             y[bestmove, nx] = one(eltype(y))
         end
         move!(p, bestmove)
