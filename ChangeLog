@@ -210,6 +210,7 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
+	- experiment with shuffling the training data.
 	- figure out eval.pl vs discounting punct pos for acl11.
 	- figure out fixed epoch vs dev set for conll07.
 	- should we not use bparser during fselect?
