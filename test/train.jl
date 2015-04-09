@@ -87,6 +87,10 @@ function parse_commandline()
         help = "Apply nesterov's accelerated gradient"
         arg_type = Float32
         nargs = '+'
+        "--seed"
+        help = "Random number seed (-1 leaves the default seed)"
+        arg_type = Int
+        default = -1
     end
     args = parse_args(s)
     for (arg,val) in args
@@ -102,6 +106,7 @@ function main()
     args = parse_commandline()
     KUnet.gpu(!args["nogpu"])
     args["nogpu"] && blas_set_num_threads(20)
+    args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
     
     data = Corpus[]
     deprel = nothing
