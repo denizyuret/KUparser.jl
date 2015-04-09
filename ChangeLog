@@ -20,7 +20,7 @@
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
 
 	fs11h54h28: h28=8978 -> h27@64=8997 (04071554-fs11h54h28.cache) ok
-	fs11h54h14: h14=8931 -> h22?@107=8973... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
+	fs11h54h14: h14=8931 -> h22?@109=8973... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
 
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
@@ -49,9 +49,9 @@
 	9158	9140	03192351-gparsedbg.out(194/256)
 	9156	9141	04030908-bp64a11e13.out(65/130) trn:7m30s prs:96m epoch:27m (5t1p)
 	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
+	9145	9143	bp64a11h27.out(23/?)... @@parcore@test (feats=hybrid27) ~60m/epoch
 	9136	9109	03212217-gpacl11.out(184/256)
-	9130	9137	bp64a11h27.out(20/?)... @@parcore@test (feats=hybrid27) ~60m/epoch
-	9129	9146	bp64a11e20.out(42/?)... @@3999@iui@test (feats=eager20) ~30m/epoch
+	9135	9148	bp64a11e20.out(47/?)... @@3999@iui@test (feats=eager20) ~30m/epoch
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
@@ -96,18 +96,18 @@
 	uas	las	exp
 	8869	8769	GN13
 	8897	x	...gp07e20.out(62/?) @@480422@test @@aws
+	8861	x	...gp07e20b.out(108/?) @@480423@test
 	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
 	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
 	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
 	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
-	8803	x	...gp07e20b.out(44/?) @@480423@test
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
-	?	?	gp07e21.out... @@480424@test
-	?	?	gp07e21b.out... @@480425@test
+	8707	x	...gp07e21.out(36/?) @@480424@test
+	?	?	gp07e21b.out... @@480425@test eager21b.out@@aws and also biyofiz-julia for debugging
 	?	?	gp07e23.out... @@480426@test
 	?	?	gp07e36.out... @@480427@test
 	?	?	gp07e39.out... @@480428@test
@@ -210,7 +210,9 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
-	- experiment with shuffling the training data.
+	= experiment with shuffling the training data.
+	- add sbatch option to train net every n sentences.
+
 	- figure out eval.pl vs discounting punct pos for acl11.
 	- figure out fixed epoch vs dev set for conll07.
 	- should we not use bparser during fselect?
