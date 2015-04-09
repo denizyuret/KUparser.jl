@@ -74,7 +74,7 @@ function gparse{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec,
             for s=s1:s2
                 anyvalidmoves(p[s]) || continue; nx += 1
                 movecosts(p[s], c[s].head, c[s].deprel, cost)
-                isempty(y) || (y[indmin(cost), nx] = one(eltype(y)))
+                isempty(y) || (y[:,nx]=zero(eltype(y)); y[indmin(cost),nx]=one(eltype(y)))
                 move!(p[s], maxscoremove(score, cost, nx-nx0))
             end
             @assert nx == nx1
