@@ -411,3 +411,17 @@ function Base.copy!(dst::Parser, src::Parser)
     dst
 end # copy!
 
+function reset!(p::Parser)
+    p.wptr = 1
+    p.sptr = 0
+    p.stack[:] = 0
+    p.head[:] = 0
+    p.deprel[:] = 0
+    p.lcnt[:] = 0
+    p.rcnt[:] = 0
+    p.ldep[:] = 0
+    p.rdep[:] = 0
+    init!(p)
+end
+
+reset!{T<:Parser}(pa::Vector{T})=(for p in pa; reset!(p); end)
