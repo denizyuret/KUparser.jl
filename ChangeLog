@@ -1,3 +1,17 @@
+2015-04-10    <dyuret@ku.edu.tr>
+
+	* TODO:
+	- add sbatch option to train net every n sentences.
+	- 3net
+	- realpos
+
+2015-04-09    <dyuret@ku.edu.tr>
+
+	* shuffle: Added shuffling option to KUnet train.  Makes a big
+	difference when sentences parsed in a big batch.  Otherwise all
+	sentence initial parts go together in the beginning and hurt
+	training.
+
 2015-04-06    <dyuret@ku.edu.tr>
 
 	* test/fselect.jl: FEATURE SELECTION EXPERIMENTS
@@ -19,8 +33,8 @@
 	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
 
-	fs11h54h28: h28=8978 -> h27@64=8997 (04071554-fs11h54h28.cache) ok
-	fs11h54h14: h14=8931 -> h22?@109=8973... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
+	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok
+	fs11h54h14: h14=8931 -> h23?@125=8977... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
 
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
@@ -44,14 +58,14 @@
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
 	9171	9152	03292013-bp10acl11eager.out(55/115)
 	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
+	9165	9170	...bp64a11h27.out(33/?)... @@parcore@test (feats=hybrid27) ~60m/epoch
 	9159	9142	03300736-bp10acl11eager13.out(75/155)
 	9158	9145	03240436-bpacl11.out(79/256)
 	9158	9140	03192351-gparsedbg.out(194/256)
 	9156	9141	04030908-bp64a11e13.out(65/130) trn:7m30s prs:96m epoch:27m (5t1p)
 	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
-	9145	9143	bp64a11h27.out(23/?)... @@parcore@test (feats=hybrid27) ~60m/epoch
+	9147	9166	...bp64a11e20.out(75/?)... @@3999@iui@test (feats=eager20) ~30m/epoch
 	9136	9109	03212217-gpacl11.out(184/256)
-	9135	9148	bp64a11e20.out(47/?)... @@3999@iui@test (feats=eager20) ~30m/epoch
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
@@ -95,22 +109,22 @@
 	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
 	uas	las	exp
 	8869	8769	GN13
-	8897	x	...gp07e20.out(62/?) @@480422@test @@aws
-	8861	x	...gp07e20b.out(108/?) @@480423@test
+	8897	x	04091636-gp07e20.out(62/124) (feats=eager20)
+	8881	?	...gp07e21b.out(105/?) @@480425@test (feats=eager21b)
+	8861	x	04100103-gp07e20b.out(108/216) (feats=eager20b)
 	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
 	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
 	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
 	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
+	8803	x	...gp07e21.out(200/?) @@480424@test (feats=eager21)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
+	8775	?	...gp07e23.out(54/?) @@480426@test (feats=eager23)
 	8763	x	03281848-gpconll07eager.out(32/65)
-	8707	x	...gp07e21.out(36/?) @@480424@test
-	?	?	gp07e21b.out... @@480425@test eager21b.out@@aws and also biyofiz-julia for debugging
-	?	?	gp07e23.out... @@480426@test
-	?	?	gp07e36.out... @@480427@test
-	?	?	gp07e39.out... @@480428@test
+	8513	?	...gp07e36.out(4/?) @@480427@test (feats=eager36)
+	8501	?	...gp07e39.out(3/?) @@480428@test (feats=eager39)
 
 	con07-static-eager-ZN11e: uas1:ok uas2:no
 	uas	las	exp
@@ -210,7 +224,6 @@
 2015-03-31    <dyuret@ku.edu.tr>
 
 	* TODO:
-	= experiment with shuffling the training data.
 	- add sbatch option to train net every n sentences.
 
 	- figure out eval.pl vs discounting punct pos for acl11.
