@@ -15,7 +15,7 @@
 # li: i'th leftmost child, default i=1 means the leftmost child 
 # ri: i'th rightmost child, default i=1 means the rightmost child
 # w: word vector
-# p: context vector
+# p: postag (used to be context vector)
 # d: distance to the right.  e.g. s1d is s0s1 distance, s0d is s0n0
 #    distance.  encoding: 1,2,3,4,5-10,10+ (from ZN11)
 # L: dependency label (0 is ROOT or NONE)
@@ -26,6 +26,7 @@
 
 typealias Feature String
 typealias Fvec{T<:String} Vector{T}
+const npostag = 45
 
 function features(p::Parser, s::Sentence, feats::Fvec,
                   x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
@@ -75,7 +76,8 @@ function features(p::Parser, s::Sentence, feats::Fvec,
             if fn == 'w'
                 copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nw)
             elseif fn == 'p'
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw)
+                # copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw)
+                x[nx+s.postag[a]] = x1
             elseif fn == 'd'
                 (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1)
             elseif fn == 'L'
@@ -110,7 +112,8 @@ end
 
 function flen1(c::Char, nw::Integer,nd::Integer)
     c == 'w' && return nw
-    c == 'p' && return nw
+#    c == 'p' && return nw
+    c == 'p' && return npostag
     c == 'd' && return 6
     c == 'L' && return(nd+1)
     c == 'a' && return 10
