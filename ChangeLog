@@ -1,9 +1,14 @@
 2015-04-10    <dyuret@ku.edu.tr>
 
+	* realpos: Compare the performance of using real pos features
+	rather than context vectors.
+
+	7963	...gp07h14rp.out(17/?) @@4-2@realpos
+	8673	...gp07h14.out(8/?)   @@4-1@cvector
+
 	* TODO:
 	- add sbatch option to train net every n sentences.
 	- 3net
-	- realpos
 
 2015-04-09    <dyuret@ku.edu.tr>
 
