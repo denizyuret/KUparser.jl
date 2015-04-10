@@ -33,9 +33,10 @@
 	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
 
-	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok
-	fs11h54h14: h14=8931 -> h23?@125=8977... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
+	fs11h54h27: h27=9111 -> ? @@aws running with ArcHybrid13 and bparser10 and shuffling
+	fs11h54h14: h14=8931 -> h24?@129=8981... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
 
+	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok BUG: this was run with ArcEager13!
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
 	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache) ok
@@ -110,18 +111,18 @@
 	uas	las	exp
 	8869	8769	GN13
 	8897	x	04091636-gp07e20.out(62/124) (feats=eager20)
-	8881	?	...gp07e21b.out(105/?) @@480425@test (feats=eager21b)
+	8887	?	...gp07e21b.out(138/?) @@480425@test (feats=eager21b)
 	8861	x	04100103-gp07e20b.out(108/216) (feats=eager20b)
 	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
 	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
 	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
 	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
+	8807	?	...gp07e23.out(86/?) @@480426@test (feats=eager23)
 	8803	x	...gp07e21.out(200/?) @@480424@test (feats=eager21)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
-	8775	?	...gp07e23.out(54/?) @@480426@test (feats=eager23)
 	8763	x	03281848-gpconll07eager.out(32/65)
 	8513	?	...gp07e36.out(4/?) @@480427@test (feats=eager36)
 	8501	?	...gp07e39.out(3/?) @@480428@test (feats=eager39)
