@@ -5,12 +5,10 @@ require("fscore.jl")
 function main()
     args = parse_commandline()
     (data, ndeps) = initdata(args)
-    open(args["cache"],"a") do f end # this creates the cachefile if it does not exist
     pt = eval(parse(args["arctype"]))
-    ftry = Array(Feature,nworkers())
     allfeats = eval(parse("Flist."*args["allfeats"]))
 
-    # Init bestfeats, bestscore to the feats specified in args
+    # Initialize bestfeats, bestscore
     bestfeats = eval(parse("Flist."*args["feats"]))
     bestscore = getcache(args["cache"], bestfeats)
     if bestscore < 0
@@ -18,45 +16,58 @@ function main()
         updatecache(args["cache"], bestfeats, bestscore)
     end
 
-    # See if we can improve bestfeats with single feature flip steps
-    updatedbest = true
-    while updatedbest
-        updatedbest = false
-
-        # First check the cache to see if we already have a good step
-        scores = map(allfeats) do f
-            getcache(args["cache"], bestfeats, f)
-        end
-        (smax,imax) = findmax(scores)
-        if smax > bestscore
-            updatedbest = true
+    nextidx = 0
+    function getnextidx()
+        # See if we can improve bestfeats with single feature flip steps from cache
+        scores = nothing
+        while true
+            scores = map(allfeats) do f
+                getcache(args["cache"], bestfeats, f)
+            end
+            (smax,imax) = findmax(scores)
+            smax <= bestscore && break
             bestscore = smax
             bestfeats = flip(bestfeats, allfeats[imax])
-            continue
+            nextidx = 0
         end
 
-        # If not check steps not in cache, nworkers at a time
-        nf = 0
-        while (nf < length(allfeats))
-            nftry = 0
-            while (nf < length(allfeats) && nftry < length(ftry))
-                s = getcache(args["cache"], bestfeats, allfeats[nf+=1])
-                s < 0 && (ftry[nftry+=1] = allfeats[nf])
+        # OK at this point none of the neighbors in cache are better than bestfeats
+        # Are there any neighbors left to compute?  If not return nothing to terminate.
+        minimum(scores) >= 0 && return nothing
+
+        # So there are uncomputed neighbors, find the next one to compute
+        nextidx += 1
+        while ((nextidx <= length(scores)) && (scores[nextidx] >= 0))
+            nextidx += 1
+        end
+        # If we find one return it, otherwise return 0 to send worker to temporary sleep.
+        return (nextidx <= length(scores) ? nextidx : 0)
+    end
+
+    # Feeder tasks based on multi.jl:pmap implementation:
+    @sync for wpid in workers()
+        @async begin
+            idx = getnextidx()
+            while idx != nothing
+                if idx == 0
+                    sleep(10)
+                else
+                    feats = flip(bestfeats, allfeats[idx])
+                    try 
+                        score = remotecall_fetch(wpid, fscore, pt, data, ndeps, feats, args)
+                        if isa(score, Number)
+                            updatecache(args["cache"], feats, score)
+                        else
+                            warn("Got $score from $wpid"); sleep(10)
+                        end
+                    catch ex
+                        warn("Caught $ex from $wpid"); sleep(10)
+                    end
+                end
+                idx = getnextidx()
             end
-            nftry == 0 && break
-            @everywhere gc()
-            scores = pmap(ftry[1:nftry]) do f
-                fscore(pt, data, ndeps, flip(bestfeats, f), args)
-            end
-            updatecache(args["cache"], bestfeats, ftry[1:nftry], scores)
-            (smax,imax) = findmax(scores)
-            if smax > bestscore
-                updatedbest = true
-                bestscore = smax
-                bestfeats = flip(bestfeats, ftry[imax])
-            end
-        end # while (nf < length(allfeats))
-    end # while updatedbest
+        end
+    end
     info("$bestscore\t$(join(sort(bestfeats), ' '))")
 end
 
@@ -168,10 +179,12 @@ function getcache(cachefile::String, feats::Fvec, f::Feature="")
     isempty(f) || (feats = flip(feats, f))
     fkey = join(sort(feats), ' ')
     fval = -1.0
-    open(cachefile) do fp
-        for l in eachline(fp)
-            (score, fstr) = split(chomp(l), '\t')
-            fstr == fkey && (fval = float(score); break)
+    if isfile(cachefile)
+        open(cachefile) do fp
+            for l in eachline(fp)
+                (score, fstr) = split(chomp(l), '\t')
+                fstr == fkey && (fval = float(score); break)
+            end
         end
     end
     return fval
