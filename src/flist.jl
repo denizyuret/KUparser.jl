@@ -3,7 +3,7 @@ module Flist                    # feature matrices
 # fs07h54h28 (8797): local best for conll07, ArcHybrid13, start=hybrid28, all=hybrid54
 hybrid28b = split("n0A n0a n0l2w n0lL n0lp n0p n0w n1p n1w n2w s0A s0B s0a s0b s0d s0p s0w s1A s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
 
-# fs11h54h28 (8997): local best in acl11, ArcHybrid13, start=hybrid28, all=hybrid54
+# fs11h54h28 (8997): local best in acl11, ArcEager13 (by mistake), start=hybrid28, all=hybrid54
 hybrid27 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
 
 # fs11e64e20 (8926): local best for acl11, ArcEager13, start=eager20, all=eager64
