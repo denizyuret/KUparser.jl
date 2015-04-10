@@ -16,7 +16,7 @@ function main()
         updatecache(args["cache"], bestfeats, bestscore)
     end
 
-    nextidx = 0
+    idxqueue = [1:length(allfeats)]
     function getnextidx()
         # See if we can improve bestfeats with single feature flip steps from cache
         scores = nothing
@@ -28,7 +28,7 @@ function main()
             smax <= bestscore && break
             bestscore = smax
             bestfeats = flip(bestfeats, allfeats[imax])
-            nextidx = 0
+            idxqueue = [1:length(allfeats)]
         end
 
         # OK at this point none of the neighbors in cache are better than bestfeats
@@ -36,12 +36,11 @@ function main()
         minimum(scores) >= 0 && return nothing
 
         # So there are uncomputed neighbors, find the next one to compute
-        nextidx += 1
-        while ((nextidx <= length(scores)) && (scores[nextidx] >= 0))
-            nextidx += 1
+        while (!isempty(idxqueue) && (scores[idxqueue[1]] >= 0))
+            shift!(idxqueue)
         end
         # If we find one return it, otherwise return 0 to send worker to temporary sleep.
-        return (nextidx <= length(scores) ? nextidx : 0)
+        return (isempty(idxqueue) ? 0 : shift!(idxqueue))
     end
 
     # Feeder tasks based on multi.jl:pmap implementation:
@@ -49,18 +48,22 @@ function main()
         @async begin
             idx = getnextidx()
             while idx != nothing
+                info("$wpid gets idx=$idx")
                 if idx == 0
                     sleep(10)
                 else
                     feats = flip(bestfeats, allfeats[idx])
                     try 
                         score = remotecall_fetch(wpid, fscore, pt, data, ndeps, feats, args)
+                        info("$wpid gets score=$score")
                         if isa(score, Number)
                             updatecache(args["cache"], feats, score)
                         else
+                            push!(idxqueue, idx)
                             warn("Got $score from $wpid"); sleep(10)
                         end
                     catch ex
+                        push!(idxqueue, idx)
                         warn("Caught $ex from $wpid"); sleep(10)
                     end
                 end
