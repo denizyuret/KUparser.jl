@@ -29,4 +29,5 @@ function restartmachines()
     Base.terminate_all_workers()
     addprocs(machines)
     require("KUparser")
+    require("fscore.jl")
 end
