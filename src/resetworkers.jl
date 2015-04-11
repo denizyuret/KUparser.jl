@@ -29,3 +29,33 @@ function restartmachines()
     Base.terminate_all_workers()
     addprocs(machines)
 end
+
+function restartmachines(host::ASCIIString)
+    wid = 0
+    for i in keys(Base.map_pid_wrkr)
+        i == 1 && continue
+        w = Base.map_pid_wrkr[i]
+        w.host == host && (wid = i; break)
+    end
+    if wid == 0 
+        warn("Cannot find worker on $host")
+        return nothing
+    end
+    ret = rmprocs(wid; waitfor=0.5)
+    if ret != :ok
+        warn("Forcibly interrupting busy worker $i")
+        # Might be computation bound, interrupt them and try again
+        interrupt(wid)
+        ret = rmprocs(wid; waitfor=0.5)
+        if ret != :ok
+            warn("Unable to terminate worker $i")
+            return nothing
+        end
+    end
+    @assert ret == :ok
+    return addprocs([host])[1]
+end
+
+function restartmachines(machines::AbstractVector)
+    map(restartmachines, machines)
+end
