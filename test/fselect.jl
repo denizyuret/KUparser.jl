@@ -16,7 +16,7 @@ function main()
         updatecache(args["cache"], bestfeats, bestscore)
     end
 
-    idxqueue = [1:length(allfeats)]
+    idxqueue = randperm(length(allfeats))
     function getnextidx()
         # See if we can improve bestfeats with single feature flip steps from cache
         scores = nothing
@@ -28,7 +28,7 @@ function main()
             smax <= bestscore && break
             bestscore = smax
             bestfeats = flip(bestfeats, allfeats[imax])
-            idxqueue = [1:length(allfeats)]
+            idxqueue = randperm(length(allfeats))
         end
 
         # OK at this point none of the neighbors in cache are better than bestfeats
