@@ -11,9 +11,22 @@ function resetworkers(ncpu)
 end # resetworkers
 
 # Really remove all workers
+# There is also Base.terminate_all_workers() we can use here...
 function rmworkers()
     nprocs() > 1 && rmprocs(workers())
     while nworkers() > 1
         sleep(1)
     end
+end
+
+function restartmachines()
+    machines = ASCIIString[]
+    for i in keys(Base.map_pid_wrkr)
+        i == 1 && continue
+        w = Base.map_pid_wrkr[i]
+        push!(machines, w.host)
+    end
+    Base.terminate_all_workers()
+    addprocs(machines)
+    require("KUparser")
 end
