@@ -74,6 +74,8 @@ function main()
             end  # @async begin
         end  # @sync for wpid in workers()
         Main.restartmachines()
+        require("KUparser")
+        require("fscore.jl")
     end  # while
     info("$bestscore\t$(join(sort(bestfeats), ' '))")
 end
