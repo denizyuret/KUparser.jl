@@ -44,10 +44,12 @@ function main()
     end
 
     # Feeder tasks based on multi.jl:pmap implementation:
-    @sync for wpid in workers()
-        @async begin
-            idx = getnextidx()
-            while idx != nothing
+    while !(isempty(idxqueue) && (getnextidx()==nothing))
+        @sync for wpid in workers()
+            @async begin
+                idx = getnextidx()
+                # This got messed up because gc() is a leaky bucket
+                # while idx != nothing
                 info("$wpid gets idx=$idx")
                 if idx == 0
                     sleep(10)
@@ -66,11 +68,13 @@ function main()
                         push!(idxqueue, idx)
                         warn("Caught $ex from $wpid"); sleep(10)
                     end
-                end
-                idx = getnextidx()
-            end
-        end
-    end
+                end  # if idx == 0
+                # idx = getnextidx()
+                # end
+            end  # @async begin
+        end  # @sync for wpid in workers()
+        Main.restartmachines()
+    end  # while
     info("$bestscore\t$(join(sort(bestfeats), ' '))")
 end
 
