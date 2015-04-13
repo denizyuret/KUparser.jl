@@ -35,16 +35,14 @@ function main()
 
         @show fs; flush(STDOUT)
 
-        # OK at this point none of the neighbors in cache are better than fs.bestfeats
-        # Are there any neighbors left to compute?  If not return nothing to terminate.
-        minimum(fs.scores) >= 0 && return nothing
-
-        # So there are uncomputed neighbors, find the next one to compute
+        # Find the next neighbor to compute
         while (!isempty(fs.idxqueue) && (fs.scores[fs.idxqueue[1]] >= 0))
             shift!(fs.idxqueue)
         end
-        # If we find one return it, otherwise return 0 to send worker to temporary sleep.
-        return (isempty(fs.idxqueue) ? 0 : shift!(fs.idxqueue))
+
+        return (minimum(fs.scores) >= 0 ? nothing : # terminate if all scores known
+                isempty(fs.idxqueue) ? 0 :          # wait for remaining computations if queue empty
+                shift!(fs.idxqueue))                # compute the next element in queue
     end
 
     # Feeder tasks based on multi.jl:pmap implementation:
@@ -55,11 +53,13 @@ function main()
                 idx = getnextidx()
                 # This got messed up because gc() is a leaky bucket
                 # while idx != nothing
-                @show ("$wpid gets fs.allfeats[$idx]=$(fs.allfeats[idx])"); flush(STDOUT)
-                if idx == 0
+                if idx == nothing
+                    # do nothing, time to terminate
+                elseif idx == 0
                     sleep(10)
                 else
-                    feats = flip(fs.bestfeats, fs.allfeats[idx])
+                    @show ("$wpid gets fs.allfeats[$idx]=$(fs.allfeats[idx])"); flush(STDOUT)
+                    @show feats = flip(fs.bestfeats, fs.allfeats[idx])
                     try 
                         score = remotecall_fetch(wpid, fscore, pt, data, ndeps, feats, args)
                         @show ("$wpid gets score[$(fs.allfeats[idx])]=$score"); flush(STDOUT)
@@ -83,7 +83,7 @@ function main()
         require("KUparser")
         require("fscore.jl")
     end  # while
-    info("$fs.bestscore\t$(join(sort(fs.bestfeats), ' '))")
+    info("$(fs.bestscore)\t$(join(sort(fs.bestfeats), ' '))")
 end
 
 function parse_commandline()
