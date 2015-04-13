@@ -1,19 +1,24 @@
 2015-04-10    <dyuret@ku.edu.tr>
 
-	* test/fselect.jl: bug: tasks that end with error do not get added
-	back on the queue.
+	* test/fselect.jl: fixed bug: tasks that end with error do not get
+	added back on the queue.
 
 	* realpos: Compare the performance of using real pos features
 	rather than context vectors.
 
-	8125	...gp07h14rp.out(127/?) @@4-2@realpos
-	8851	...gp07h14.out(79/?)   @@4-1@cvector
+	8127	04110236-gp07h14rp.out(144/288)
+	8893	04112133-gp07h14.out(470/559)
 
 	- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
 
 	* TODO:
-	- add sbatch option to train net every n sentences.
-	- 3net
+	- add sbatch option to train net every n sentences for bparser.
+	- find the fastest way to run beam64.
+	- finish 3net.
+	- debug realpos.
+	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
+	- figure out dev set vs fixed epoch for c07.
+	- finish 5x experiments.
 
 2015-04-09    <dyuret@ku.edu.tr>
 
@@ -43,9 +48,10 @@
 	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
 
-	fs11h54h27: h27=9111 -> h26?@27=9121... (unfinished 04101809-fs11h54h27.cache) @@aws running with ArcHybrid13 and bparser10 and shuffling
-	fs11h54h14: h14=8931 -> h24?@141=8981... @@480377@fselect (fs11h54h14.cache) we should try hybrid on acl11. ) start: h14=8931 curr15@5=8931 30m/f.
+	fs11h54h27: h27=9111 -> h25?@234=9144... @@aws-ca ArcHybrid13, bparser10, shuffling 04111203-fs11h54h27.cache (crashed again) (restarted after unfinished 04101809-fs11h54h27.cache)  running with 
+	fs11h54h14: h14=8931 -> h25?@198=8992 (04122017-fs11h54h14.cache) ok
 
+	fs11e64e27: e27=8994 -> e26?@190=9061... restarted. terminated! @@aws-virginia (e27=h27 run with ArcEager13, bparser10, shuffle)
 	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok BUG: this was run with ArcEager13!
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
@@ -67,14 +73,14 @@
 	9211	9171	03220927-bparselatestop.out(129/207)
 	9205	9166	03220548-bparsedbg.out(193/256)
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
-	9174	9182	...bp64a11h27.out(45/?)... @@parcore@test (feats=hybrid27) ~60m/epoch
+	9174	9182	04110746-bp64a11h27.out(45/59) (feats=hybrid27,got stuck)
 	9171	9152	03292013-bp10acl11eager.out(55/115)
 	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
 	9159	9142	03300736-bp10acl11eager13.out(75/155)
 	9158	9145	03240436-bpacl11.out(79/256)
 	9158	9140	03192351-gparsedbg.out(194/256)
 	9156	9141	04030908-bp64a11e13.out(65/130) trn:7m30s prs:96m epoch:27m (5t1p)
-	9154	9161	...bp64a11e20.out(88/?)... @@3999@iui@test (feats=eager20) ~30m/epoch
+	9154	9161	04110144-bp64a11e20.out(88/113) (feats=eager20,got stuck)
 	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
 	9136	9109	03212217-gpacl11.out(184/256)
 	9116	9074	03200328-oparsedbg.out(254/256)
@@ -121,28 +127,28 @@
 	uas	las	exp
 	8869	8769	GN13
 	8897	x	04091636-gp07e20.out(62/124) (feats=eager20)
-	8887	?	...gp07e21b.out(138/?) @@480425@test (feats=eager21b)
+	8887	?	04101642-gp07e21b.out(138/276) (feats=eager21b)
+	8883	?	04110758-eager21b.out(76/152) (feats=eager21b,shuffle)
+	8867	?	04111209-eager23.out(96/192) (feats=eager23,shuffle)
 	8861	x	04100103-gp07e20b.out(108/216) (feats=eager20b)
-	8847	?	...gp07e21b.out(46/?) @@aws171 s3/eager21b.out
-	8843	?	04021402-gp07e13k44.out(95/190) (4+4k hidden)
-	8839	?	04020644-gp07e13k10.out(39/100) (10k hidden)
+	8847	x	04110739-gp07e21.out(437/599) (feats=eager21)
+	8847	?	04110758-eager20.out(104/208) (feats=eager20,shuffle)
+	8843	?	04021402-gp07e13k44.out(95/190) (feats=eager39,4+4k hidden)
+	8839	?	04020644-gp07e13k10.out(39/100) (feats=eager39,10k hidden)
+	8837	?	04111211-eager21.out(173/233) (feats=eager21, shuffle)
+	8831	?	04110758-eager39.out(51/102) (feats=eager39, shuffle)
+	8829	?	04110424-gp07e36.out(75/150) (feats=eager36)
 	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
+	8821	?	04110758-eager36.out(56/112) (feats=eager36,shuffle)
 	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
-	8809	?	...gp07e36.out(47/?) @@480427@test (feats=eager36)
+	8811	?	04110758-eager20b.out(75/150) (feats=eager20b,shuffle)
 	8807	?	04101459-gp07e23.out(86/172) (feats=eager23)
-	8805	x	...gp07e21.out(344/?) @@480424@test (feats=eager21)
-	8805	?	...gp07e20.out(50/?) @@aws145 s3/eager20.out
+	8801	?	04111024-gp07e39.out(96/192) (feats=eager39)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
-	8791	?	...gp07e39.out(30/?) @@480428@test (feats=eager39)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
-	8765	?	...gp07e23.out(31/?) @@aws196 s3/eager23.out
 	8763	x	03281848-gpconll07eager.out(32/65)
-	8759	?	...gp07e36.out(20/?) @@aws63 s3/eager36.out
-	8743	?	...gp07e39.out(19/?) @@aws21 s3/eager39.out
-	8743	?	...gp07e20b.out(45/?) @@aws177 s3/eager20b.out
-	8739	?	...gp07e21.out(33/?) @@aws101 s3/eager21.out
 
 	con07-static-eager-ZN11e: uas1:ok uas2:no
 	uas	las	exp
