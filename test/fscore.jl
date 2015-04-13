@@ -55,3 +55,8 @@ function flip(a, x)
     return b
 end
 
+function flip!(a, x)
+    i = findfirst(a, x)
+    i == 0 ? push!(a, x) : deleteat!(a, i)
+    return a
+end
