@@ -176,13 +176,14 @@ function main()
                 trn = sub(data[1], s1:s2)
                 @date (p,x,y) = gparse(pt, trn, ndeps, feats, net, args["pbatch"], args["ncpu"]; xy=true)
                 @show e = evalparse(p, trn); p=nothing; gc()
-                accuracy[1] = e[1]
+                @show accuracy[1] = ((s1-1)*accuracy[1] + (s2-s1+1)*e[1])/s2
+                @show map(size, (x, y))
                 @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true); x=y=nothing; gc()
-                for i=2:length(data)
-                    @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
-                    @show e = evalparse(p, data[i]); p=nothing; gc()
-                    accuracy[i] = e[1]
-                end
+            end
+            for i=2:length(data)
+                @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
+                @show e = evalparse(p, data[i]); p=nothing; gc()
+                accuracy[i] = e[1]
             end
         elseif (args["parser"] == "bparser")
             # The first corpus gives us the new training set
@@ -192,13 +193,14 @@ function main()
                 trn = sub(data[1], s1:s2)
                 @date (p,x,y) = bparse(pt, trn, ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
                 @show e = evalparse(p, trn); p=nothing; gc()
-                accuracy[1] = e[1]
+                @show accuracy[1] = ((s1-1)*accuracy[1] + (s2-s1+1)*e[1])/s2
+                @show map(size, (x, y))
                 @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true); x=y=nothing; gc()
-                for i=2:length(data)
-                    @date p = bparse(pt, data[i], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"])
-                    @show e = evalparse(p, data[i]); p=nothing; gc()
-                    accuracy[i] = e[1]
-                end
+            end
+            for i=2:length(data)
+                @date p = bparse(pt, data[i], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"])
+                @show e = evalparse(p, data[i]); p=nothing; gc()
+                accuracy[i] = e[1]
             end
         else
             error("Unknown parser "*args["parser"])
