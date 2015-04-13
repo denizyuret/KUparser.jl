@@ -2,78 +2,75 @@ using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
 VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 require("fscore.jl")
 
+type Fselect allfeats; bestfeats; bestscore; idxqueue; scores; Fselect()=new(); end
+
 function main()
     args = parse_commandline()
     (data, ndeps) = initdata(args)
     pt = eval(parse(args["arctype"]))
-    allfeats = eval(parse("Flist."*args["allfeats"]))
 
-    # Initialize bestfeats, bestscore
-    bestfeats = eval(parse("Flist."*args["feats"]))
-    bestscore = getcache(args["cache"], bestfeats)
-    if bestscore < 0
-        bestscore = @fetchfrom workers()[1] fscore(pt, data, ndeps, bestfeats, args)
-        updatecache(args["cache"], bestfeats, bestscore)
+    # We want a single copy of the state variables
+    fs = Fselect()
+    fs.allfeats = eval(parse("Flist."*args["allfeats"]))
+    fs.idxqueue = randperm(length(fs.allfeats))
+    fs.bestfeats = eval(parse("Flist."*args["feats"]))
+    fs.bestscore = getcache(args["cache"], fs.bestfeats)
+    if fs.bestscore < 0
+        fs.bestscore = @fetchfrom workers()[1] fscore(pt, data, ndeps, fs.bestfeats, args)
+        updatecache(args["cache"], fs.bestfeats, fs.bestscore)
     end
 
-    idxqueue = randperm(length(allfeats))
     function getnextidx()
-        # See if we can improve bestfeats with single feature flip steps from cache
-        scores = nothing
+        # See if we can improve fs.bestfeats with single feature flip steps from cache
         while true
-            scores = map(allfeats) do f
-                getcache(args["cache"], bestfeats, f)
+            fs.scores = map(fs.allfeats) do f
+                getcache(args["cache"], fs.bestfeats, f)
             end
-            (smax,imax) = findmax(scores)
-            smax <= bestscore && break
-            bestscore = smax
-            bestfeats = flip(bestfeats, allfeats[imax])
-            idxqueue = randperm(length(allfeats))
+            (smax,imax) = findmax(fs.scores)
+            smax <= fs.bestscore && break
+            fs.bestscore = smax
+            fs.bestfeats = flip!(fs.bestfeats, fs.allfeats[imax])
+            fs.idxqueue = randperm(length(fs.allfeats))
         end
 
-        @show join(sort(bestfeats),' ')
-        @show idxqueue
-        @show sort(scores)
-        flush(STDOUT)
+        @show fs; flush(STDOUT)
 
-        # OK at this point none of the neighbors in cache are better than bestfeats
+        # OK at this point none of the neighbors in cache are better than fs.bestfeats
         # Are there any neighbors left to compute?  If not return nothing to terminate.
-        minimum(scores) >= 0 && return nothing
+        minimum(fs.scores) >= 0 && return nothing
 
         # So there are uncomputed neighbors, find the next one to compute
-        while (!isempty(idxqueue) && (scores[idxqueue[1]] >= 0))
-            shift!(idxqueue)
+        while (!isempty(fs.idxqueue) && (fs.scores[fs.idxqueue[1]] >= 0))
+            shift!(fs.idxqueue)
         end
         # If we find one return it, otherwise return 0 to send worker to temporary sleep.
-        return (isempty(idxqueue) ? 0 : shift!(idxqueue))
+        return (isempty(fs.idxqueue) ? 0 : shift!(fs.idxqueue))
     end
 
     # Feeder tasks based on multi.jl:pmap implementation:
-    while !(isempty(idxqueue) && (getnextidx()==nothing))
-        @show join(sort(bestfeats),' ')
-        @show idxqueue
-        flush(STDOUT)
+    while !(isempty(fs.idxqueue) && (getnextidx()==nothing))
+        @show fs; flush(STDOUT)
         @sync for wpid in workers()
             @async begin
                 idx = getnextidx()
                 # This got messed up because gc() is a leaky bucket
                 # while idx != nothing
-                @show ("$wpid gets allfeats[$idx]=$(allfeats[idx])"); flush(STDOUT)
+                @show ("$wpid gets fs.allfeats[$idx]=$(fs.allfeats[idx])"); flush(STDOUT)
                 if idx == 0
                     sleep(10)
                 else
-                    feats = flip(bestfeats, allfeats[idx])
+                    feats = flip(fs.bestfeats, fs.allfeats[idx])
                     try 
                         score = remotecall_fetch(wpid, fscore, pt, data, ndeps, feats, args)
-                        @show ("$wpid gets score[$(allfeats[idx])]=$score"); flush(STDOUT)
+                        @show ("$wpid gets score[$(fs.allfeats[idx])]=$score"); flush(STDOUT)
                         if isa(score, Number)
                             updatecache(args["cache"], feats, score)
                         else
-                            push!(idxqueue, idx)
+                            push!(fs.idxqueue, idx)
                             @show ("Got $score from $wpid"); flush(STDOUT); sleep(10)
                         end
                     catch ex
-                        push!(idxqueue, idx)
+                        push!(fs.idxqueue, idx)
                         @show ("Caught $ex from $wpid"); flush(STDOUT); sleep(10)
                     end
                 end  # if idx == 0
@@ -81,14 +78,12 @@ function main()
                 # end
             end  # @async begin
         end  # @sync for wpid in workers()
-        @show join(sort(bestfeats),' ')
-        @show idxqueue
-        @date Main.restartmachines()
+        @show fs; flush(STDOUT)
+        @date Main.restartmachines(); flush(STDOUT)
         require("KUparser")
         require("fscore.jl")
-        flush(STDOUT)
     end  # while
-    info("$bestscore\t$(join(sort(bestfeats), ' '))")
+    info("$fs.bestscore\t$(join(sort(fs.bestfeats), ' '))")
 end
 
 function parse_commandline()
