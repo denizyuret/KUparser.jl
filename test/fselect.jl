@@ -31,6 +31,11 @@ function main()
             idxqueue = randperm(length(allfeats))
         end
 
+        @show bestfeats
+        @show idxqueue
+        @show scores
+        flush(STDOUT)
+
         # OK at this point none of the neighbors in cache are better than bestfeats
         # Are there any neighbors left to compute?  If not return nothing to terminate.
         minimum(scores) >= 0 && return nothing
@@ -45,12 +50,15 @@ function main()
 
     # Feeder tasks based on multi.jl:pmap implementation:
     while !(isempty(idxqueue) && (getnextidx()==nothing))
+        @show bestfeats
+        @show idxqueue
+        flush(STDOUT)
         @sync for wpid in workers()
             @async begin
                 idx = getnextidx()
                 # This got messed up because gc() is a leaky bucket
                 # while idx != nothing
-                info("$wpid gets idx=$idx")
+                info("$wpid gets idx=$idx"); flush(STDOUT)
                 if idx == 0
                     sleep(10)
                 else
@@ -73,9 +81,12 @@ function main()
                 # end
             end  # @async begin
         end  # @sync for wpid in workers()
-        Main.restartmachines()
+        @show bestfeats
+        @show idxqueue
+        @date Main.restartmachines()
         require("KUparser")
         require("fscore.jl")
+        flush(STDOUT)
     end  # while
     info("$bestscore\t$(join(sort(bestfeats), ' '))")
 end
