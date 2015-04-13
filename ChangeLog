@@ -1,33 +1,4 @@
-2015-04-10    <dyuret@ku.edu.tr>
-
-	* test/fselect.jl: fixed bug: tasks that end with error do not get
-	added back on the queue.
-
-	* realpos: Compare the performance of using real pos features
-	rather than context vectors.
-
-	8127	04110236-gp07h14rp.out(144/288)
-	8893	04112133-gp07h14.out(470/559)
-
-	- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
-
-	* TODO:
-	- add sbatch option to train net every n sentences for bparser.
-	- find the fastest way to run beam64.
-	- finish 3net.
-	- debug realpos.
-	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
-	- figure out dev set vs fixed epoch for c07.
-	- finish 5x experiments.
-
-2015-04-09    <dyuret@ku.edu.tr>
-
-	* shuffle: Added shuffling option to KUnet train.  Makes a big
-	difference when sentences parsed in a big batch.  Otherwise all
-	sentence initial parts go together in the beginning and hurt
-	training.  Results prior to 2015-04-09 suspect.
-
-2015-04-06    <dyuret@ku.edu.tr>
+2015-04-13    <dyuret@ku.edu.tr>
 
 	* test/fselect.jl: FEATURE SELECTION EXPERIMENTS
 
@@ -48,16 +19,14 @@
 	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
 
-	fs11h54h27: h27=9111 -> h25?@234=9144... @@aws-ca ArcHybrid13, bparser10, shuffling 04111203-fs11h54h27.cache (crashed again) (restarted after unfinished 04101809-fs11h54h27.cache)  running with 
+	fs11h54h27: h27=9111 -> h25?@252=9144... unfinished (04131735-fs11h54h27.cache) ... @@aws-ca ArcHybrid13, bparser10, shuffling 04111203-fs11h54h27.cache (crashed again) (restarted after unfinished 04101809-fs11h54h27.cache)  running with 
 	fs11h54h14: h14=8931 -> h25?@198=8992 (04122017-fs11h54h14.cache) ok
 
-	fs11e64e27: e27=8994 -> e26?@190=9061... restarted. terminated! @@aws-virginia (e27=h27 run with ArcEager13, bparser10, shuffle)
+	fs11e64e27: e27=8994 -> e26?@226=9061... unfinished restarted. terminated! @@aws-virginia (e27=h27 run with ArcEager13, bparser10, shuffle)
 	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok BUG: this was run with ArcEager13!
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
 	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache) ok
-
-2015-04-05    <dyuret@ku.edu.tr>
 
 	* Summary: corpus-parser-arctype-feats where:
 	corpus in acl11, con07
@@ -157,6 +126,39 @@
 	8681	x	03300220-opconll07eager13.out(102/139)
 	8675	x	04070709-op07e36.out(28/100) (feats=eager36)
 	8649	x	03292324-opconll07eager.out(31/63)
+
+2015-04-10    <dyuret@ku.edu.tr>
+
+	* test/fselect.jl: fixed bug: tasks that end with error do not get
+	added back on the queue.
+
+	* realpos: Compare the performance of using real pos features
+	rather than context vectors.
+
+	8127	04110236-gp07h14rp.out(144/288)
+	8893	04112133-gp07h14.out(470/559)
+
+	- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
+
+	* TODO:
+	- add sbatch option to train net every n sentences for bparser.
+	- find the fastest way to run beam64.
+	- finish 3net.
+	- debug realpos.
+	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
+	- figure out dev set vs fixed epoch for c07.
+	- finish 5x experiments.
+
+2015-04-09    <dyuret@ku.edu.tr>
+
+	* shuffle: Added shuffling option to KUnet train.  Makes a big
+	difference when sentences parsed in a big batch.  Otherwise all
+	sentence initial parts go together in the beginning and hurt
+	training.  Results prior to 2015-04-09 suspect.
+
+2015-04-06    <dyuret@ku.edu.tr>
+
+2015-04-05    <dyuret@ku.edu.tr>
 
 
 	* 04050753-hybrid54.cache: optimizing ArcHybrid13 features on conll07.
