@@ -31,9 +31,9 @@ function main()
             idxqueue = randperm(length(allfeats))
         end
 
-        @show bestfeats
+        @show join(sort(bestfeats),' ')
         @show idxqueue
-        @show scores
+        @show sort(scores)
         flush(STDOUT)
 
         # OK at this point none of the neighbors in cache are better than bestfeats
@@ -50,7 +50,7 @@ function main()
 
     # Feeder tasks based on multi.jl:pmap implementation:
     while !(isempty(idxqueue) && (getnextidx()==nothing))
-        @show bestfeats
+        @show join(sort(bestfeats),' ')
         @show idxqueue
         flush(STDOUT)
         @sync for wpid in workers()
@@ -58,30 +58,30 @@ function main()
                 idx = getnextidx()
                 # This got messed up because gc() is a leaky bucket
                 # while idx != nothing
-                info("$wpid gets idx=$idx"); flush(STDOUT)
+                @show ("$wpid gets allfeats[$idx]=$(allfeats[idx])"); flush(STDOUT)
                 if idx == 0
                     sleep(10)
                 else
                     feats = flip(bestfeats, allfeats[idx])
                     try 
                         score = remotecall_fetch(wpid, fscore, pt, data, ndeps, feats, args)
-                        info("$wpid gets score=$score")
+                        @show ("$wpid gets score[$(allfeats[idx])]=$score"); flush(STDOUT)
                         if isa(score, Number)
                             updatecache(args["cache"], feats, score)
                         else
                             push!(idxqueue, idx)
-                            warn("Got $score from $wpid"); sleep(10)
+                            @show ("Got $score from $wpid"); flush(STDOUT); sleep(10)
                         end
                     catch ex
                         push!(idxqueue, idx)
-                        warn("Caught $ex from $wpid"); sleep(10)
+                        @show ("Caught $ex from $wpid"); flush(STDOUT); sleep(10)
                     end
                 end  # if idx == 0
                 # idx = getnextidx()
                 # end
             end  # @async begin
         end  # @sync for wpid in workers()
-        @show bestfeats
+        @show join(sort(bestfeats),' ')
         @show idxqueue
         @date Main.restartmachines()
         require("KUparser")
