@@ -19,8 +19,8 @@
 	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
 
-	fs11h54h27: h27=9111 -> h25?@252=9144... unfinished (04131735-fs11h54h27.cache) ... @@aws-ca ArcHybrid13, bparser10, shuffling 04111203-fs11h54h27.cache (crashed again) (restarted after unfinished 04101809-fs11h54h27.cache)  running with 
-	fs11h54h14: h14=8931 -> h25?@198=8992 (04122017-fs11h54h14.cache) ok
+	fs11h54h27: h27=9111 -> h25@252=9144 (04132230-fs11h54h27.cache) ok
+	fs11h54h14: h14=8931 -> h25b@198=8992 (04122017-fs11h54h14.cache) ok
 
 	fs11e64e27: e27=8994 -> e26?@226=9061... unfinished restarted. terminated! @@aws-virginia (e27=h27 run with ArcEager13, bparser10, shuffle)
 	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok BUG: this was run with ArcEager13!
