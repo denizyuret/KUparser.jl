@@ -142,8 +142,8 @@ function main()
             @assert deprel == d["deprel"]
         end
     end
-
-    dist = map(c->pbatch(c,args["pbatch"]), data)
+    
+    @date dist = map(c->pbatch(c,args["pbatch"]), data)
     data = nothing; gc()
     feats = eval(parse("Flist."*args["feats"]))
     pt = eval(parse(args["arctype"]))
@@ -177,7 +177,7 @@ function main()
         p=x=y=nothing; gc()
     end
     @show net
-    tnet = testnet(net)
+    @date tnet = testnet(net)
 
     # @show evalparse(p, data[1]); p=nothing
     # for i=2:length(data)
@@ -188,22 +188,23 @@ function main()
     (bestscore,bestepoch,epoch)=(0,0,0)
     
     while true
-        @show epoch += 1
+        @show epoch += 1; flush(STDOUT)
         @date pxy = pmap(dist[1]) do c
             bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"]; xy=true)
         end
-        @show e = evalpxy(pxy, dist[1])
+        @show e = evalpxy(pxy, dist[1]); flush(STDOUT)
         accuracy[1] = e[1]
         @date for (p,x,y) in pxy
             train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         end
         pxy = nothing; gc()
-        tnet = testnet(net)
+        @date tnet = testnet(net)
         for i=2:length(dist)
+            @show i; flush(STDOUT)
             @date p = pmap(dist[i]) do c
                 bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"])
             end
-            @show e = evalp(p, dist[i])
+            @show e = evalp(p, dist[i]); flush(STDOUT)
             p = nothing; gc()
             accuracy[i] = e[1]
         end
@@ -218,7 +219,7 @@ function main()
         # Update best score and save best net
 
         if (score > bestscore)
-            @show (bestscore,bestepoch)=(score,epoch)
+            @show (bestscore,bestepoch)=(score,epoch); flush(STDOUT);
             !isempty(args["out"]) && save(args["out"], net)
         end
 
