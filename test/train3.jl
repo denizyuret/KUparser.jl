@@ -144,6 +144,7 @@ function main()
     end
 
     dist = map(c->pbatch(c,args["pbatch"]), data)
+    data = nothing; gc()
     feats = eval(parse("Flist."*args["feats"]))
     pt = eval(parse(args["arctype"]))
     s1 = data[1][1]
@@ -176,6 +177,7 @@ function main()
         p=x=y=nothing; gc()
     end
     @show net
+    tnet = testnet(net)
 
     # @show evalparse(p, data[1]); p=nothing
     # for i=2:length(data)
@@ -187,44 +189,6 @@ function main()
     
     while true
         @show epoch += 1
-        # @show map(size, (x, y))
-        # @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
-        # if epoch % args["pepochs"] == 0
-        #     @meminfo
-        #     if (args["parser"] == "oparser")
-        #         # We never change the training set with oparser, just report accuracy
-        #         for i=1:length(data)
-        #             @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
-        #             @show e = evalparse(p, data[i]); p=nothing
-        #             accuracy[i] = e[1]  # e[1] is UAS including punct
-        #         end
-        #     elseif (args["parser"] == "gparser")
-        #         # The first corpus gives us the new training set
-        #         p = x = y = nothing; gc()
-        #         @date (p,x,y) = gparse(pt, data[1], ndeps, feats, net, args["pbatch"], args["ncpu"]; xy=true)
-        #         @show e = evalparse(p, data[1]); p=nothing
-        #         accuracy[1] = e[1]
-        #         for i=2:length(data)
-        #             @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
-        #             @show e = evalparse(p, data[i]); p=nothing
-        #             accuracy[i] = e[1]
-        #         end
-        #     elseif (args["parser"] == "bparser")
-        # The first corpus gives us the new training set
-        # p = x = y = nothing; gc()
-        # @date (p,x,y) = bparse(pt, data[1], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
-        # @show e = evalparse(p, data[1]); p=nothing
-        # accuracy[1] = e[1]
-        # for i=2:length(data)
-        #     @date p = bparse(pt, data[i], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"])
-        #     @show e = evalparse(p, data[i]); p=nothing
-        #     accuracy[i] = e[1]
-        # end
-        # else
-        #     error("Unknown parser "*args["parser"])
-        # end
-
-        tnet = testnet(net)
         @date pxy = pmap(dist[1]) do c
             bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"]; xy=true)
         end
@@ -233,11 +197,14 @@ function main()
         @date for (p,x,y) in pxy
             train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         end
+        pxy = nothing; gc()
+        tnet = testnet(net)
         for i=2:length(dist)
             @date p = pmap(dist[i]) do c
                 bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"])
             end
             @show e = evalp(p, dist[i])
+            p = nothing; gc()
             accuracy[i] = e[1]
         end
 
