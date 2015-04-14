@@ -123,18 +123,16 @@ function evalp(p, d)
     evalparse(pa, da)
 end
 
-function main()
-    args = parse_commandline()
-    # KUnet.gpu(!args["nogpu"])
-    # args["nogpu"] && blas_set_num_threads(20)
-    args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
-    
-    data = Corpus[]
-    deprel = nothing
+function initdata(args)
+    pt = eval(parse(args["arctype"]))
+    data = Any[]
     ndeps = 0
+    feats = eval(parse("Flist."*args["feats"]))
+    net = nothing
+    deprel = nothing
     for f in args["datafiles"]
         @date d=load(f)
-        push!(data, d["corpus"])
+        push!(data, pbatch(d["corpus"], args["pbatch"]))
         if deprel == nothing
             deprel = d["deprel"]
             ndeps = length(deprel)
@@ -142,18 +140,11 @@ function main()
             @assert deprel == d["deprel"]
         end
     end
-    
-    @date dist = map(c->pbatch(c,args["pbatch"]), data)
-    feats = eval(parse("Flist."*args["feats"]))
-    pt = eval(parse(args["arctype"]))
-    s1 = data[1][1]
-    p1 = pt(wcnt(s1),length(deprel))
-    xrows=KUparser.flen(p1, s1, feats)
-    yrows=p1.nmove
-
-    if !isempty(args["net"])
-        net = newnet(args["net"])
-    else 
+    if isempty(args["net"])
+        s1 = data[1][1][1]
+        p1 = pt(wcnt(s1),length(deprel))
+        xrows=KUparser.flen(p1, s1, feats)
+        yrows=p1.nmove
         net=newnet(relu, [xrows; args["hidden"]; yrows]...)
         net[end].f=KUnet.logp
         for k in [fieldnames(UpdateParam); :dropout]
@@ -173,42 +164,49 @@ function main()
         # Initialize net using oparse on first corpus
         @date (p,x,y) = oparse(pt, data[1], ndeps, feats)
         @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
-        p=x=y=nothing; gc()
+    else 
+        net = newnet(args["net"])
     end
-    @show net
+    return (pt, data, ndeps, feats, net)
+end
+
+function myparse{T<:Parser}(pt::Type{T}, ca::Array{Corpus}, ndeps::Integer, feats::Fvec, net::Net, 
+                            nbeam::Integer, nbatch::Integer, tbatch::Integer; trn::Bool=false)
     @date tnet = testnet(net)
-
-    # @show evalparse(p, data[1]); p=nothing
-    # for i=2:length(data)
-    #     @date p = oparse(pt, data[i], ndeps, args["ncpu"])
-    #     @show evalparse(p, data[i]); p=nothing
-    # end
-    accuracy = Array(Float32, length(data))
-    (bestscore,bestepoch,epoch)=(0,0,0)
-    data = nothing; gc()
-
-    while true
-        @show epoch += 1; flush(STDOUT)
-        @date pxy = pmap(dist[1]) do c
+    if trn
+        @date pxy = pmap(ca) do c
             bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"]; xy=true)
         end
-        @show e = evalpxy(pxy, dist[1]); flush(STDOUT)
-        accuracy[1] = e[1]
+        @show e = evalpxy(pxy, data[1]); flush(STDOUT)
         @date for (p,x,y) in pxy
             train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         end
-        pxy = nothing; gc()
-        @date tnet = testnet(net)
-        for i=2:length(dist)
-            @show i; flush(STDOUT)
-            @date p = pmap(dist[i]) do c
-                bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"])
-            end
-            @show e = evalp(p, dist[i]); flush(STDOUT)
-            p = nothing; gc()
-            accuracy[i] = e[1]
+    else
+        @date p = pmap(ca) do c
+            bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"])
         end
+        @show e = evalp(p, data[i]); flush(STDOUT)
+    end
+    return e[1]
+end
 
+function main()
+    args = parse_commandline()
+    args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
+    @date (pt, data, ndeps, feats, net) = initdata(args)
+    @show (pt, ndeps, feats)
+    @show map(size, data)
+    @show net
+    accuracy = Array(Float32, length(data))
+    (bestscore,bestepoch,epoch)=(0,0,0)
+    @everywhere gc()
+
+    while true
+        @show epoch += 1; flush(STDOUT)
+        for i=1:length(data)
+            accuracy[i] = myparse(pt, data[i], ndeps, feats, net, args; trn=(i==1))
+            @everywhere gc()
+        end
         println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
 
         # We look at accuracy[2] (dev score) by default,
