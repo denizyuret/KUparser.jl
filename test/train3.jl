@@ -1,5 +1,5 @@
-@everywhere using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
-@everywhere VERSION < v"0.4-" && eval(Expr(:using,:Dates))
+using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, CUDArt
+VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -13,6 +13,9 @@ function parse_commandline()
         default = ""
         "--net"
         help = "Initialize net from this file if specified"
+        default = ""
+        "--machinefile"
+        help = "Need this to restart workers to avoid pmap leak"
         default = ""
         # "--nogpu"  # always use gpu
         # help = "Do not use gpu"
@@ -170,14 +173,22 @@ function initdata(args)
     return (pt, data, ndeps, feats, net)
 end
 
-function myparse{T<:Parser}(pt::Type{T}, ca::Array{Corpus}, ndeps::Integer, feats::Fvec, net::Net, 
-                            nbeam::Integer, nbatch::Integer, tbatch::Integer; trn::Bool=false)
+function restart_all_workers(wlist)
+    @date Base.terminate_all_workers()
+    @date gc()
+    @show Base.PGRP.refs
+    @date addprocs(wlist)
+    @date @everywhere eval(Expr(:using,:KUnet))
+    @date @everywhere eval(Expr(:using,:KUparser))
+end
+
+function myparse{T<:Parser}(pt::Type{T}, ca::AbstractArray, ndeps::Integer, feats::Fvec, net::Net, args::Dict; trn::Bool=false)
     @date tnet = testnet(net)
     if trn
         @date pxy = pmap(ca) do c
             bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"]; xy=true)
         end
-        @show e = evalpxy(pxy, data[1]); flush(STDOUT)
+        @show e = evalpxy(pxy, ca); flush(STDOUT)
         @date for (p,x,y) in pxy
             train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         end
@@ -185,7 +196,7 @@ function myparse{T<:Parser}(pt::Type{T}, ca::Array{Corpus}, ndeps::Integer, feat
         @date p = pmap(ca) do c
             bparse(pt, c, ndeps, feats, copy(tnet,:gpu), args["nbeam"], args["pbatch"])
         end
-        @show e = evalp(p, data[i]); flush(STDOUT)
+        @show e = evalp(p, ca); flush(STDOUT)
     end
     return e[1]
 end
@@ -199,13 +210,13 @@ function main()
     @show net
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch,epoch)=(0,0,0)
-    @everywhere gc()
+    @show wlist = (isempty(args["machinefile"]) ? [] : split(readall(args["machinefile"])))
 
     while true
         @show epoch += 1; flush(STDOUT)
+        isempty(wlist) || restart_all_workers(wlist)
         for i=1:length(data)
             accuracy[i] = myparse(pt, data[i], ndeps, feats, net, args; trn=(i==1))
-            @everywhere gc()
         end
         println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
 
