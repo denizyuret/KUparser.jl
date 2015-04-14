@@ -1,3 +1,8 @@
+2015-04-14    <dyuret@ku.edu.tr>
+
+	* train3.jl: training bparse with 36 workers on aws
+	@@vol-e0a5c1f6@virginia.
+
 2015-04-13    <dyuret@ku.edu.tr>
 
 	* test/fselect.jl: FEATURE SELECTION EXPERIMENTS
@@ -13,20 +18,20 @@
 	Results:
 
 	fs07h54h28: h28=8683 -> h28b=8797 (04081831-fs07h54h28.cache)
-	fs07h54h13: h13=8613 -> h14=8791 (04050753-hybrid54.cache) ok
+	fs07h54h13: h13=8613 -> h14=8791 (04050753-hybrid54.cache)
 
-	fs07e39e39: e39=8619 -> e36=8725 (04060625-fs07e39e39.cache) ok
-	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache) ok
-	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache) ok
+	fs07e39e39: e39=8619 -> e36=8725 (04060625-fs07e39e39.cache)
+	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache)
+	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache)
 
-	fs11h54h27: h27=9111 -> h25@252=9144 (04132230-fs11h54h27.cache) ok
-	fs11h54h14: h14=8931 -> h25b@198=8992 (04122017-fs11h54h14.cache) ok
+	fs11h54h27: h27=9111 -> h25=9144 (04132230-fs11h54h27.cache)
+	fs11h54h14: h14=8931 -> h25b=8992 (04122017-fs11h54h14.cache)
 
-	fs11e64e27: e27=8994 -> e26?@226=9061... unfinished restarted. terminated! @@aws-virginia (e27=h27 run with ArcEager13, bparser10, shuffle)
-	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) ok BUG: this was run with ArcEager13!
-	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache) ok
-	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache) ok
-	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache) ok
+	fs11e64e27: e27=8994 -> e25=9098 (04142002-fs11e64e27.cache) (e27=h27 run with ArcEager13, bparser10, shuffle)
+	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) BUG: this was run with ArcEager13!
+	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache)
+	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache)
+	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache)
 
 	* Summary: corpus-parser-arctype-feats where:
 	corpus in acl11, con07
@@ -55,6 +60,7 @@
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
+	?	?	...bp64a11h25.out() @@parcore@test
 
 	con07-dynamic-hybrid-GN13h: uas1:ok uas2:ok
 	:(no averaging or dev set in my results)
@@ -148,6 +154,7 @@
 	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
 	- figure out dev set vs fixed epoch for c07.
 	- finish 5x experiments.
+	- finish embedding experiments.
 
 2015-04-09    <dyuret@ku.edu.tr>
 
