@@ -144,7 +144,6 @@ function main()
     end
     
     @date dist = map(c->pbatch(c,args["pbatch"]), data)
-    data = nothing; gc()
     feats = eval(parse("Flist."*args["feats"]))
     pt = eval(parse(args["arctype"]))
     s1 = data[1][1]
@@ -186,7 +185,8 @@ function main()
     # end
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch,epoch)=(0,0,0)
-    
+    data = nothing; gc()
+
     while true
         @show epoch += 1; flush(STDOUT)
         @date pxy = pmap(dist[1]) do c
