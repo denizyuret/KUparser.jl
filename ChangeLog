@@ -1,7 +1,78 @@
-2015-04-14    <dyuret@ku.edu.tr>
+2015-04-16    <dyuret@ku.edu.tr>
 
-	* train3.jl: training bparse with 36 workers on aws
-	@@vol-e0a5c1f6@virginia.
+	* src/util.jl: Bugun yine sacma bir sey farkettim.  Evaluation sirasinda "punctuation excluded" diye herkes farkli bir yontem kullaniyor, ve bu yontemler arasindaki fark 0.3%'e cikabiliyor. Ornegin benim beam parser'in su anki dev uas sonuclari:
+
+	0.9276 according to conll07
+	0.9305 according to ZN11
+	0.9294 according to KCC08
+
+	Karsilastirmalarda dikkatli olun, karsilastirdiginiz paper ne kullaniyorsa onu kullanin.  kullandigim exact definition'lar:
+
+	# Everybody means something else by "excluding punctuation":
+
+	# The buggy conll07 eval.pl script looks for non-alpha characters, but excludes ` and $, also won't match -LRB-, -RRB- etc.
+	c07punct(w)=(ismatch(r"^\W+$",w) && !ismatch(r"^[`$]+$",w))
+
+	# ZN11 eval.py uses his own regexp for punctuation (I think both for chinese and english)
+	zn11punct(w)=ismatch(r"^[,?!:;]$|^-LRB-$|^-RRB-$|^[.]+$|^[`]+$|^[']+$|^（$|^）$|^、$|^。$|^！$|^？$|^…$|^，$|^；$|^／$|^：$|^“$|^”$|^「$|^」$|^『$|^』$|^《$|^》$|^一一$",w)
+
+	# KCC08 uses postags rather than wordforms, but for some reason skips #, $, -LRB-, -RRB- etc.
+	kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
+
+
+	* TODO:
+	- add sbatch option to train net every n sentences for bparser.
+	- find the fastest way to run beam64.
+	- finish 3net.
+	- debug realpos.
+	-- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
+	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
+	- figure out dev set vs fixed epoch for c07.
+	- finish 5x experiments.
+	- finish embedding experiments.
+	- compare regexp based vs postag based word score.
+
+	* TODO:
+	- add sbatch option to train net every n sentences.
+
+	- figure out eval.pl vs discounting punct pos for acl11.
+	- figure out fixed epoch vs dev set for conll07.
+	- should we not use bparser during fselect?
+
+	- Leave postags as postags, compare with context vectors.
+
+	- Try the split experiment with three networks (move, rlabel, llabel).
+
+	- Explore training options.
+	-- Try move+label nnet output?
+	-- cost function of nnet, cost fn of parser?
+
+	- Run five experiments and report avg-std.
+
+	- Explore feature options.
+	  training epoch timing: conll07-tacl13hybrid: 120s, conll07-acl11eager: 220s, acl11-acl11eager: 448s
+	  tacl13hybrid has 13 features: [(s0,s1,n0,n1)(wp),(s1l,s1r,s0l,s0r,n0l)(p)]
+	  acl11eager has 39: [n0(wpAa),s0(wpLdAaBb),(n1,n2,s0h2)(wp),(n0l2,n0l,s0h,s0l2,s0l,s0r2,s0r)(wpL)]
+	  Nobody has heads in hybrid, si may have heads in eager.
+	  In both si have children, but only n0l in buffer.
+	  s1 is important in hybrid, so we should add its children.
+	  we should subtract heads and labels for all si,ni for hybrid.  So we have 54:
+	  hybrid54: [n0(wpAa),(s0,s1)(wpdAaBb),(n1,n2,s2)(wp),(n0l2,n0l,s0l2,s0l,s0r2,s0r,s1l2,s1l,s1r2,s1r)(wpL)]
+	  our previous best feature sets:
+	  fv021a: [n0(wpa),s0(wpb-),(s1,s0r)(wb),(n1,n0l)(wp),s2(w),s0l(wpb),(s1r,s2r)(a)]
+	  fv022b: [n0(wpa),s0(wpabH),s1(wpbdH),(n1,n0l)(wp),(s0r,s0l)(w),(s1l)(pb),(s2)(W)]
+
+	  For conll07/acl11 hybrid: start with tacl13hybrid or fv022b, do a search within hybrid54.
+	  For conll07/acl11 eager : start with acl11eager and do a search within (maybe add s1?)
+	  Each one level search means trying out 40-50 features.
+	  Per epoch is 100min for 120s, 180min for 220s, 360min for 448s.
+	  To finish one level in 24 hours we can do 14 epochs for 100min, 8 epochs for 180min, 4 epochs for 460 min.
+
+	- try previous moves as features? (rnn idea)
+	- try arceasy (better on Goldberg&Nivre13)
+	- train with oparse, parse with bparse?
+
+	- Write paper.
 
 2015-04-13    <dyuret@ku.edu.tr>
 
@@ -24,10 +95,10 @@
 	fs07e39e21: e21=8623 -> e20b=8705 (04072145-fs07e39e21.cache)
 	fs07e64e20: e20=8613 -> e21b=8677 (04080348-fs07e64e20c.cache)
 
-	fs11h54h27: h27=9111 -> h25=9144 (04132230-fs11h54h27.cache)
+	fs11h54h27: h27=9111 -> h25=9144 (04132230-fs11h54h27.cache, bparser10, shuffle)
 	fs11h54h14: h14=8931 -> h25b=8992 (04122017-fs11h54h14.cache)
 
-	fs11e64e27: e27=8994 -> e25=9098 (04142002-fs11e64e27.cache) (e27=h27 run with ArcEager13, bparser10, shuffle)
+	fs11e64e27: e27=8994 -> e25=9098 (04142002-fs11e64e27.cache, e27=h27 run with ArcEager13, bparser10, shuffle)
 	fs11h54h28: h28=8978 -> h27=8997 (04071554-fs11h54h28.cache) BUG: this was run with ArcEager13!
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache)
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache)
@@ -46,8 +117,10 @@
 	9212	9165	03290018-bparse64.out(113/166)
 	9211	9171	03220927-bparselatestop.out(129/207)
 	9205	9166	03220548-bparsedbg.out(193/256)
+	9204	9189	...bp64a11h25.out(65/115) @@480579@test 0.50756 bp64a11h25 dyuret       r     04/15/2015 00:39:40 ilac.q@ilac-2-1.local              1
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
 	9174	9182	04110746-bp64a11h27.out(45/59) (feats=hybrid27,got stuck)
+	9173	9170	...bp64a11e25.out(60/80) @@480580@test 0.50756 bp64a11e25 dyuret       r     04/15/2015 00:41:40 ilac.q@ilac-1-1.local              1
 	9171	9152	03292013-bp10acl11eager.out(55/115)
 	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
 	9159	9142	03300736-bp10acl11eager13.out(75/155)
@@ -60,13 +133,13 @@
 	9116	9074	03200328-oparsedbg.out(254/256)
 	9099	9075	03160543-julia3_otrain_jl.out(128/256)
 	9093	9060	03212217-opacl11.out(210/256)
-	?	?	...bp64a11h25.out() @@parcore@test
 
 	con07-dynamic-hybrid-GN13h: uas1:ok uas2:ok
 	:(no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
 	8903	x	04061328-gp07h14.out(314/458) (feats=hybrid14)
+	8847	?	...gp07h25.out(91/158) @@480681@test 0.50756 gp07h25    dyuret       qw    04/15/2015 21:17:49                                    1
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
@@ -122,6 +195,7 @@
 	8801	?	04111024-gp07e39.out(96/192) (feats=eager39)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
+	8793	x	...gp07e25.out(137/174) @@480680@test 0.50756 gp07e25    dyuret       r     04/15/2015 21:17:40 ilac.q@ilac-1-0.local              1
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
 
@@ -144,26 +218,12 @@
 	8127	04110236-gp07h14rp.out(144/288)
 	8893	04112133-gp07h14.out(470/559)
 
-	- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
-
-	* TODO:
-	- add sbatch option to train net every n sentences for bparser.
-	- find the fastest way to run beam64.
-	- finish 3net.
-	- debug realpos.
-	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
-	- figure out dev set vs fixed epoch for c07.
-	- finish 5x experiments.
-	- finish embedding experiments.
-
 2015-04-09    <dyuret@ku.edu.tr>
 
 	* shuffle: Added shuffling option to KUnet train.  Makes a big
 	difference when sentences parsed in a big batch.  Otherwise all
 	sentence initial parts go together in the beginning and hurt
 	training.  Results prior to 2015-04-09 suspect.
-
-2015-04-06    <dyuret@ku.edu.tr>
 
 2015-04-05    <dyuret@ku.edu.tr>
 
@@ -213,9 +273,9 @@
 	supported on ilac with acl11eager (700MB per cpu).  TODO: feature
 	set for archybrid.
 
- 480368 0.50531 hybrid54   dyuret       r     04/03/2015 23:02:25 ilac.q@ilac-0-3.local              1        
- 480370 0.50531 acl11eager dyuret       qw    04/03/2015 23:04:42                                    1        
-   3969 0.60500 acl11eager2 dyuret       r     04/03/2015 23:07:22 iui.q@iui-5-0.local                1        
+ 480368 0.50531 hybrid54   dyuret       r     04/03/2015 23:02:25 ilac.q@ilac-0-3.local              1
+ 480370 0.50531 acl11eager dyuret       qw    04/03/2015 23:04:42                                    1
+   3969 0.60500 acl11eager2 dyuret       r     04/03/2015 23:07:22 iui.q@iui-5-0.local                1
 
 2015-04-02    <dyuret@ku.edu.tr>
 
@@ -256,44 +316,6 @@
 
 2015-03-31    <dyuret@ku.edu.tr>
 
-	* TODO:
-	- add sbatch option to train net every n sentences.
-
-	- figure out eval.pl vs discounting punct pos for acl11.
-	- figure out fixed epoch vs dev set for conll07.
-	- should we not use bparser during fselect?
-
-	- Leave postags as postags, compare with context vectors.
-
-	- Try the split experiment with three networks (move, rlabel, llabel).
-
-	- Explore training options.
-	-- Try move+label nnet output?
-	-- cost function of nnet, cost fn of parser?
-
-	- Run five experiments and report avg-std.
-
-	- Explore feature options.
-	  training epoch timing: conll07-tacl13hybrid: 120s, conll07-acl11eager: 220s, acl11-acl11eager: 448s
-	  tacl13hybrid has 13 features: [(s0,s1,n0,n1)(wp),(s1l,s1r,s0l,s0r,n0l)(p)]
-	  acl11eager has 39: [n0(wpAa),s0(wpLdAaBb),(n1,n2,s0h2)(wp),(n0l2,n0l,s0h,s0l2,s0l,s0r2,s0r)(wpL)]
-	  Nobody has heads in hybrid, si may have heads in eager.
-	  In both si have children, but only n0l in buffer.
-	  s1 is important in hybrid, so we should add its children.
-	  we should subtract heads and labels for all si,ni for hybrid.  So we have 54:
-	  hybrid54: [n0(wpAa),(s0,s1)(wpdAaBb),(n1,n2,s2)(wp),(n0l2,n0l,s0l2,s0l,s0r2,s0r,s1l2,s1l,s1r2,s1r)(wpL)]
-	  our previous best feature sets:
-	  fv021a: [n0(wpa),s0(wpb-),(s1,s0r)(wb),(n1,n0l)(wp),s2(w),s0l(wpb),(s1r,s2r)(a)]
-	  fv022b: [n0(wpa),s0(wpabH),s1(wpbdH),(n1,n0l)(wp),(s0r,s0l)(w),(s1l)(pb),(s2)(W)]
-
-	  For conll07/acl11 hybrid: start with tacl13hybrid or fv022b, do a search within hybrid54.
-	  For conll07/acl11 eager : start with acl11eager and do a search within (maybe add s1?)
-	  Each one level search means trying out 40-50 features.
-	  Per epoch is 100min for 120s, 180min for 220s, 360min for 448s.
-	  To finish one level in 24 hours we can do 14 epochs for 100min, 8 epochs for 180min, 4 epochs for 460 min.
-
-	- Write paper.
-
 	* Renames:
 	Fmats -> Flist
 	Features -> Fvec
@@ -319,7 +341,7 @@
 2015-03-28  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* archybrid13.jl: This is identical to the GN13 implementation.
-	$$480169 0.50531 gpconll07h dyuret       r     03/28/2015 23:56:10 ilac.q@ilac-3-1.local              1        
+	$$480169 0.50531 gpconll07h dyuret       r     03/28/2015 23:56:10 ilac.q@ilac-3-1.local              1
 gpconll07hybrid13.out
 DATA:	1	0.8441778	0.8279033
 DATA:	2	0.83230513	0.8199081
@@ -331,7 +353,7 @@ DATA:	64	0.95570713	0.86927843
 DATA:	93	0.96766937	0.8826704	***
 DATA:	110	0.9719262	0.8754747
 
-	$$480170 0.50531 opconll07h dyuret       qw    03/28/2015 23:56:36                                    1        
+	$$480170 0.50531 opconll07h dyuret       qw    03/28/2015 23:56:36                                    1
 opconll07hybrid13.out
 DATA:	1	0.84368515	0.82670397
 DATA:	2	0.85893685	0.8372976
@@ -344,7 +366,7 @@ DATA:	90	0.969781	0.87687385	***
 DATA:	104	0.9736997	0.87227666
 
 	* arceager13.jl: This is identical to the GN13 implementation.
-	$$480168 0.50531 bp10acl11e dyuret       qw    03/28/2015 22:10:05                                    1        
+	$$480168 0.50531 bp10acl11e dyuret       qw    03/28/2015 22:10:05                                    1
 bp10acl11eager13.out
 DATA:	5	0.91694665	0.89882094	0.894397
 DATA:	10	0.93207145	0.9077448	0.9059699
@@ -354,7 +376,7 @@ DATA:	25	0.95625395	0.9119825	0.9115447
 DATA:	30	0.9611717	0.91415113	0.91249734	***
 DATA:	35	0.9651421	0.9134033	0.9133265
 
-	$$480171 0.00000 gpconll07e dyuret       qw    03/29/2015 00:13:46                                    1        
+	$$480171 0.00000 gpconll07e dyuret       qw    03/29/2015 00:13:46                                    1
 gpconll07eager13.out
 DATA:	1	0.8377936	0.82230663
 DATA:	2	0.8526624	0.8237058
@@ -365,7 +387,7 @@ DATA:	32	0.9612292	0.87327605
 DATA:	39	0.9680746	0.8786728	***
 DATA:	53	0.9765279	0.8772736
 
-	$$480172 0.00000 opconll07e dyuret       qw    03/29/2015 00:13:48                                    1        
+	$$480172 0.00000 opconll07e dyuret       qw    03/29/2015 00:13:48                                    1
 
 	+bp10acl11eager13.out
 	+bp10acl11eager.out
@@ -399,11 +421,11 @@ DATA:	53	0.9765279	0.8772736
 
 	Recommended: ncpu=12, pbatch=32 (to be on the safe side), nbeam=10, pepochs=5.
 	This will give us 5 epochs in 50 mins or 10 mins/epoch.
-	- Maybe we should try learningRate=1 to speed things up?
-	- They are using nbeam=64 we are using nbeam=10
+	x Maybe we should try learningRate=1 to speed things up?
+	+ They are using nbeam=64 we are using nbeam=10
 	+ acleager is not identical to acleager13
 
-	$$480162 0.50531 bp10acl11e dyuret       r     03/28/2015 19:31:40 ilac.q@ilac-2-0.local              1        
+	$$480162 0.50531 bp10acl11e dyuret       r     03/28/2015 19:31:40 ilac.q@ilac-2-0.local              1
 bp10acl11eager.out
 DATA:	5	0.9163362	0.8975497	0.8949086	with punct
 	5	0.9237522	0.9075777	0.9035607	*** (.9314 .9290 in ZN11 nopunct nbeam=64)
@@ -420,13 +442,13 @@ DATA:	50	0.97418284	0.915198	0.9141733
 	* GN13: comparison using labeled parsers (cont. 2015-03-25)
 	+ using exact feature sets acl11eager and tacl13hybrid as far as I know
 	+ still not using exact archybrid13 and arceager13
-	- still not using a dev set to determine when to quit
-	- still not taking averages
-	- still no easyfirst
-	- try much larger learningRate (lr=1 worked well during debugging with conll07.tst)
+	= still not using a dev set to determine when to quit
+	= still not taking averages
+	x still no easyfirst
+	x try much larger learningRate (lr=1 worked well during debugging with conll07.tst)
 
 	* 03281848-gpconll07eager.out:
-	$$480149 0.50531 gpconll07e dyuret       r     03/28/2015 12:02:55 ilac.q@ilac-2-0.local              1        
+	$$480149 0.50531 gpconll07e dyuret       r     03/28/2015 12:02:55 ilac.q@ilac-2-0.local              1
 DATA:	1	0.8374577	0.82490504
 DATA:	2	0.84297526	0.8139117
 DATA:	4	0.8828344	0.8454927
@@ -437,7 +459,7 @@ DATA:	64	0.98047125	0.8686788
 DATA:	65	0.98105574	0.8712772
 
 	* 03290106-gpconll07eager.out: Second run:
-	$$480164 0.50531 gpconll07e dyuret       r     03/28/2015 20:31:40 ilac.q@ilac-3-0.local              1        
+	$$480164 0.50531 gpconll07e dyuret       r     03/28/2015 20:31:40 ilac.q@ilac-3-0.local              1
 DATA:	1	0.8370031	0.8173096
 DATA:	2	0.8489071	0.81690985
 DATA:	4	0.8842317	0.85048974
@@ -448,7 +470,7 @@ DATA:	32	0.95996624	0.87807316
 DATA:	45	0.971288	0.87227666
 
 	* 03281640-opconll07eager.out:
-	$$480150 0.50531 opconll07e dyuret       r     03/28/2015 12:11:55 ilac.q@ilac-2-1.local              1        
+	$$480150 0.50531 opconll07e dyuret       r     03/28/2015 12:11:55 ilac.q@ilac-2-1.local              1
 DATA:	1	0.8356036	0.82290626
 DATA:	2	0.8547718	0.8237058
 DATA:	4	0.87467223	0.8374975
@@ -459,11 +481,11 @@ DATA:	32	0.9519026	0.85748553
 DATA:	43	0.96290195	0.85968417
 
 	Second run: opconll07eager.out
-	##480165 0.50531 opconll07e dyuret       r     03/28/2015 20:33:10 ilac.q@ilac-3-1.local              1        
+	##480165 0.50531 opconll07e dyuret       r     03/28/2015 20:33:10 ilac.q@ilac-3-1.local              1
 	$$480173 0.00000 opconll07e dyuret       qw    03/29/2015 00:15:41                                    1        	
 
 	* 03282213-opconll07hybrid.out:
-	$$480151 0.50531 opconll07h dyuret       r     03/28/2015 12:12:25 ilac.q@ilac-0-0.local              1        
+	$$480151 0.50531 opconll07h dyuret       r     03/28/2015 12:12:25 ilac.q@ilac-0-0.local              1
 DATA:	1	0.843506	0.8297022
 DATA:	2	0.85940933	0.8392964
 DATA:	4	0.87632257	0.8462922
@@ -475,7 +497,7 @@ DATA:	79	0.9661533	0.878273	*** (.8643 in GN13)
 DATA:	128	0.9788523	0.8744753
 DATA:	159	0.9828203	0.8746752
 
-	$$480160 0.50531 gpconll07h dyuret       r     03/28/2015 18:58:10 ilac.q@ilac-2-1.local              1        
+	$$480160 0.50531 gpconll07h dyuret       r     03/28/2015 18:58:10 ilac.q@ilac-2-1.local              1
 gpconll07hybrid3.out
 DATA:	1	0.84406805	0.8257046	*** (.8762 in GN13)
 DATA:	2	0.83588797	0.81571054
@@ -566,8 +588,8 @@ DATA:	194	0.98414147	0.8794723
 	+ could have head and deprel as functions as well
 	+ in fact probably best never to use fields
 	all parsers need to take the "parser type" as an argument
-	- make sure arceasy follows this pattern
-	- implement nolabel versions as parser types as well
+	x make sure arceasy follows this pattern
+	x implement nolabel versions as parser types as well
 	bparser methods: same as gparser
 	bparser fields: nmove
 	arc!: head, deprel, lcnt, ldep, rcnt, rdep
@@ -608,13 +630,12 @@ DATA:	194	0.98414147	0.8794723
 	+ Implement distance.
 	+ Find max number of deps.
 	+ Implement heads.
-	- Seriously test new feature code.
+	x Seriously test new feature code.
 	+ Rerun some old experiments with larger epoch or lower dropout.
 	+ Implement arceager.
 	= Run acl11 experiments.
 	= Run conll07 experiments (arceager).
 	+ Make latestop default for beamparser.
-	- train.jl: allow length(v)==2*length(net) for param spec each w,b
 
 	+ 03271009-gptacl13.out: Testing new features and running variance experiment:
 	$$480131 0.50531 gptacl13   dyuret       r     03/26/2015 19:34:40 ilac.q@ilac-2-0.local
@@ -685,18 +706,18 @@ DATA:	194	0.98414147	0.8794723
 
 		paper		GN13		acl11		label
 		:----		:---		:----		:----
-	single	S0wp		s0wp		STwt		StackWordTag 
-		S0w		s0w		STw		StackWord    
-		S0p		s0p		STt		StackTag     
-		N0wp		n0wp		N0wt		NextWordTag  
-		N0w		n0w		N0w		NextWord     
-		N0p		n0p		N0t		NextTag	     
+	single	S0wp		s0wp		STwt		StackWordTag
+		S0w		s0w		STw		StackWord
+		S0p		s0p		STt		StackTag
+		N0wp		n0wp		N0wt		NextWordTag
+		N0w		n0w		N0w		NextWord
+		N0p		n0p		N0t		NextTag	
 		N1wp		n1wp		N1wt		Next+1WordTag
-		N1w		n1w		N1w		Next+1Word   
-		N1p		n1p		N1t		Next+1Tag    
+		N1w		n1w		N1w		Next+1Word
+		N1p		n1p		N1t		Next+1Tag
 		N2wp		n2wp		N2wt		Next+2WordTag
-		N2w		n2w		N2w		Next+2Word   
-		N2p		n2p		N2t		Next+2Tag    
+		N2w		n2w		N2w		Next+2Word
+		N2p		n2p		N2t		Next+2Tag
 	???					HTw		HeadStackWord	
 						HTt		HeadStackTag	
 						HTwt		HeadStackWordTag
@@ -715,60 +736,60 @@ DATA:	194	0.98414147	0.8794723
 		S0pS0rpN0p	s0p,s0rp,n0p	STtSTRDtN0t	StackTagStackRDTagNextTag
 		S0pN0pN0lp	s0p,n0p,n0lp	STtN0tN0LDt	StackTagNextTagNextLDTag
 	???					HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
-	dist	S0wd		s0wd		STwd		StackWordDist	     
-		S0pd		s0pd		STtd		StackTagDist	     
-		N0wd		n0wd		N0wd		NextWordDist	     
-		N0pd		n0pd		N0td		NextTagDist	     
+	dist	S0wd		s0wd		STwd		StackWordDist	
+		S0pd		s0pd		STtd		StackTagDist	
+		N0wd		n0wd		N0wd		NextWordDist	
+		N0pd		n0pd		N0td		NextTagDist	
 		S0wN0wd		s0w,n0w,d	STwN0wd		StackWordNextWordDist
-		S0pN0pd		s0p,n0p,d	STtN0td		StackTagNextTagDist  
+		S0pN0pd		s0p,n0p,d	STtN0td		StackTagNextTagDist
 	valency	S0wvr		s0wvr		STwra		StackWordRightArity
-		S0pvr		s0pvr		STtra		StackTagRightArity 
-		S0wvl		s0wvl		STwla		StackWordLeftArity 
-		S0pvl		s0pvl		STtla		StackTagLeftArity  
+		S0pvr		s0pvr		STtra		StackTagRightArity
+		S0wvl		s0wvl		STwla		StackWordLeftArity
+		S0pvl		s0pvl		STtla		StackTagLeftArity
 		N0wvl		n0wvl		N0wla		NextWordRightArity ?? NextWordLeftArity
 		N0pvl		n0pvl		N0tla		NextTagRightArity  ?? NextTagLeftArity
 	unigram	S0hw		s0hw		STHw		StackHeadWord
-		S0hp		s0hp		STHt		StackHeadTag 
-		S0L		s0L		STi		StackLabel   
-		S0lw		s0lw		STLDw		StackLDWord 
-		S0lp		s0lp		STLDt		StackLDTag  
+		S0hp		s0hp		STHt		StackHeadTag
+		S0L		s0L		STi		StackLabel
+		S0lw		s0lw		STLDw		StackLDWord
+		S0lp		s0lp		STLDt		StackLDTag
 		S0lL		s0lL		STLDi		StackLDLabel
-		S0rw		s0rw		STRDw		StackRDWord 
-		S0rp		s0rp		STRDt		StackRDTag  
+		S0rw		s0rw		STRDw		StackRDWord
+		S0rp		s0rp		STRDt		StackRDTag
 		S0rL		s0rL		STRDi		StackRDLabel
-		N0lw		n0lw		N0LDw		NextLDWord  
-		N0lp		n0lp		N0LDt		NextLDTag   
-		N0lL		n0lL		N0LDi		NextLDLabel 
+		N0lw		n0lw		N0LDw		NextLDWord
+		N0lp		n0lp		N0LDt		NextLDTag
+		N0lL		n0lL		N0LDi		NextLDLabel
 	third	S0h2w		s0h2w		STHHw		StackHeadHeadWord
-		S0h2p		s0h2p		STHHt		StackHeadHeadTag 
-		S0hL		s0hL		STHi		StackLabel ?? StackHeadLabel	 
-		S0l2w		s0l2w		STL2Dw		StackL2DWord	 
-		S0l2p		s0l2p		STL2Dt		StackL2DTag	 
-		S0l2L		s0l2L		STL2Di		StackL2DLabel	 
-		S0r2w		s0r2w		STR2Dw		StackR2DWord	 
-		S0r2p		s0r2p		STR2Dt		StackR2DTag	 
-		S0r2L		s0r2L		STR2Di		StackR2DLabel	 
-		N0l2w		n0l2w		N0L2Dw		NextL2DWord	 
-		N0l2p		n0l2p		N0L2Dt		NextL2DTag	 
-		N0l2L		n0l2L		N0L2Di		NextL2DLabel     
+		S0h2p		s0h2p		STHHt		StackHeadHeadTag
+		S0hL		s0hL		STHi		StackLabel ?? StackHeadLabel	
+		S0l2w		s0l2w		STL2Dw		StackL2DWord	
+		S0l2p		s0l2p		STL2Dt		StackL2DTag	
+		S0l2L		s0l2L		STL2Di		StackL2DLabel	
+		S0r2w		s0r2w		STR2Dw		StackR2DWord	
+		S0r2p		s0r2p		STR2Dt		StackR2DTag	
+		S0r2L		s0r2L		STR2Di		StackR2DLabel	
+		N0l2w		n0l2w		N0L2Dw		NextL2DWord	
+		N0l2p		n0l2p		N0L2Dt		NextL2DTag	
+		N0l2L		n0l2L		N0L2Di		NextL2DLabel
 		S0pS0lpS0l2p	s0p,s0lp,s0l2p	STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
 		S0pS0rpS0r2p	s0p,s0rp,s0r2p	STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
 		S0pS0hpS0h2p	s0p,s0hp,s0h2p	STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
 		N0pN0lpN0l2p	n0p,n0lp,n0l2p	N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextTagNextL2DTag
 	labset	S0wsr		s0wsr		STwrp		StackWordRightSetoftags
-		S0psr		s0psr		STtrp		StackTagRightSetoftags 
-		S0wsl		s0wsl		STwlp		StackWordLeftSetoftags 
-		S0psl		s0psl		STtlp		StackTagLeftSetoftags  
-		N0wsl		n0wsl		N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags  
-		N0psl		n0psl		N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags  
-	lcf					STl		StackLemma 
-						STc		StackCPOS  
-						STf		StackFeats 
-						N0l		NextLemma  
-						N0c		NextCPOS   
-						N0f		NextFeats  
+		S0psr		s0psr		STtrp		StackTagRightSetoftags
+		S0wsl		s0wsl		STwlp		StackWordLeftSetoftags
+		S0psl		s0psl		STtlp		StackTagLeftSetoftags
+		N0wsl		n0wsl		N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
+		N0psl		n0psl		N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
+	lcf					STl		StackLemma
+						STc		StackCPOS
+						STf		StackFeats
+						N0l		NextLemma
+						N0c		NextCPOS
+						N0f		NextFeats
 						N1l		Next+1Lemma
-						N1c		Next+1CPOS 
+						N1c		Next+1CPOS
 						N1f		Next+1Feats
 
 2015-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -789,9 +810,9 @@ DATA:	194	0.98414147	0.8794723
 
 	* TODO:
 	+ add acl11eager to flist.
-	- add acl11 adapted to hybrid?
-	-- use archybrid with acl11 features with labels
-	-- Design better featureset for archybrid.
+	+ add acl11 adapted to hybrid?
+	+ use archybrid with acl11 features with labels
+	+ Design better featureset for archybrid.
 	+ update features to have labels, labelsets, new encoding for valence and distance
 	+ s0hp, s0hw, (we don't have heads)
 	+ d (s0n0, 10+ encoded, we have 4+ encoding with (-1 0 3), 8bit encodings with +-7)
@@ -890,16 +911,14 @@ DATA:	194	0.98414147	0.8794723
 
 	* TODO: parser and training
 	+ ** add deprel labels as features! **: features.jl, archybrid.jl
-	- output two variables (move+label) or one (movelabel)?
+	= output two variables (move+label) or one (movelabel)?
 	+ check features and encodings of zhang&nivre11.
-	- use oparser for fselect.  faster if only test at the end.
-	- need fselect again for labeled parser.
-	- try previous moves as features? (rnn idea)
-	- try arceasy (better on Goldberg&Nivre13) 
+	+ use oparser for fselect.  faster if only test at the end.
+	+ need fselect again for labeled parser.
 	+ Try arceager (Zhang&Nivre11).
 	+ train.jl: write pepochs option to get nbeam=64 to work.
-	- train.jl: implement earlystop for efficiency (Zhang does it)
-	-- latestop seems to perform better?
+	x train.jl: implement earlystop for efficiency (Zhang does it)
+	x latestop seems to perform better?
 	+ train.jl: longer training (stop if 2x best epoch)
 	+ train.jl: save models
 	+ train.jl: compute eval.py (wordacc) score.
@@ -912,16 +931,16 @@ DATA:	194	0.98414147	0.8794723
 	+ which arc system are they (Zhang&Nivre11) using? arceager.
 
 	* TODO: model and optimization
-	- play with optimization, rmsprop, adam, layers, dropout, hidden layers?
-	- alternative to adagrad?
-	- try more hidden layers.
+	x play with optimization, rmsprop, adam, layers, dropout, hidden layers?
+	x alternative to adagrad?
+	+ try more hidden layers.
 
 	* TODO: features
 	= fv1768: memory error
 	x try bparse 10 epochs all Flist: oparse instead for fselect.
-	- try local search around best feats
-	- feature select with acl11
-	- feature select with conll07
+	+ try local search around best feats
+	+ feature select with acl11
+	+ feature select with conll07
 	+ features from ZN11 and GN13
 
 2015-03-20  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -1512,28 +1531,28 @@ DATA:	194	0.98414147	0.8794723
 
 	fv022b/conll07				fv021a/conllWSJ
 
-	+[-208]    '-n0w'       '[0 0 4]'   	+[-157]    '-s0w'       '[-1 0 4]'  
-	+[-152]    '-s0w'       '[-1 0 4]'  	+[-141]    '-n0w'       '[0 0 4]'   
-	+[ -69]    '-s1w'       '[-2 0 4]'  	+[ -70]    '-s1w'       '[-2 0 4]'  
-	+[ -68]    '-n1w'       '[1 0 4]'   	+[ -55]    '-n1w'       '[1 0 4]'   
-	+[ -60]    '-n0l1w'     '[0 -1 4]'  	-[ -21]    '-s2w'       '[-3 0 4]'  
-	+[ -50]    '-n1c'       '[1 0 -4]'  	+[ -21]    '-s0l1w'     '[-1 -1 4]' 
-	+[ -40]    '-s0c'       '[-1 0 -4]' 	+[ -21]    '-s0c'       '[-1 0 -4]' 
-	+[ -34]    '-s0r1w'     '[-1 1 4]'  	+[ -18]    '-n0l1w'     '[0 -1 4]'  
-	+[ -33]    '-n0c'       '[0 0 -4]'  	+[ -18]    '-n1c'       '[1 0 -4]'  
-	-[ -32]    '-s0r<'      '[-1 0 6]'  	-[ -16]    '-s1r<'      '[-2 0 6]'  
-	-[ -31]    '-s1d>'      '[-2 0 7]'  	-[ -16]    '-s0r='      '[-1 0 2]'  
-	+[ -31]    '-s0l1w'     '[-1 -1 4]' 	+[ -15]    '-n0c'       '[0 0 -4]'  
-	-[ -28]    '-s1l1c'     '[-2 -1 -4]'	-[ -14]    '-n0l1-'     '[0 -1 -1]' 
-	-[ -28]    '-s0l1-'     '[-1 -1 -1]'	-[ -13]    '-s2r1l='    '[-3 1 -2]' 
-	+[ -28]    '-n0l1c'     '[0 -1 -4]' 	+[ -13]    '-s0r1w'     '[-1 1 4]'  
-	-[ -28]    '-s2aw'      '[-3 0 8]'  	-[ -11]    '-s1r1l='    '[-2 1 -2]' 
-	-[ -25]    '-n0l='      '[0 0 -2]'  	-[ -11]    '-s0l1r='    '[-1 -1 2]' 
+	+[-208]    '-n0w'       '[0 0 4]'   	+[-157]    '-s0w'       '[-1 0 4]'
+	+[-152]    '-s0w'       '[-1 0 4]'  	+[-141]    '-n0w'       '[0 0 4]'
+	+[ -69]    '-s1w'       '[-2 0 4]'  	+[ -70]    '-s1w'       '[-2 0 4]'
+	+[ -68]    '-n1w'       '[1 0 4]'   	+[ -55]    '-n1w'       '[1 0 4]'
+	+[ -60]    '-n0l1w'     '[0 -1 4]'  	-[ -21]    '-s2w'       '[-3 0 4]'
+	+[ -50]    '-n1c'       '[1 0 -4]'  	+[ -21]    '-s0l1w'     '[-1 -1 4]'
+	+[ -40]    '-s0c'       '[-1 0 -4]' 	+[ -21]    '-s0c'       '[-1 0 -4]'
+	+[ -34]    '-s0r1w'     '[-1 1 4]'  	+[ -18]    '-n0l1w'     '[0 -1 4]'
+	+[ -33]    '-n0c'       '[0 0 -4]'  	+[ -18]    '-n1c'       '[1 0 -4]'
+	-[ -32]    '-s0r<'      '[-1 0 6]'  	-[ -16]    '-s1r<'      '[-2 0 6]'
+	-[ -31]    '-s1d>'      '[-2 0 7]'  	-[ -16]    '-s0r='      '[-1 0 2]'
+	+[ -31]    '-s0l1w'     '[-1 -1 4]' 	+[ -15]    '-n0c'       '[0 0 -4]'
+	-[ -28]    '-s1l1c'     '[-2 -1 -4]'	-[ -14]    '-n0l1-'     '[0 -1 -1]'
+	-[ -28]    '-s0l1-'     '[-1 -1 -1]'	-[ -13]    '-s2r1l='    '[-3 1 -2]'
+	+[ -28]    '-n0l1c'     '[0 -1 -4]' 	+[ -13]    '-s0r1w'     '[-1 1 4]'
+	-[ -28]    '-s2aw'      '[-3 0 8]'  	-[ -11]    '-s1r1l='    '[-2 1 -2]'
+	-[ -25]    '-n0l='      '[0 0 -2]'  	-[ -11]    '-s0l1r='    '[-1 -1 2]'
 	-[ -22]    '-s1r1+'     '[-2 1 1]'  	-[  -9]    '-s0l1c'     '[-1 -1 -4]'
-	-[ -20]    '-s1c'       '[-2 0 -4]' 	-[  -9]    '-s0-'       '[-1 0 -1]' 
-	-[ -19]    '-s0h-'      '[-1 0 -9]' 	-[  -7]    '-s0r1r='    '[-1 1 2]'  
-	-[ -11]    '-s1h-'      '[-2 0 -9]' 	+[  -7]    '-n0l1c'     '[0 -1 -4]' 
-	-[  -4]    '-s1l1r>'    '[-2 -1 5]' 
+	-[ -20]    '-s1c'       '[-2 0 -4]' 	-[  -9]    '-s0-'       '[-1 0 -1]'
+	-[ -19]    '-s0h-'      '[-1 0 -9]' 	-[  -7]    '-s0r1r='    '[-1 1 2]'
+	-[ -11]    '-s1h-'      '[-2 0 -9]' 	+[  -7]    '-n0l1c'     '[0 -1 -4]'
+	-[  -4]    '-s1l1r>'    '[-2 -1 5]'
 
 2014-10-16  Deniz Yuret  <dyuret@ku.edu.tr>
 
