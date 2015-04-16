@@ -56,27 +56,43 @@ end
 
 testnet(net::KUnet.Net)=map(l->testnet(l), net)
 
+# Compare two pxy results when xy may be shuffled due to batch processing
+pxyequal(a,b)=(isequal(a[1],b[1]) && isequal(sortcols(vcat(a[2],a[3])), sortcols(vcat(b[2],b[3]))))
 
 # Compute relevant scores
-function evalparse(parsers, sentences)
+function evalparse(parsers, sentences; ispunct=zn11punct, postag=[])
     ph = map(p->p.head, parsers)
     sh = map(s->s.head, sentences)
     pd = map(p->p.deprel, parsers)
     sd = map(s->s.deprel, sentences)
     wf = map(s->s.form, sentences)
+    sp = map(s->s.postag, sentences)
     phcat = vcat(ph...)
     shcat = vcat(sh...)
     pdcat = vcat(pd...)
     sdcat = vcat(sd...)
     wfcat = vcat(wf...)
-    uas = mean(phcat .== shcat)
-    las = mean((phcat .== shcat) & (pdcat .== sdcat))
-    uem = mean(ph .== sh)
-    lem = mean((ph .== sh) & (pd .== sd))
-    isword = map(w->(!ismatch(r"^\W+$",w) || ismatch(r"^[`$]+$",w)), wfcat)
+    spcat = vcat(sp...)
+    uas = mean(phcat .== shcat) # unlabeled attachment score
+    las = mean((phcat .== shcat) & (pdcat .== sdcat)) # labeled attachment score
+    uem = mean(ph .== sh)                             # unlabeled exact match
+    lem = mean((ph .== sh) & (pd .== sd))             # labeled exact match
+    if ispunct == kcc08punct
+        @assert !isempty(postag)
+        isword = map(p->!ispunct(p), postag[spcat])
+    else
+        isword = map(w->!ispunct(w), wfcat)
+    end
     uas2 = mean(phcat[isword] .== shcat[isword])
     las2 = mean((phcat[isword] .== shcat[isword]) & (pdcat[isword] .== sdcat[isword]))
     return (uas, uas2, las, las2, uem, lem)
 end
 
-pxyequal(a,b)=(isequal(a[1],b[1]) && isequal(sortcols(vcat(a[2],a[3])), sortcols(vcat(b[2],b[3]))))
+# Everybody means something else by "excluding punctuation":
+# The buggy conll07 eval.pl script looks for non-alpha characters, but excludes ` and $, also won't match -LRB-, -RRB- etc.
+c07punct(w)=(ismatch(r"^\W+$",w) && !ismatch(r"^[`$]+$",w))
+# ZN11 eval.py uses his own regexp for punctuation (I think both for chinese and english)
+zn11punct(w)=ismatch(r"^[,?!:;]$|^-LRB-$|^-RRB-$|^[.]+$|^[`]+$|^[']+$|^（$|^）$|^、$|^。$|^！$|^？$|^…$|^，$|^；$|^／$|^：$|^“$|^”$|^「$|^」$|^『$|^』$|^《$|^》$|^一一$",w)
+# KCC08 uses postags rather than wordforms, but for some reason skips #, $, -LRB-, -RRB- etc.
+kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
+
