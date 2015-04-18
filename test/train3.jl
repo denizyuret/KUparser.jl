@@ -201,6 +201,12 @@ function myparse{T<:Parser}(pt::Type{T}, ca::AbstractArray, ndeps::Integer, feat
     return e[1]
 end
 
+function rss()
+    statm = split(readall("/proc/$(getpid())/statm"))
+    pages = int(statm[2])
+    mb = pages >> 8
+end
+
 function main()
     args = parse_commandline()
     args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
@@ -214,9 +220,16 @@ function main()
 
     while true
         @show epoch += 1; flush(STDOUT)
-        isempty(wlist) || restart_all_workers(wlist)
         for i=1:length(data)
-            accuracy[i] = myparse(pt, data[i], ndeps, feats, net, args; trn=(i==1))
+            @show rss(); flush(STDOUT)
+            @date isempty(wlist) || restart_all_workers(wlist)
+            @show rss(); flush(STDOUT)
+            @date gc()
+            @show rss(); flush(STDOUT)
+            @date accuracy[i] = myparse(pt, data[i], ndeps, feats, net, args; trn=(i==1))
+            @show rss(); flush(STDOUT)
+            @date gc()
+            @show rss(); flush(STDOUT)
         end
         println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
 
