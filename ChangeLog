@@ -1,4 +1,13 @@
+2015-04-17    <dyuret@ku.edu.tr>
+
+	* mcnemar: is a paired test.
+	+ conll07 tst has 5003 words.
+	+ example: ref-uas=8762 (4384-619), gp07h28b=8913 (4459-544)
+	+ we need the number of conflicting cases, i.e. individual answers, not just percentages.
+
 2015-04-16    <dyuret@ku.edu.tr>
+
+	* conll07.dev.jld4: split sec02 (first 1989 sentences) as dev, named the remaining training set conll07.trn2.jld4.
 
 	* src/util.jl: Bugun yine sacma bir sey farkettim.  Evaluation sirasinda "punctuation excluded" diye herkes farkli bir yontem kullaniyor, ve bu yontemler arasindaki fark 0.3%'e cikabiliyor. Ornegin benim beam parser'in su anki dev uas sonuclari:
 
@@ -111,16 +120,16 @@
 	feats in ZN11e (arc11eager), GN13h (tacl13hybrid), or other
 
 	acl11-beam64-eager-ZN11e: uas1:no uas2:no
-	:(only ZN11 scores exclude punct)
+	:(all except ZN11 scores include punct which approx -1.0%)
 	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
 	9314	9290	ZN11	x	9180	5012	4800
 	9212	9165	03290018-bparse64.out(113/166)
 	9211	9171	03220927-bparselatestop.out(129/207)
 	9205	9166	03220548-bparsedbg.out(193/256)
-	9204	9189	...bp64a11h25.out(65/115) @@480579@test 0.50756 bp64a11h25 dyuret       r     04/15/2015 00:39:40 ilac.q@ilac-2-1.local              1
+	9204	9189	04161249-bp64a11h25.out(65/130) (feats=hybrid25,uas2dev=9305,uas2tst=9270,model=04161131-bp64a11h25.jld)
 	9186	9136	03201925-julia3_btrain_jl.out(77/77)
 	9174	9182	04110746-bp64a11h27.out(45/59) (feats=hybrid27,got stuck)
-	9173	9170	...bp64a11e25.out(60/80) @@480580@test 0.50756 bp64a11e25 dyuret       r     04/15/2015 00:41:40 ilac.q@ilac-1-1.local              1
+	9173	9170	04162129-bp64a11e25.out(60/120) (feats=eager25,model=04160207-bp64a11e25.jld)
 	9171	9152	03292013-bp10acl11eager.out(55/115)
 	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
 	9159	9142	03300736-bp10acl11eager13.out(75/155)
@@ -138,8 +147,9 @@
 	:(no averaging or dev set in my results)
 	uas	las	exp
 	8762	8628	GN13
+	8913	?	04170445-gp07h28b.out(98/196) (feats=hybrid28b)
 	8903	x	04061328-gp07h14.out(314/458) (feats=hybrid14)
-	8847	?	...gp07h25.out(91/158) @@480681@test 0.50756 gp07h25    dyuret       qw    04/15/2015 21:17:49                                    1
+	8847	?	04161022-gp07h25.out(91/182) (feats=hybrid25)
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
 	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
@@ -157,6 +167,23 @@
 	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
 
+	* 5try:
+	- try large devset (dev=sec02, first 50k words, 1989 sentences, trn2=rest, tst=5k words)
+	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-$i "julia3 train.jl conll07.trn2.jld4 conll07.dev.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
+	8719 (170/340) 04171715-gp07h13-1.out
+	8733 (204/408) 04180121-gp07h13-2.out
+	8757 (171/342) 04172134-gp07h13-3.out
+	8721 (114/228) 04171801-gp07h13-4.out
+	8753 (154/308) 04181110-gp07h13-5.out
+	- try smaller devset (dev3: last 200 sentences, 5011 words, trn3: rest, 18377 sentences, 441562 words)
+	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-3$i "julia3 train.jl conll07.trn3.jld4 conll07.dev3.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
+	...Your job @@481217 ("gp07h13-31") has been submitted
+	...Your job @@481218 ("gp07h13-32") has been submitted
+	...Your job @@481219 ("gp07h13-33") has been submitted
+	...Your job @@481220 ("gp07h13-34") has been submitted
+	...Your job @@481221 ("gp07h13-35") has been submitted
+	- try fixed epoch (150?)
+
 	con07-static-hybrid-GN13h: uas1:ok uas2:ok
 	uas	las	exp
 	8643	8496	GN13
@@ -170,6 +197,8 @@
 	con07-beam10-hybrid-GN13h
 	uas	las	exp
 	8865	x	03221208-bpconll07.out(54/256)
+	?	?	...bp64c07h28b() @@481222@test (try beam parser with best features)
+	?	?	...bp64c07h28b2() @@4045 0.60500 bp64c07h28 dyuret       r     04/18/2015 11:25:07 iui.q@iui-5-0.local
 
 	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
 	uas	las	exp
@@ -195,7 +224,7 @@
 	8801	?	04111024-gp07e39.out(96/192) (feats=eager39)
 	8799	x	03290106-gpconll07eager.out(22/45)
 	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
-	8793	x	...gp07e25.out(137/174) @@480680@test 0.50756 gp07e25    dyuret       r     04/15/2015 21:17:40 ilac.q@ilac-1-0.local              1
+	8793	x	04161530-gp07e25.out(137/274) (feats=eager25)
 	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
 	8763	x	03281848-gpconll07eager.out(32/65)
 
@@ -1567,7 +1596,7 @@ DATA:	194	0.98414147	0.8794723
 	devscore: 0.0325506937033084 (nsv=96326, single=0.0328500403467215)
 	test: (TODO)
 
-	corpus: conll07EnglishToken (trn:16588s,398439w,763702m;dev:1989s,48134w,92290m;trn+dev:18577s,446573w,855992m;tst:214s,5003w)
+	corpus: conll07EnglishToken (trn2:16588s,398439w,763702m;dev:1989s,48134w,92290m;trn=trn2+dev:18577s,446573w,855992m;tst:214s,5003w)
 	arctype: archybrid
 	embedding: wikipedia2MUNK-100 (TODO: other embeddings, bansal)
 	feats: fv022b (TODO: compare with wsj feats)
@@ -1604,3 +1633,79 @@ DATA:	194	0.98414147	0.8794723
 	18	0.0050	0.1202	0.1243
 	19	0.0048	0.1200	0.1239
 	20	0.0049	0.1199	0.1251
+
+2014-08-03  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* conll07:
+
+	- goldberg-nivre-2013: gives results for conll07 english using
+	greedy parsers.  training is 02-11 (half regular PTB size), look
+	at where the test data comes from (it is part of wsj23).
+
+	- results on conll07.  check the source of the test corpus: paper
+	claims subset of wsj23.  It seems to be wsj_2300 to part of
+	wsj_2308.  Best UAS in conll07 paper: 90.63.  Goldberg-Nivre-2013
+	best deterministic parser: 89.41 (Note: this is for easyfirst uas,
+	best hybrid uas=8762, best eager uas=8869).  Both include
+	punctuation (Correction: Only GN13 is including punct. C07 is
+	probably using eval.pl and excluding punctuation, nothing
+	specified in paper but it does say performance on conll07 task).
+
+		 nsent	nword
+	trnconll 18577	446573
+	tstconll 214	5003
+
+	Short	UAS+p	Paper
+	Car07	90.63	X. Carreras. 2007. Experiments with a high-order projective dependency parser. In Proc. of the CoNLL 2007 Shared Task. EMNLP-CoNLL.
+	GN13	89.41	Yoav Goldberg and Joakim Nivre. 2013. Training Deterministic Parsers with Non-Deterministic Oracles.. TACL, vol 1, pp 403--414.
+
+	* ptb:
+
+	- results on PTB.  For beam parsers Zhang-Nivre-2011 test on PTB
+	and report 92.9 on test (wsj23), 93.14 on dev (wsj22).  They also
+	report two transition parsers: ZC08transition (91.4) HS10 (91.4),
+	and four graph based parsers: MST (91.5), K08 (92.0), KC10 (93.0,
+	92.9) These exclude punctuation: ZC08 says "Like McDonald et
+	al. (2005), we evaluate the parsing accuracy by the precision of
+	lexical heads (the percentage of input words, excluding
+	punctuation, that have been assigned the correct parent) and by
+	the percentage of complete matches, in which all words excluding
+	punctuation have been assigned the correct parent."
+
+		Secs	Sents 	Words
+	Train 	2–21 	39832	950028
+	Dev 	22 	1700	40117
+	Test 	23 	2416	56684
+
+	Short	UAS-p	Paper
+	ZN11	92.9	Yue Zhang and Joakim Nivre. 2011. Transition-based dependency parsing with rich non-local features. In Proceedings of the 49th Annual Meeting of the Asso- ciation for Computational Linguistics: Human Language Technologies, pages 188–193.
+	ZC08	92.1	Yue Zhang and Stephen Clark. 2008. A tale of two parsers: Investigating and combining graph-based and transition-based dependency parsing. In Proceedings of the Conference on Empirical Methods in Natural Language Processing (EMNLP), pages 562–571.
+	ZC08tr	91.4	just transition based features of ZC08.
+	MST05	90.9	Ryan McDonald, Koby Crammer, and Fernando Pereira. 2005. Online large-margin training of dependency parsers. In Proceedings of ACL, pages 91–98, Ann Arbor, Michigan, June.
+	MST2	91.5	R McDonald and F Pereira. 2006. Online learning of approximate dependency parsing algorithms. In In Proc. of EACL, pages 81–88, Trento, Italy, April.
+	MST1	90.7	First order result according to MP06.
+
+	- conll07-ptb difference:
+
+	from conll-xi/data/english/ptb/doc/README:
+	The head and dependency relation fields were converted using the
+	algorithms described in
+	> Richard Johansson and Pierre Nugues (tentative title)
+	> "Extended Constituent-to-Dependency Conversion for English"
+	> (Submitted)
+	> http://www.lucas.lth.se/lt/pennconverter
+	This was run with the arguments: -conjAsHead -prepAsHead
+
+	new website:
+	http://nlp.cs.lth.se/software/treebank_converter
+	http://fileadmin.cs.lth.se/nlp/software/pennconverter/pennconverter.jar
+
+	The new arg -conll2007 is supposed to generate the conll07
+	conventions.  But files are not identical.  It seems the old
+	version of pennconverter (and thus the original conll07 data) had
+	some conjunction bugs which were later fixed.  220/5003 (4.40%)
+	head difference is the closest I can get to conll07.  On the
+	training set about 5 sentences were deleted from ptb to conll07.
+	Of the 446573 heads the closest I can get is 20298 difference
+	(4.55%).  It seems if we are going to work with conll07 data we
+	better use part of train as devel instead of trying to regenerate.
