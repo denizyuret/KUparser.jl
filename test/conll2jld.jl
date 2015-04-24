@@ -1,9 +1,9 @@
 using HDF5,JLD,DataStructures
-using KUparser: Sentence, Pval, Dval
+using KUparser: Sentence, Position, DepRel
 
 # Store postag/deprel strings as positive integer values
-postag_hash = Dict{UTF8String,Dval}()
-deprel_hash = Dict{UTF8String,Dval}()
+postag_hash = Dict{UTF8String,DepRel}()
+deprel_hash = Dict{UTF8String,DepRel}()
 
 # First argument is a dictionary file
 dict = load(ARGS[1])
@@ -18,7 +18,7 @@ deprel_hash[ROOT] = 0
 f = open(ARGS[2])
 corpus  = Sentence[]
 s = nothing
-ndims = 0
+mydims = 0
 for l in eachline(f)
     if l == "\n"
         @assert s != nothing
@@ -30,10 +30,10 @@ for l in eachline(f)
     form = convert(UTF8String, form)
     postag = postag_hash[postag]
     deprel = deprel_hash[deprel]
-    head = convert(Pval, int(head))
+    head = convert(Position, int(head))
     wvec = map(float32, split(wvec, ' '))
     if s == nothing
-        ndims = length(wvec)
+        mydims = length(wvec)
         s = Sentence()
         s.form = [form]
         s.postag = [postag]
@@ -41,7 +41,7 @@ for l in eachline(f)
         s.deprel = [deprel]
         s.wvec = wvec''
     else
-        @assert ndims == length(wvec)
+        @assert mydims == length(wvec)
         push!(s.form, form)
         push!(s.postag, postag)
         push!(s.head, head)
