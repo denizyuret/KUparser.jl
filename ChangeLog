@@ -35,6 +35,7 @@
 	- try smaller dev set. (dev5: first 500 sentences, 11803 words, trn5: rest 18077 sents, 434770 words)
 	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-5$i "julia3 train.jl conll07.trn5.jld4 conll07.dev5.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
 	- try separate dev set (dev:sec22: pennconverter gives %5 different deprels but we'll try)
+	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-6$i "julia3 train.jl conll07.trn.jld4 conll07.dev.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
 
 	conll07 full trn, no dev:
 	gp07h13-2?: minlen=208, @050=8726, @100=8739, maxavg@109=8774, @150=8734, @200=8744
@@ -42,10 +43,15 @@
 	op07h13-?:  minlen=146, @050=8700, maxavg@075=8741, @100=8710, @150=8724, @200=8715
 	op07h28b-?: minlen=200, @050=8777, @100=8801, @150=8799, maxavg@177=8831, @200=8806
 
-	gp07e21b-?:
-	op07e21b-?:
-	op07e39-?:
-	gp07e39-?:
+	@@gp07e21b-?:
+	@@op07e21b-?:
+	@@gp07e39-?:
+	@@op07e39-?:
+	@@gp07h14-?:
+	@@op07h14-?:
+	@@gp07h13-4?: dev1000
+	@@gp07h13-5?: dev500
+	@@gp07h13-6?: dev22
 
 2015-04-20    <dyuret@ku.edu.tr>
 
@@ -234,9 +240,8 @@
 	con07-beam10-hybrid-GN13h
 	uas	las	exp
 	8865	x	03221208-bpconll07.out(54/256)
-	9041	?	...bp64c07h28b(50/100) @@481222@test (try beam parser with best features)
-	?	?	...bp64c07h28b2() @@4045 0.60500 bp64c07h28 dyuret       r     04/18/2015 11:25:07 iui.q@iui-5-0.local
-	- does it matter if pepochs=1 or 5?
+	9041	?	04190719-bp64c07h28b.out(50/100) (try beam parser with best features)
+	+ does it matter if pepochs=1 or 5? not really.
 
 	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
 	uas	las	exp
