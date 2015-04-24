@@ -1,4 +1,3 @@
-using CUDArt
 using KUnet
 
 # Print date, expression and elapsed time after execution
@@ -45,17 +44,6 @@ function sortpermx{I<:Integer}(x::AbstractVector{I}, v::AbstractVector; alg::Alg
     sort!(x, alg, Perm(ord(lt,by,rev,order),v))
 end
 
-# Only copy what is needed for predict
-function testnet(l::KUnet.Layer)
-    ll = KUnet.Layer()
-    isdefined(l,:w) && (ll.w = to_host(l.w))
-    isdefined(l,:b) && (ll.b = to_host(l.b))
-    isdefined(l,:f) && (ll.f = l.f)
-    return ll
-end
-
-testnet(net::KUnet.Net)=map(l->testnet(l), net)
-
 # Compare two pxy results when xy may be shuffled due to batch processing
 pxyequal(a,b)=(isequal(a[1],b[1]) && isequal(sortcols(vcat(a[2],a[3])), sortcols(vcat(b[2],b[3]))))
 
@@ -96,3 +84,4 @@ zn11punct(w)=ismatch(r"^[,?!:;]$|^-LRB-$|^-RRB-$|^[.]+$|^[`]+$|^[']+$|^（$|^）
 # KCC08 uses postags rather than wordforms, but for some reason skips #, $, -LRB-, -RRB- etc.
 kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
 
+testnet(net)=copy(net,:test)
