@@ -1,3 +1,57 @@
+2015-04-24    <dyuret@ku.edu.tr>
+
+	* TODO:
+	- debug julia memory leak
+	- complete and test 3net implementation
+	- run half size dev (sec02/2)
+
+	* 5try:
+	+ try large devset (dev2=sec02, first 50k words, 1989 sentences, trn2=rest, tst=5k words)
+	+ avg=8737
+	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-$i "julia3 train.jl conll07.trn2.jld4 conll07.dev2.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
+	8719 (170/340) 04171715-gp07h13-1.out
+	8733 (204/408) 04180121-gp07h13-2.out
+	8757 (171/342) 04172134-gp07h13-3.out
+	8721 (114/228) 04171801-gp07h13-4.out
+	8753 (154/308) 04181110-gp07h13-5.out
+	+ try smaller devset (dev3: last 200 sentences, 5011 words, trn3: rest, 18377 sentences, 441562 words)
+	+ avg=8697
+	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-3$i "julia3 train.jl conll07.trn3.jld4 conll07.dev3.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
+	8663 (46/100) 04181444-gp07h13-31.out
+	8741 (58/116) 04181544-gp07h13-32.out
+	8711 (55/110) 04181556-gp07h13-33.out
+	8685 (70/140) 04181953-gp07h13-34.out
+	8687 (64/128) 04182242-gp07h13-35.out
+	+ try fixed epoch (150)
+	+ avg=8734
+	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-2$i "julia3 train.jl conll07.trn.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
+	8747 	gp07h13-21.out
+	8763 	gp07h13-22.out
+	8733	gp07h13-23.out (completed in gp07h13-3.out)
+	8707	gp07h13-24.out
+	8723	gp07h13-25.out
+	- try smaller dev set. (dev4: first 1000 sentences, 24358 words, trn4: rest 17577 sents, 422215 words)
+	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-4$i "julia3 train.jl conll07.trn4.jld4 conll07.dev4.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
+	- try smaller dev set. (dev5: first 500 sentences, 11803 words, trn5: rest 18077 sents, 434770 words)
+	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-5$i "julia3 train.jl conll07.trn5.jld4 conll07.dev5.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
+	- try separate dev set (dev:sec22: pennconverter gives %5 different deprels but we'll try)
+
+	conll07 full trn, no dev:
+	gp07h13-2?: minlen=208, @050=8726, @100=8739, maxavg@109=8774, @150=8734, @200=8744
+	gp07h28b-?: minlen=200, @050=8818, @100=8844, maxavg@113=8866, @150=8848, @200=8840
+	op07h13-?:  minlen=146, @050=8700, maxavg@075=8741, @100=8710, @150=8724, @200=8715
+	op07h28b-?: minlen=200, @050=8777, @100=8801, @150=8799, maxavg@177=8831, @200=8806
+
+	gp07e21b-?:
+	op07e21b-?:
+	op07e39-?:
+	gp07e39-?:
+
+2015-04-20    <dyuret@ku.edu.tr>
+
+	* conll07: the paper says english has 20 deprels.  eval07.pl
+	includes punctuation.  uses unpaired z-test for comparison.
+
 2015-04-17    <dyuret@ku.edu.tr>
 
 	* mcnemar: is a paired test.
@@ -167,23 +221,6 @@
 	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
 
-	* 5try:
-	- try large devset (dev=sec02, first 50k words, 1989 sentences, trn2=rest, tst=5k words)
-	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-$i "julia3 train.jl conll07.trn2.jld4 conll07.dev.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
-	8719 (170/340) 04171715-gp07h13-1.out
-	8733 (204/408) 04180121-gp07h13-2.out
-	8757 (171/342) 04172134-gp07h13-3.out
-	8721 (114/228) 04171801-gp07h13-4.out
-	8753 (154/308) 04181110-gp07h13-5.out
-	- try smaller devset (dev3: last 200 sentences, 5011 words, trn3: rest, 18377 sentences, 441562 words)
-	$ for i in 1 2 3 4 5; do psub-ilac -N gp07h13-3$i "julia3 train.jl conll07.trn3.jld4 conll07.dev3.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --seed $i"; sleep 2; done
-	...Your job @@481217 ("gp07h13-31") has been submitted
-	...Your job @@481218 ("gp07h13-32") has been submitted
-	...Your job @@481219 ("gp07h13-33") has been submitted
-	...Your job @@481220 ("gp07h13-34") has been submitted
-	...Your job @@481221 ("gp07h13-35") has been submitted
-	- try fixed epoch (150?)
-
 	con07-static-hybrid-GN13h: uas1:ok uas2:ok
 	uas	las	exp
 	8643	8496	GN13
@@ -197,8 +234,9 @@
 	con07-beam10-hybrid-GN13h
 	uas	las	exp
 	8865	x	03221208-bpconll07.out(54/256)
-	?	?	...bp64c07h28b() @@481222@test (try beam parser with best features)
+	9041	?	...bp64c07h28b(50/100) @@481222@test (try beam parser with best features)
 	?	?	...bp64c07h28b2() @@4045 0.60500 bp64c07h28 dyuret       r     04/18/2015 11:25:07 iui.q@iui-5-0.local
+	- does it matter if pepochs=1 or 5?
 
 	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
 	uas	las	exp
@@ -350,6 +388,9 @@
 	Features -> Fvec
 	ArcEager -> ArcEagerR1
 	ArcHybrid -> ArcHybridR1
+	Pval -> Position
+	Dval -> DepRel
+	Mval -> Move
 
 	* iui-k40-memory: Each K40 has 11.5GB for a total of 23GB.  The
 	ZN11 setup takes in MB GPU memory:
