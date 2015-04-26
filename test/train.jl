@@ -127,25 +127,30 @@ function main()
     s1 = data[1][1]
     p1 = pt(wcnt(s1),length(deprel))
     xrows=KUparser.flen(p1, s1, feats)
-    yrows=p1.nmove
+    # yrows=p1.nmove
+    model = Array(Net, 3)
 
-    net=newnet(relu, [xrows; args["hidden"]; yrows]...)
-    net[end].f=KUnet.logp
-    for k in [fieldnames(UpdateParam); :dropout]
-        haskey(args, string(k)) || continue
-        v = args[string(k)]
-        if isempty(v)
-            continue
-        elseif length(v)==1
-            setparam!(net, k, v[1])
-        else 
-            @assert length(v)==length(net) "$k should have 1 or $(length(net)) elements"
-            for i=1:length(v)
-                setparam!(net[i], k, v[i])
+    for imodel=1:3              # move, left, right
+        yrows = ((imodel==1) ? (isa(p1,ArcHybridR1) ? 3 : 4) : p1.ndeps)
+        net=newnet(relu, [xrows; args["hidden"]; yrows]...)
+        net[end].f=KUnet.logp
+        for k in [fieldnames(UpdateParam); :dropout]
+            haskey(args, string(k)) || continue
+            v = args[string(k)]
+            if isempty(v)
+                continue
+            elseif length(v)==1
+                setparam!(net, k, v[1])
+            else 
+                @assert length(v)==length(net) "$k should have 1 or $(length(net)) elements"
+                for i=1:length(v)
+                    setparam!(net[i], k, v[i])
+                end
             end
         end
+        @show net
+        model[imodel] = net
     end
-    @show net
 
     # Initialize training set using oparse on first corpus
     @date (p,x,y) = oparse(pt, data[1], ndeps, args["ncpu"], feats)
@@ -160,35 +165,35 @@ function main()
     while true
         @show epoch += 1
         @show map(size, (x, y))
-        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
+        @date train(p1, model, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
         if epoch % args["pepochs"] == 0
             @meminfo
             if (args["parser"] == "oparser")
                 # We never change the training set with oparser, just report accuracy
                 for i=1:length(data)
-                    @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
+                    @date p = gparse(pt, data[i], ndeps, feats, model, args["pbatch"], args["ncpu"])
                     @show e = evalparse(p, data[i]); p=nothing
                     accuracy[i] = e[1]  # e[1] is UAS including punct
                 end
             elseif (args["parser"] == "gparser")
                 # The first corpus gives us the new training set
                 p = x = y = nothing; gc()
-                @date (p,x,y) = gparse(pt, data[1], ndeps, feats, net, args["pbatch"], args["ncpu"]; xy=true)
+                @date (p,x,y) = gparse(pt, data[1], ndeps, feats, model, args["pbatch"], args["ncpu"]; xy=true)
                 @show e = evalparse(p, data[1]); p=nothing
                 accuracy[1] = e[1]
                 for i=2:length(data)
-                    @date p = gparse(pt, data[i], ndeps, feats, net, args["pbatch"], args["ncpu"])
+                    @date p = gparse(pt, data[i], ndeps, feats, model, args["pbatch"], args["ncpu"])
                     @show e = evalparse(p, data[i]); p=nothing
                     accuracy[i] = e[1]
                 end
             elseif (args["parser"] == "bparser")
                 # The first corpus gives us the new training set
                 p = x = y = nothing; gc()
-                @date (p,x,y) = bparse(pt, data[1], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
+                @date (p,x,y) = bparse(pt, data[1], ndeps, feats, model, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
                 @show e = evalparse(p, data[1]); p=nothing
                 accuracy[1] = e[1]
                 for i=2:length(data)
-                    @date p = bparse(pt, data[i], ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"])
+                    @date p = bparse(pt, data[i], ndeps, feats, model, args["nbeam"], args["pbatch"], args["ncpu"])
                     @show e = evalparse(p, data[i]); p=nothing
                     accuracy[i] = e[1]
                 end
@@ -206,7 +211,7 @@ function main()
 
             if (score > bestscore)
                 @show (bestscore,bestepoch)=(score,epoch)
-                !isempty(args["out"]) && save(args["out"], net)
+                !isempty(args["out"]) && save(args["out"], model)
             end
 
             # Quit if we have the minimum number of epochs and have
