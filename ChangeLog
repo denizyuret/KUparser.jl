@@ -30,28 +30,20 @@
 	8733	gp07h13-23.out (completed in gp07h13-3.out)
 	8707	gp07h13-24.out
 	8723	gp07h13-25.out
+	- try fixed epoch with other parser/feature combos:
+	@@op07e39-?: (conll07 no dev)
+	@@gp07e39-?: (conll07 no dev)
+	@@gp07h14-?: (conll07 no dev)
+	@@op07h14-?: (conll07 no dev)
+	@@gp07h13-4?: (conll07 dev1000)
+	@@gp07h13-5?: (conll07 dev500)
+	@@gp07h13-6?: (conll07 dev22)
 	- try smaller dev set. (dev4: first 1000 sentences, 24358 words, trn4: rest 17577 sents, 422215 words)
 	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-4$i "julia3 train.jl conll07.trn4.jld4 conll07.dev4.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
 	- try smaller dev set. (dev5: first 500 sentences, 11803 words, trn5: rest 18077 sents, 434770 words)
 	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-5$i "julia3 train.jl conll07.trn5.jld4 conll07.dev5.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
 	- try separate dev set (dev:sec22: pennconverter gives %5 different deprels but we'll try)
 	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-6$i "julia3 train.jl conll07.trn.jld4 conll07.dev.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
-
-	conll07 full trn, no dev:
-	gp07h13-2?: minlen=208, @050=8726, @100=8739, maxavg@109=8774, @150=8734, @200=8744
-	gp07h28b-?: minlen=200, @050=8818, @100=8844, maxavg@113=8866, @150=8848, @200=8840
-	op07h13-?:  minlen=146, @050=8700, maxavg@075=8741, @100=8710, @150=8724, @200=8715
-	op07h28b-?: minlen=200, @050=8777, @100=8801, @150=8799, maxavg@177=8831, @200=8806
-
-	@@gp07e21b-?:
-	@@op07e21b-?:
-	@@gp07e39-?:
-	@@op07e39-?:
-	@@gp07h14-?:
-	@@op07h14-?:
-	@@gp07h13-4?: dev1000
-	@@gp07h13-5?: dev500
-	@@gp07h13-6?: dev22
 
 2015-04-20    <dyuret@ku.edu.tr>
 
@@ -92,7 +84,8 @@
 	* TODO:
 	- add sbatch option to train net every n sentences for bparser.
 	- find the fastest way to run beam64.
-	- finish 3net.
+	= finish 3net.
+	@@iui-nohup.out
 	- debug realpos.
 	-- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
 	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
@@ -100,6 +93,7 @@
 	- finish 5x experiments.
 	- finish embedding experiments.
 	- compare regexp based vs postag based word score.
+	+ does it matter if bp pepochs=1 or 5? not really: bp64c07h28b*
 
 	* TODO:
 	- add sbatch option to train net every n sentences.
@@ -209,6 +203,7 @@
 	8762	8628	GN13
 	8913	?	04170445-gp07h28b.out(98/196) (feats=hybrid28b)
 	8903	x	04061328-gp07h14.out(314/458) (feats=hybrid14)
+	8848+	x	gp07h28b-?: minlen=200, @050=8818, @100=8844, maxavg@113=8866, @150=8848, @200=8840 (conll07 no dev)
 	8847	?	04161022-gp07h25.out(91/182) (feats=hybrid25)
 	8827	x	03291208-gpconll07hybrid13.out(93/187)
 	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
@@ -220,9 +215,13 @@
 	8789	x	03250401-gptacl13.out(169/213)
 	8773	x	03271009-gptacl13.out(233/256)
 	8761	x	04010123-gp07h13k44.out(138/276) (4k+4k hidden layers)
+	8744+	x	gp07h13-2?: minlen=208, @050=8726, @100=8739, maxavg@109=8774, @150=8734, @200=8744 (conll07 no dev)
+	8737+	x	gp07h13-?:  minlen=228, @050=8698, @100=8731, avgtst@maxavgdev@140=8744, @150=8748, @200=8764, maxavgtst@223=8775, tst@maxdev=8737 (conll07 dev02)
+	8733+	x	gp07h13-n3: minlen=000, @050=8715, @100=8733, ... (3net experiment) @@iui-nohup.out (conll07 no dev)
 	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
 	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
 	8709	x	03260132-gptacl13w.out(256/256) (only w features)
+	8697+	x	gp07h13-3?: minlen=100, @050=8690, @100=8726, avgtst@maxavgdev@76=8713, maxavgtst@86=8745, tst@maxdev=8697 (conll07 dev200)
 	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
 	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
 	7877	x	03270146-gptacl13p.out(187/256) (only p features)
@@ -232,7 +231,9 @@
 	8643	8496	GN13
 	8887	x	04070512-op07h14.out(377/754) (feats=hybrid14)
 	8823	x	03300624-opconll07hybrid13.out(242/485)
+	8806+	x	op07h28b-?: minlen=200, @050=8777, @100=8801, @150=8799, maxavg@177=8831, @200=8806 (conll07 no dev)
 	8783	x	03282213-opconll07hybrid.out(79/159)
+	8724+	x	op07h13-?:  minlen=146, @050=8700, maxavg@075=8741, @100=8710, @150=8724, @200=8715 (conll07 no dev)
 	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
 	8689	x	03271008-optacl13.out(234/256)
 	8675	x	03242000-optacl13.out(66/78)
@@ -241,7 +242,6 @@
 	uas	las	exp
 	8865	x	03221208-bpconll07.out(54/256)
 	9041	?	04190719-bp64c07h28b.out(50/100) (try beam parser with best features)
-	+ does it matter if pepochs=1 or 5? not really.
 
 	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
 	uas	las	exp
@@ -258,6 +258,7 @@
 	8837	?	04111211-eager21.out(173/233) (feats=eager21, shuffle)
 	8831	?	04110758-eager39.out(51/102) (feats=eager39, shuffle)
 	8829	?	04110424-gp07e36.out(75/150) (feats=eager36)
+	8828+	x	gp07e21b-?: minlen=200, @050=8818, maxavg@066=8852, @100=8818, @150=8828, @200=8794 (conll07 no dev)(only 4 completed)
 	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
 	8821	x	03292103-gpconll07eager13.out(93/187)
 	8821	?	04110758-eager36.out(56/112) (feats=eager36,shuffle)
@@ -274,6 +275,7 @@
 	con07-static-eager-ZN11e: uas1:ok uas2:no
 	uas	las	exp
 	8610	8493	GN13
+	8739+	x	op07e21b-?: minlen=268, @050=8671, @100=8698, @150=8701, @200=8711, maxavg@250=8739 (conll07 no dev)
 	8685	x	03281640-opconll07eager.out(21/43)
 	8681	x	03300220-opconll07eager13.out(102/139)
 	8675	x	04070709-op07e36.out(28/100) (feats=eager36)
