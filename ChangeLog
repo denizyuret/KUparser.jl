@@ -1,9 +1,194 @@
+2015-05-05    <dyuret@ku.edu.tr>
+
+	* paper: ideas:
+	1. word vectors instead of words
+	- basic approaches for word vectors
+	- dense representations represent similarity (scode sphere)
+	- dense representations allow nonlinear models
+	- empirical comparison of word vector types on parsing
+	- works with any word vector (but do need to construct context vectors)
+	2. context vectors instead of pos:
+	- history of pos, map vs territory
+	- inconsistencies in pos (examples from mali paper)
+	- empirical comparison of pos vectors vs context vectors (vs both vs neither)
+	3. nonlinear models instead of linear+ad-hoc-feature-combos
+	- examples of feature combos
+	- kernel perceptron: memory problems
+	- neural network
+
+2015-05-02    <dyuret@ku.edu.tr>
+
+	* vcirik: Selam,
+
+	repository'e (https://github.com/wolet/conll2eparse) pos tagleri
+	one-hot vector olarak ekleyen
+	script'i (https://github.com/wolet/conll2eparse/blob/master/src/scripts/enrich_with_pos.py)
+	ekledim. Var olan bir eParse corpusuna pos tag column'lari
+	ekliyor.
+
+	wikipedia100 icin,  /ai/home/vcirik/temp/conll2eparse/run altinda
+	su datalari cikardim :
+
+	type : conll-ptb_type_wikipedia2MUNK-100
+	type + pos : conll-ptb_type_wikipedia2MUNK-100+pos
+	type + context vec :
+	conll-ptb_token_wikipedia2MUNK-100+wikipedia2MUNK-100
+	type + context vec + pos :
+	conll-ptb_token_wikipedia2MUNK-100+wikipedia2MUNK-100+pos
+
+	Dikkat edilecek tek husus, bizim parser'i calistirirken embedding
+	sayisina 45 eklemek lazim.
+
+	kolay gelsin,
+	volkan
+
+	- comparing with original acl11 data: dev and tst are identical.
+	There are pos differences in trn.  acl11 has NNP for some tokens
+	that have different pos in ptb3/ptb2 (e.g. Revitalized Classics in
+	the beginning of sec02).
+
+
+2015-04-28    <dyuret@ku.edu.tr>
+
+	* Summary: corpus-parser-arctype-feats where:
+	corpus in acl11, con07
+	parser in beam, dynamic, static
+	arctype in hybrid, eager
+	feats in ZN11e (arc11eager), GN13h (tacl13hybrid), or other
+
+	acl11-beam64-eager-ZN11e: uas1:no uas2:no
+	:(all except ZN11 scores include punct which approx -1.0%)
+	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
+	9314	9290	ZN11	x	9180	5012	4800
+	9212	9165	03290018-bparse64.out(113/166)
+	9211	9171	03220927-bparselatestop.out(129/207)
+	9205	9166	03220548-bparsedbg.out(193/256)
+	9204	9189	04161249-bp64a11h25.out(65/130) (feats=hybrid25,uas2dev=9305,uas2tst=9270,model=04161131-bp64a11h25.jld)
+	9186	9136	03201925-julia3_btrain_jl.out(77/77)
+	9174	9182	04110746-bp64a11h27.out(45/59) (feats=hybrid27,got stuck)
+	9173	9170	04162129-bp64a11e25.out(60/120) (feats=eager25,model=04160207-bp64a11e25.jld)
+	9171	9152	03292013-bp10acl11eager.out(55/115)
+	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
+	9159	9142	03300736-bp10acl11eager13.out(75/155)
+	9158	9145	03240436-bpacl11.out(79/256)
+	9158	9140	03192351-gparsedbg.out(194/256)
+	9156	9141	04030908-bp64a11e13.out(65/130) trn:7m30s prs:96m epoch:27m (5t1p)
+	9154	9161	04110144-bp64a11e20.out(88/113) (feats=eager20,got stuck)
+	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
+	9136	9109	03212217-gpacl11.out(184/256)
+	9116	9074	03200328-oparsedbg.out(254/256)
+	9099	9075	03160543-julia3_otrain_jl.out(128/256)
+	9093	9060	03212217-opacl11.out(210/256)
+
+	con07-dynamic-hybrid-GN13h: uas1:ok uas2:ok
+	:(no averaging or dev set in my results except ones marked with +)
+	8762-8840@5003 one-tailed p-value:0.1149
+	uas	las	exp
+	8762	8628	GN13
+	8913	?	04170445-gp07h28b.out(98/196) (feats=hybrid28b)
+	8903	x	04061328-gp07h14.out(314/458) (feats=hybrid14)
+	8847	?	04161022-gp07h25.out(91/182) (feats=hybrid25)
+	8840+	x	gp07h28b-?: (conll07 no dev) minlen=200, @050=8818, @100=8844, maxavg@113=8866, @150=8848, @200=8840
+	8832+	x	gp07h28b-4?: (dev1000) 8855@122 8839@211 8851@123 8823@56 8793@89
+	8829+	x	gp07h14-?: (conll07 no dev) minlen=238, @050=8782, @100=8792, maxavg@109=8774, @150=8825, @200=8829, maxavg@225=8845
+	8827	x	03291208-gpconll07hybrid13.out(93/187)
+	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
+	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
+	8799	x	04010425-gp07h13d25.out(139/256) (dropout 0.2 0.5)
+	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
+	8793	x	03311930-gp07h13k10.out(134/268) (10k hidden unit)
+	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
+	8789	x	03250401-gptacl13.out(169/213)
+	8773	x	03271009-gptacl13.out(233/256)
+	8766+	x	gp07h13-6?: (conll07 dev22) tst@maxdev: 8739 8753 8797 8733 8807 (>200 epochs)
+	8764++	x	gp07h13-4?: (conll07 dev1000) tst@maxdev: 8799,8763,8737,8761,8761 (250-300 epochs)
+	8761	x	04010123-gp07h13k44.out(138/276) (4k+4k hidden layers)
+	8759+	x	04280722-gp07h13-n3.out: (3net experiment, conll07 no dev) len=408, @050=8715, @100=8733, @150=8745, @200=8759, maxavg@204=8837, @250=8767, @300=8757, @350=8753, @400=8765
+	8756+	x	gp07h13-5?: (conll07 dev500) tst@maxdev: 8759 8727 8767 8755 8773
+	8744+	x	gp07h13-2?: (conll07 no dev) minlen=208, @050=8726, @100=8739, maxavg@109=8774, @150=8734, @200=8744
+	8737+	x	gp07h13-?: (conll07 dev1989 sec02) 8719 8721 8757 8733 8753 minlen=228, @050=8698, @100=8731, avgtst@maxavgdev@140=8744, @150=8748, @200=8764, maxavgtst@223=8775, tst@maxdev=8737
+	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
+	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
+	8709	x	03260132-gptacl13w.out(256/256) (only w features)
+	8697+	x	gp07h13-3?: (conll07 dev200) minlen=100, @050=8690, @100=8726, avgtst@maxavgdev@76=8713, maxavgtst@86=8745, tst@maxdev=8697
+	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
+	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
+	7877	x	03270146-gptacl13p.out(187/256) (only p features)
+
+	con07-static-hybrid-GN13h: uas1:ok uas2:ok
+	8643-8806@5003 p-value: 0.0073 (http://in-silico.net/tools/statistics/ztest two proportion z-test)
+	8643-8724@5003 p-value: 0.1154
+	uas	las	exp
+	8643	8496	GN13
+	8887	x	04070512-op07h14.out(377/754) (feats=hybrid14)
+	8823	x	03300624-opconll07hybrid13.out(242/485)
+	8806+	x	op07h28b-?: minlen=200, @050=8777, @100=8801, @150=8799, maxavg@177=8831, @200=8806 (conll07 no dev)
+	8803+	x	op07h14-?: (conll07 no dev) minlen=242 @050=8754 @100=8783 @150=8785 maxavg@185=8832 @200=8803 @240=8808
+	8783	x	03282213-opconll07hybrid.out(79/159)
+	8774+	x	op07h28b-4?: (dev1000) tst@maxdev: 8727 8767 8789 8783 8807 (100-150 epochs)
+	8728+	x	op07h13-4?: (dev1000) tst@maxdev: 8749 8703 8705 8739 8743 (151-1998 epochs)
+	8724+	x	op07h13-?:  minlen=146, @050=8700, maxavg@075=8741, @100=8710, @150=8724, @200=8715 (conll07 no dev)
+	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
+	8689	x	03271008-optacl13.out(234/256)
+	8675	x	03242000-optacl13.out(66/78)
+
+	con07-beam10-hybrid-GN13h
+	uas	las	exp
+	8865	x	03221208-bpconll07.out(54/256)
+	9041	?	04190719-bp64c07h28b.out(50/100) (try beam parser with best features)
+
+	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
+	8743-8869@5003 p-value: 0.026
+	uas	las	exp
+	8869	8769	GN13
+	8897	x	04091636-gp07e20.out(62/124) (feats=eager20)
+	8887	?	04101642-gp07e21b.out(138/276) (feats=eager21b)
+	8883	?	04110758-eager21b.out(76/152) (feats=eager21b,shuffle)
+	8867	?	04111209-eager23.out(96/192) (feats=eager23,shuffle)
+	8861	x	04100103-gp07e20b.out(108/216) (feats=eager20b)
+	8847	x	04110739-gp07e21.out(437/599) (feats=eager21)
+	8847	?	04110758-eager20.out(104/208) (feats=eager20,shuffle)
+	8843	?	04021402-gp07e13k44.out(95/190) (feats=eager39,4+4k hidden)
+	8839	?	04020644-gp07e13k10.out(39/100) (feats=eager39,10k hidden)
+	8837	?	04111211-eager21.out(173/233) (feats=eager21, shuffle)
+	8831	?	04110758-eager39.out(51/102) (feats=eager39, shuffle)
+	8829	?	04110424-gp07e36.out(75/150) (feats=eager36)
+	8828+	x	gp07e21b-?: minlen=200, @050=8818, maxavg@066=8852, @100=8818, @150=8828, @200=8794 (conll07 no dev)(only 4 completed)
+	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
+	8821	x	03292103-gpconll07eager13.out(93/187)
+	8821	?	04110758-eager36.out(56/112) (feats=eager36,shuffle)
+	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
+	8811	?	04110758-eager20b.out(75/150) (feats=eager20b,shuffle)
+	8807	?	04101459-gp07e23.out(86/172) (feats=eager23)
+	8801	?	04111024-gp07e39.out(96/192) (feats=eager39)
+	8799	x	03290106-gpconll07eager.out(22/45)
+	8798+	x	gp07e20-4?: (dev1000) tst@maxdev: 8815 8777 8787 8785 8829 (epochs 44-110? rerun with minepochs)
+	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
+	8793	x	04161530-gp07e25.out(137/274) (feats=eager25)
+	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
+	8763	x	03281848-gpconll07eager.out(32/65)
+	8743+	x	gp07e39-?: minlen=200, @050=8722, @100=8743, maxavg@106=8765, @150=8733, @200=8742 (conll07 no dev)
+	8690+	x	gp07e39-4?: (dev1000) tst@maxdev: 8745 8671 8651 8709 8677 (27-39 epochs? rerun with minepochs)
+
+	con07-static-eager-ZN11e: uas1:ok uas2:no
+	8610-8655@5003 p-value: .2562
+	8610-8739@5003 p-value: .0285
+	uas	las	exp
+	8610	8493	GN13
+	8739+	x	op07e21b-?: minlen=268, @050=8671, @100=8698, @150=8701, @200=8711, maxavg@250=8739 (conll07 no dev)
+	8685	x	03281640-opconll07eager.out(21/43)
+	8681	x	03300220-opconll07eager13.out(102/139)
+	8675	x	04070709-op07e36.out(28/100) (feats=eager36)
+	8655+	x	op07e39-?: minlen=200, @050=8604, maxavg@073=8664, @100=8655, @150=8621, @200=8620 (conll07 no dev)
+	8649	x	03292324-opconll07eager.out(31/63)
+	8629+	x	op07e39-4?.out: (dev1000) tst@maxdev: 8663 8625 8599 8651 8607 (epochs 34-299)
+
 2015-04-24    <dyuret@ku.edu.tr>
 
 	* TODO:
-	- debug julia memory leak
-	- complete and test 3net implementation
-	- run half size dev (sec02/2)
+	+ debug julia memory leak
+	+ complete and test 3net implementation
+	+ run half size dev (sec02/2)
 
 	* 5try:
 	+ try large devset (dev2=sec02, first 50k words, 1989 sentences, trn2=rest, tst=5k words)
@@ -30,20 +215,16 @@
 	8733	gp07h13-23.out (completed in gp07h13-3.out)
 	8707	gp07h13-24.out
 	8723	gp07h13-25.out
-	- try fixed epoch with other parser/feature combos:
-	@@op07e39-?: (conll07 no dev)
-	@@gp07e39-?: (conll07 no dev)
-	@@gp07h14-?: (conll07 no dev)
-	@@op07h14-?: (conll07 no dev)
-	@@gp07h13-4?: (conll07 dev1000)
-	@@gp07h13-5?: (conll07 dev500)
-	@@gp07h13-6?: (conll07 dev22)
-	- try smaller dev set. (dev4: first 1000 sentences, 24358 words, trn4: rest 17577 sents, 422215 words)
-	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-4$i "julia3 train.jl conll07.trn4.jld4 conll07.dev4.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
-	- try smaller dev set. (dev5: first 500 sentences, 11803 words, trn5: rest 18077 sents, 434770 words)
-	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-5$i "julia3 train.jl conll07.trn5.jld4 conll07.dev5.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
-	- try separate dev set (dev:sec22: pennconverter gives %5 different deprels but we'll try)
-	@@for i in 1 2 3 4 5; do psub-ilac -N gp07h13-6$i "julia3 train.jl conll07.trn.jld4 conll07.dev.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
+	= try fixed epoch with other parser/feature combos:
+	= try smaller dev set. (dev4: first 1000 sentences, 24358 words, trn4: rest 17577 sents, 422215 words)
+	for i in 1 2 3 4 5; do psub-ilac -N gp07h13-4$i "julia3 train.jl conll07.trn4.jld4 conll07.dev4.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
+	= try smaller dev set. (dev5: first 500 sentences, 11803 words, trn5: rest 18077 sents, 434770 words)
+	for i in 1 2 3 4 5; do psub-ilac -N gp07h13-5$i "julia3 train.jl conll07.trn5.jld4 conll07.dev5.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
+	= try separate dev set (dev:sec22: pennconverter gives %5 different deprels but we'll try)
+	for i in 1 2 3 4 5; do psub-ilac -N gp07h13-6$i "julia3 train.jl conll07.trn.jld4 conll07.dev.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid13 --pbatch 500 --epochs 100 --seed $i"; sleep 2; done
+	= try hybrid14
+	for i in 1 2 3 4 5; do psub-ilac -N gp07h14-$i "julia3 train.jl conll07.trn.jld4 conll07.tst.jld4 --parser gparser --arctype ArcHybrid13 --feats hybrid14 --pbatch 500 --epochs 200  --seed $i"; sleep 2; done
+	for i in 1 2 3 4 5; do psub-ilac -N op07h14-$i "julia3 train.jl conll07.trn.jld4 conll07.tst.jld4 --parser oparser --arctype ArcHybrid13 --feats hybrid14 --pbatch 500 --epochs 200  --seed $i"; sleep 2; done
 
 2015-04-20    <dyuret@ku.edu.tr>
 
@@ -84,13 +265,12 @@
 	* TODO:
 	- add sbatch option to train net every n sentences for bparser.
 	- find the fastest way to run beam64.
-	= finish 3net.
-	@@iui-nohup.out
+	+ finish 3net: no significant difference.
 	- debug realpos.
 	-- why is realpos so bad?  is it that bad if we simply drop p features or is it a bug?
 	- finish fselect: c07hybrid, c07eager, a11hybrid, a11eager.
 	- figure out dev set vs fixed epoch for c07.
-	- finish 5x experiments.
+	= finish 5x experiments.
 	- finish embedding experiments.
 	- compare regexp based vs postag based word score.
 	+ does it matter if bp pepochs=1 or 5? not really: bp64c07h28b*
@@ -166,120 +346,6 @@
 	fs11e64e20: e20=8926 -> e20=8926 (04071209-fs11e64e20.cache)
 	fs11e39e21: e21=8880 -> e23=8906 (04061344-a11e21.cache)
 	fs11e39e39: e39=8906 -> e39=8906 (04042125-acl11eager2.cache)
-
-	* Summary: corpus-parser-arctype-feats where:
-	corpus in acl11, con07
-	parser in beam, dynamic, static
-	arctype in hybrid, eager
-	feats in ZN11e (arc11eager), GN13h (tacl13hybrid), or other
-
-	acl11-beam64-eager-ZN11e: uas1:no uas2:no
-	:(all except ZN11 scores include punct which approx -1.0%)
-	uas2dev	uas2tst	exp	las2dev	las2tst	uem2dev	uem2tst
-	9314	9290	ZN11	x	9180	5012	4800
-	9212	9165	03290018-bparse64.out(113/166)
-	9211	9171	03220927-bparselatestop.out(129/207)
-	9205	9166	03220548-bparsedbg.out(193/256)
-	9204	9189	04161249-bp64a11h25.out(65/130) (feats=hybrid25,uas2dev=9305,uas2tst=9270,model=04161131-bp64a11h25.jld)
-	9186	9136	03201925-julia3_btrain_jl.out(77/77)
-	9174	9182	04110746-bp64a11h27.out(45/59) (feats=hybrid27,got stuck)
-	9173	9170	04162129-bp64a11e25.out(60/120) (feats=eager25,model=04160207-bp64a11e25.jld)
-	9171	9152	03292013-bp10acl11eager.out(55/115)
-	9167	9153	04022337-bp64a11eR1.out(55/110) trn:7m30s prs:96m epoch:27m (5t1p)
-	9159	9142	03300736-bp10acl11eager13.out(75/155)
-	9158	9145	03240436-bpacl11.out(79/256)
-	9158	9140	03192351-gparsedbg.out(194/256)
-	9156	9141	04030908-bp64a11e13.out(65/130) trn:7m30s prs:96m epoch:27m (5t1p)
-	9154	9161	04110144-bp64a11e20.out(88/113) (feats=eager20,got stuck)
-	9154	9129	03171146-julia3_gtrain_jl.out(93/127)
-	9136	9109	03212217-gpacl11.out(184/256)
-	9116	9074	03200328-oparsedbg.out(254/256)
-	9099	9075	03160543-julia3_otrain_jl.out(128/256)
-	9093	9060	03212217-opacl11.out(210/256)
-
-	con07-dynamic-hybrid-GN13h: uas1:ok uas2:ok
-	:(no averaging or dev set in my results)
-	uas	las	exp
-	8762	8628	GN13
-	8913	?	04170445-gp07h28b.out(98/196) (feats=hybrid28b)
-	8903	x	04061328-gp07h14.out(314/458) (feats=hybrid14)
-	8848+	x	gp07h28b-?: minlen=200, @050=8818, @100=8844, maxavg@113=8866, @150=8848, @200=8840 (conll07 no dev)
-	8847	?	04161022-gp07h25.out(91/182) (feats=hybrid25)
-	8827	x	03291208-gpconll07hybrid13.out(93/187)
-	8811	x	04010424-gp07h13.out(164/328) (repeat of 03291208)
-	8801	x	03292304-gpconll07hybrid3.out(226/453) (ArcHybridR1)
-	8799	x	04010425-gp07h13d25.out(139/256) (dropout 0.2 0.5)
-	8793	x	03210908-gpconll07.out(133/256) (fv022b, no deprel)
-	8793	x	03311930-gp07h13k10.out(134/268) (10k hidden unit)
-	8789	x	03270848-gptacl13wp.out(241/256) (all wp features)
-	8789	x	03250401-gptacl13.out(169/213)
-	8773	x	03271009-gptacl13.out(233/256)
-	8761	x	04010123-gp07h13k44.out(138/276) (4k+4k hidden layers)
-	8744+	x	gp07h13-2?: minlen=208, @050=8726, @100=8739, maxavg@109=8774, @150=8734, @200=8744 (conll07 no dev)
-	8737+	x	gp07h13-?:  minlen=228, @050=8698, @100=8731, avgtst@maxavgdev@140=8744, @150=8748, @200=8764, maxavgtst@223=8775, tst@maxdev=8737 (conll07 dev02)
-	8733+	x	gp07h13-n3: minlen=000, @050=8715, @100=8733, ... (3net experiment) @@iui-nohup.out (conll07 no dev)
-	8727	x	03260538-gptacl13nl.out(228/256) (no deprel)
-	8717	x	03311154-gp07h13d25.out(16/32) (dropout 0.2 0.5, too short?)
-	8709	x	03260132-gptacl13w.out(256/256) (only w features)
-	8697+	x	gp07h13-3?: minlen=100, @050=8690, @100=8726, avgtst@maxavgdev@76=8713, maxavgtst@86=8745, tst@maxdev=8697 (conll07 dev200)
-	8659	x	03261450-gptacl13nd.out(26/256) (no dropout)
-	8005	x	03311801-gp07h13lr1.out(1/148) (learningRate=1.0)
-	7877	x	03270146-gptacl13p.out(187/256) (only p features)
-
-	con07-static-hybrid-GN13h: uas1:ok uas2:ok
-	uas	las	exp
-	8643	8496	GN13
-	8887	x	04070512-op07h14.out(377/754) (feats=hybrid14)
-	8823	x	03300624-opconll07hybrid13.out(242/485)
-	8806+	x	op07h28b-?: minlen=200, @050=8777, @100=8801, @150=8799, maxavg@177=8831, @200=8806 (conll07 no dev)
-	8783	x	03282213-opconll07hybrid.out(79/159)
-	8724+	x	op07h13-?:  minlen=146, @050=8700, maxavg@075=8741, @100=8710, @150=8724, @200=8715 (conll07 no dev)
-	8699	x	03210931-opconll07.out(170/256) (fv022b, no deprel)
-	8689	x	03271008-optacl13.out(234/256)
-	8675	x	03242000-optacl13.out(66/78)
-
-	con07-beam10-hybrid-GN13h
-	uas	las	exp
-	8865	x	03221208-bpconll07.out(54/256)
-	9041	?	04190719-bp64c07h28b.out(50/100) (try beam parser with best features)
-
-	con07-dynamic-eager-ZN11e: uas1:no uas2:yes
-	uas	las	exp
-	8869	8769	GN13
-	8897	x	04091636-gp07e20.out(62/124) (feats=eager20)
-	8887	?	04101642-gp07e21b.out(138/276) (feats=eager21b)
-	8883	?	04110758-eager21b.out(76/152) (feats=eager21b,shuffle)
-	8867	?	04111209-eager23.out(96/192) (feats=eager23,shuffle)
-	8861	x	04100103-gp07e20b.out(108/216) (feats=eager20b)
-	8847	x	04110739-gp07e21.out(437/599) (feats=eager21)
-	8847	?	04110758-eager20.out(104/208) (feats=eager20,shuffle)
-	8843	?	04021402-gp07e13k44.out(95/190) (feats=eager39,4+4k hidden)
-	8839	?	04020644-gp07e13k10.out(39/100) (feats=eager39,10k hidden)
-	8837	?	04111211-eager21.out(173/233) (feats=eager21, shuffle)
-	8831	?	04110758-eager39.out(51/102) (feats=eager39, shuffle)
-	8829	?	04110424-gp07e36.out(75/150) (feats=eager36)
-	8828+	x	gp07e21b-?: minlen=200, @050=8818, maxavg@066=8852, @100=8818, @150=8828, @200=8794 (conll07 no dev)(only 4 completed)
-	8823	?	04031246-gp07e13l01.out(190/380) (learningRate 0.1)
-	8821	x	03292103-gpconll07eager13.out(93/187)
-	8821	?	04110758-eager36.out(56/112) (feats=eager36,shuffle)
-	8817	x	04062220-gp07e36.out(71/100) (feats=eager36)
-	8811	?	04110758-eager20b.out(75/150) (feats=eager20b,shuffle)
-	8807	?	04101459-gp07e23.out(86/172) (feats=eager23)
-	8801	?	04111024-gp07e39.out(96/192) (feats=eager39)
-	8799	x	03290106-gpconll07eager.out(22/45)
-	8795	?	04021040-gp07e13d25.out(32/100) (dropout 0.2 0.5)
-	8793	x	04161530-gp07e25.out(137/274) (feats=eager25)
-	8785	?	04021101-gp07e13.out(33/100) (repl 03292103)
-	8763	x	03281848-gpconll07eager.out(32/65)
-
-	con07-static-eager-ZN11e: uas1:ok uas2:no
-	uas	las	exp
-	8610	8493	GN13
-	8739+	x	op07e21b-?: minlen=268, @050=8671, @100=8698, @150=8701, @200=8711, maxavg@250=8739 (conll07 no dev)
-	8685	x	03281640-opconll07eager.out(21/43)
-	8681	x	03300220-opconll07eager13.out(102/139)
-	8675	x	04070709-op07e36.out(28/100) (feats=eager36)
-	8649	x	03292324-opconll07eager.out(31/63)
 
 2015-04-10    <dyuret@ku.edu.tr>
 
