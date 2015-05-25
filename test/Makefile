@@ -100,3 +100,53 @@ conll07.%.op.mat: conll07.%.jld
 
 %.op.mat: %.jld
 	julia --depwarn=no -p ${NCPU} oparse2mat.jl $< fv021a $@
+
+
+VCIRIK=/mnt/ai/home/vcirik/temp/conll2eparse/run
+VWORD=${VCIRIK}/conll-ptb_type_wikipedia2MUNK-100
+VCVEC=${VCIRIK}/conll-ptb_token_wikipedia2MUNK-100+wikipedia2MUNK-100
+VPVEC=${VCIRIK}/conll-ptb_type_wikipedia2MUNK-100+pos
+VBOTH=${VCIRIK}/conll-ptb_token_wikipedia2MUNK-100+wikipedia2MUNK-100+pos
+PTBDEV=22
+PTBTST=23
+PTBTRN={02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21}
+
+%.wvec.lrb: %.wvec
+	perl -pe 's/^-LRB-/\(/;s/^-RRB-/\)/;s/^-LCB-/\{/;s/^-RCB-/\}/;' $< > $@
+
+acl11w.dev.wvec: ${VWORD}
+	cat $</${PTBDEV}/* | cut -f2,5,7,8,11 > $@
+
+acl11w.tst.wvec: ${VWORD}
+	cat $</${PTBTST}/* | cut -f2,5,7,8,11 > $@
+
+acl11w.trn.wvec: ${VWORD}
+	cat $</${PTBTRN}/* | cut -f2,5,7,8,11 > $@
+
+acl11c.dev.wvec: ${VCVEC}
+	cat $</${PTBDEV}/* | cut -f2,5,7,8,11 > $@
+
+acl11c.tst.wvec: ${VCVEC}
+	cat $</${PTBTST}/* | cut -f2,5,7,8,11 > $@
+
+acl11c.trn.wvec: ${VCVEC}
+	cat $</${PTBTRN}/* | cut -f2,5,7,8,11 > $@
+
+acl11p.dev.wvec: ${VPVEC}
+	cat $</${PTBDEV}/* | cut -f2,5,7,8,11 > $@
+
+acl11p.tst.wvec: ${VPVEC}
+	cat $</${PTBTST}/* | cut -f2,5,7,8,11 > $@
+
+acl11p.trn.wvec: ${VPVEC}
+	cat $</${PTBTRN}/* | cut -f2,5,7,8,11 > $@
+
+acl11cp.dev.wvec: ${VBOTH}
+	cat $</${PTBDEV}/* | cut -f2,5,7,8,11 > $@
+
+acl11cp.tst.wvec: ${VBOTH}
+	cat $</${PTBTST}/* | cut -f2,5,7,8,11 > $@
+
+acl11cp.trn.wvec: ${VBOTH}
+	cat $</${PTBTRN}/* | cut -f2,5,7,8,11 > $@
+
