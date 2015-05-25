@@ -1,26 +1,29 @@
 module Flist                    # feature matrices
 
-# fs11e64e27 (9098): local best for acl11, ArcEager13, start=eager27=hybrid27, all=eager64, bparser10, shuffled
-eager25 = split("n0A n0a n0l2L n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0B s0p s0w s1A s1B s1a s1d s1p s1rL s1rp s1w s2p s2w")
-
 # fs11h54h27 (9144): local best for acl11, ArcHybrid13, start=hybrid27, all=hybrid54, bparser10, shuffled
 hybrid25 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0rL s0w s1A s1B s1a s1rL s1rp s1rw s1w s2w")
 
-# fs11h54h14 (8992): local best for acl11, ArcHybrid13, start=hybrid14, all=hybrid54
-hybrid25b = split("n0a n0l2p n0l2w n0lp n0lw n0w n1p n1w n2w s0B s0a s0d s0l2L s0lL s0lp s0p s0rp s0w s1B s1b s1lL s1lp s1p s1r2p s1w")
-
-# fs07h54h28 (8797): local best for conll07, ArcHybrid13, start=hybrid28, all=hybrid54
-hybrid28b = split("n0A n0a n0l2w n0lL n0lp n0p n0w n1p n1w n2w s0A s0B s0a s0b s0d s0p s0w s1A s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
+# fs11e64e27 (9098): local best for acl11, ArcEager13, start=eager27=hybrid27, all=eager64, bparser10, shuffled
+eager25 = split("n0A n0a n0l2L n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0B s0p s0w s1A s1B s1a s1d s1p s1rL s1rp s1w s2p s2w")
 
 # fs11h54h28 (8997): local best in acl11, ArcEager13 (by mistake), start=hybrid28, all=hybrid54
 hybrid27 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
 eager27 = hybrid27
+
+# fs11h54h14 (8992): local best for acl11, ArcHybrid13, start=hybrid14, all=hybrid54
+hybrid25b = split("n0a n0l2p n0l2w n0lp n0lw n0w n1p n1w n2w s0B s0a s0d s0l2L s0lL s0lp s0p s0rp s0w s1B s1b s1lL s1lp s1p s1r2p s1w")
 
 # fs11e64e20 (8926): local best for acl11, ArcEager13, start=eager20, all=eager64
 eager20 = split("n0A n0a n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
 
 # fs11e39e21 (8906): local best for acl11, ArcEager13, start=eager21, all=eager39
 eager23 = split("n0A n0lL n0lp n0p n0w n1p n1w n2p n2w s0B s0L s0a s0b s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
+
+# fs07h54h28 (8797): local best for conll07, ArcHybrid13, start=hybrid28, all=hybrid54
+hybrid28b = split("n0A n0a n0l2w n0lL n0lp n0p n0w n1p n1w n2w s0A s0B s0a s0b s0d s0p s0w s1A s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
+
+# fs07h54h13 (8791): Local best for conll07, ArcHybrid13, start=tacl13hybrid (aka hybrid13), all=hybrid54
+hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
 
 # fs07e39e39 (8725): local best in conll07, ArcEager13, start=acl11eager, all=acl11eager
 eager36 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0b s0d s0h2p s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2p s0r2w s0rL s0rp s0rw s0w")
@@ -30,9 +33,6 @@ eager20b = split("n0l2L n0lw n0p n0w n1w n2p n2w s0B s0L s0a s0h2p s0hw s0l2L s0
 
 # fs07e64e20 (8677): Local best for conll07, ArcEager13, start=eager20, all=eager64
 eager21b = split("n0A n0a n0l2L n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
-
-# fs07h54h13 (8791): Local best for conll07, ArcHybrid13, start=tacl13hybrid (aka hybrid13), all=hybrid54
-hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
 
 # more complete set than acl11eager: added s1 features
 eager64 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0a s0b s0d s0h2p s0h2w s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2L s0r2p s0r2w s0rL s0rp s0rw s0w s1A s1B s1L s1a s1b s1d s1h2p s1h2w s1hL s1hp s1hw s1l2L s1l2p s1l2w s1lL s1lp s1lw s1p s1r2L s1r2p s1r2w s1rL s1rp s1rw s1w")
