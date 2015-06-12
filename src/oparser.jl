@@ -8,21 +8,21 @@
 # feats::Fvec: (optional) specification of features, a (p,x,y) tuple returned if specified, only p if not
 
 
-function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats::Fvec=Feature[])
+function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats=nothing)
     p = pt(wcnt(s), ndeps)
     oparse(p, s, ndeps, feats)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec=Feature[])
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats=nothing)
     pa = map(s->pt(wcnt(s), ndeps), c)
     oparse(pa, c, ndeps, feats)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats::Fvec=Feature[])
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats=nothing)
     @date Main.resetworkers(ncpu)
     sa = distribute(c)                                  # distributed sentence array
     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
-    if !isempty(feats)
+    if !(feats==nothing)
         xtype = wtype(c[1])
         x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
         y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
@@ -42,12 +42,12 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer
     end
     pa = convert(Vector{pt}, pa)
     @date Main.rmworkers()
-    return (isempty(feats) ? pa : (pa, sdata(x), sdata(y)))
+    return ((feats==nothing) ? pa : (pa, sdata(x), sdata(y)))
 end
 
-function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec=Feature[], 
-                x::AbstractArray=(isempty(feats) ? [] : Array(wtype(s),xsize(p,s,feats))), 
-                y::AbstractArray=(isempty(feats) ? [] : zeros(wtype(s),ysize(p,s))),
+function oparse(p::Parser, s::Sentence, ndeps::Integer, feats=nothing, 
+                x::AbstractArray=((feats==nothing) ? [] : Array(wtype(s),xsize(p,s,feats))), 
+                y::AbstractArray=((feats==nothing) ? [] : zeros(wtype(s),ysize(p,s))),
                 nx::Integer=0)
     c = Array(Position, p.nmove)
     totalcost = 0; nx0 = nx
@@ -55,26 +55,26 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec=Feature[],
         movecosts(p, s.head, s.deprel, c)
         (bestcost,bestmove) = findmin(c)
         totalcost += bestcost
-        if !isempty(feats)
+        if !(feats==nothing)
             features(p, s, feats, x, (nx+=1))
             y[:, nx] = zero(eltype(y))
             y[bestmove, nx] = one(eltype(y))
         end
         move!(p, bestmove)
     end
-    @assert (isempty(feats) || (nx0 + nmoves(p,s) == nx))
+    @assert ((feats==nothing) || (nx0 + nmoves(p,s) == nx))
     @assert (totalcost == truecost(p,s))
-    return (isempty(feats) ? p : (p,x,y))
+    return ((feats==nothing) ? p : (p,x,y))
 end
 
-function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec=Feature[], 
-                           x::AbstractArray=(isempty(feats) ? [] : Array(wtype(c[1]),xsize(pa[1],c,feats))), 
-                           y::AbstractArray=(isempty(feats) ? [] : zeros(wtype(c[1]),ysize(pa[1],c))),
+function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats=nothing, 
+                           x::AbstractArray=((feats==nothing) ? [] : Array(wtype(c[1]),xsize(pa[1],c,feats))), 
+                           y::AbstractArray=((feats==nothing) ? [] : zeros(wtype(c[1]),ysize(pa[1],c))),
                            nx::Integer=0)
     for i=1:length(c)
         oparse(pa[i], c[i], ndeps, feats, x, y, nx)
-        isempty(feats) || (nx += nmoves(pa[i], c[i]))
+        (feats==nothing) || (nx += nmoves(pa[i], c[i]))
     end
-    return (isempty(feats) ? pa : (pa,x,y))
+    return ((feats==nothing) ? pa : (pa,x,y))
 end
 
