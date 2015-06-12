@@ -13,6 +13,10 @@ include("oparser.jl");    export oparse
 include("rparser.jl");    export rparse
 include("flist.jl");      export Flist
 
+# Setting for dense vs sparse features:
+features = dfeatures
+# features = sfeatures
+
 end # module
 
 include("resetworkers.jl");
