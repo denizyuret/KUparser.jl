@@ -1,3 +1,413 @@
+2015-06-12    <dyuret@ku.edu.tr>
+
+	* acl11hybrid: dictionary.
+
+		paper		GN13		acl11		label
+		:----		:---		:----		:----
+	single	S0w		s0w		STw		StackWord
+		S0p		s0p		STt		StackTag
+		S0wp		s0wp		STwt		StackWordTag
+		N0w		n0w		N0w		NextWord
+		N0p		n0p		N0t		NextTag
+		N0wp		n0wp		N0wt		NextWordTag
+		N1w		n1w		N1w		Next+1Word
+		N1p		n1p		N1t		Next+1Tag
+		N1wp		n1wp		N1wt		Next+1WordTag
+		N2w		n2w		N2w		Next+2Word
+		N2p		n2p		N2t		Next+2Tag
+		N2wp		n2wp		N2wt		Next+2WordTag
+	unigram	S0hw		s0hw		STHw		StackHeadWord
+		S0hp		s0hp		STHt		StackHeadTag
+		S0L		s0L		STi		StackLabel
+	third	S0h2w		s0h2w		STHHw		StackHeadHeadWord
+		S0h2p		s0h2p		STHHt		StackHeadHeadTag
+		S0hL		s0hL		STHi		StackLabel ?? StackHeadLabel
+	unigram	S0lw		s0lw		STLDw		StackLDWord
+		S0lp		s0lp		STLDt		StackLDTag
+		S0lL		s0lL		STLDi		StackLDLabel
+		S0rw		s0rw		STRDw		StackRDWord
+		S0rp		s0rp		STRDt		StackRDTag
+		S0rL		s0rL		STRDi		StackRDLabel
+		N0lw		n0lw		N0LDw		NextLDWord
+		N0lp		n0lp		N0LDt		NextLDTag
+		N0lL		n0lL		N0LDi		NextLDLabel
+	third	S0l2w		s0l2w		STL2Dw		StackL2DWord
+		S0l2p		s0l2p		STL2Dt		StackL2DTag
+		S0l2L		s0l2L		STL2Di		StackL2DLabel
+		S0r2w		s0r2w		STR2Dw		StackR2DWord
+		S0r2p		s0r2p		STR2Dt		StackR2DTag
+		S0r2L		s0r2L		STR2Di		StackR2DLabel
+		N0l2w		n0l2w		N0L2Dw		NextL2DWord
+		N0l2p		n0l2p		N0L2Dt		NextL2DTag
+		N0l2L		n0l2L		N0L2Di		NextL2DLabel
+	unused					HTw		HeadStackWord
+						HTt		HeadStackTag
+						HTwt		HeadStackWordTag
+	pair	S0wpN0wp	s0wp,n0wp	STwtN0wt	StackWordTagNextWordTag
+		S0wpN0w		s0wp,n0w	STwtN0w		StackWordTagNextWord
+		S0wN0wp		s0w,n0wp	STwN0wt		StackWordNextWordTag
+		S0pN0wp		s0p,n0wp	STtN0wt		StackTagNextWordTag
+		S0wpN0p		s0wp,n0p	STwtN0t		StackWordTagNextTag
+		S0wN0w		s0w,n0w		STwN0w		StackWordNextWord
+		S0pN0p		s0p,n0p		STtN0t		StackTagNextTag
+		N0pN1p		n0p,n1p		N0tN1t		NextTagNext+1Tag
+	three	N0pN1pN2p	n0p,n1p,n2p	N0tN1tN2t	NextTagTrigram
+		S0pN0pN1p	s0p,n0p,n1p	STtN0tN1t	StackTagNextTagNext+1Tag
+		S0pN0pN0lp	s0p,n0p,n0lp	STtN0tN0LDt	StackTagNextTagNextLDTag
+	third	N0pN0lpN0l2p	n0p,n0lp,n0l2p	N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextL2DTag
+		S0hpS0pN0p	s0hp,s0p,n0p	STHtSTtN0t	StackHeadTagStackTagNextTag
+	unused					HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
+	third	S0pS0hpS0h2p	s0p,s0hp,s0h2p	STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
+	three	S0pS0lpN0p	s0p,s0lp,n0p	STtSTLDtN0t	StackTagStackLDTagNextTag
+	third	S0pS0lpS0l2p	s0p,s0lp,s0l2p	STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
+	three	S0pS0rpN0p	s0p,s0rp,n0p	STtSTRDtN0t	StackTagStackRDTagNextTag
+	third	S0pS0rpS0r2p	s0p,s0rp,s0r2p	STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
+	dist	S0wd		s0wd		STwd		StackWordDist
+		S0pd		s0pd		STtd		StackTagDist
+		N0wd		n0wd		N0wd		NextWordDist
+		N0pd		n0pd		N0td		NextTagDist
+		S0wN0wd		s0w,n0w,d	STwN0wd		StackWordNextWordDist
+		S0pN0pd		s0p,n0p,d	STtN0td		StackTagNextTagDist
+	valency	S0wvr		s0wvr		STwra		StackWordRightArity
+		S0pvr		s0pvr		STtra		StackTagRightArity
+		S0wvl		s0wvl		STwla		StackWordLeftArity
+		S0pvl		s0pvl		STtla		StackTagLeftArity
+		N0wvl		n0wvl		N0wla		NextWordRightArity ?? NextWordLeftArity
+		N0pvl		n0pvl		N0tla		NextTagRightArity  ?? NextTagLeftArity
+	labset	S0wsr		s0wsr		STwrp		StackWordRightSetoftags
+		S0psr		s0psr		STtrp		StackTagRightSetoftags
+		S0wsl		s0wsl		STwlp		StackWordLeftSetoftags
+		S0psl		s0psl		STtlp		StackTagLeftSetoftags
+		N0wsl		n0wsl		N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
+		N0psl		n0psl		N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
+	unused					STl		StackLemma
+						STc		StackCPOS
+						STf		StackFeats
+						N0l		NextLemma
+						N0c		NextCPOS
+						N0f		NextFeats
+						N1l		Next+1Lemma
+						N1c		Next+1CPOS
+						N1f		Next+1Feats
+
+2015-06-11    <dyuret@ku.edu.tr>
+
+	* SPARSE-KUPARSER:
+	- Debug fix kuparser with new kunet.
+	- Sparse features in kuparser: create a new branch.
+	-- a feature vector is an array of feature elements
+	-- a feature element is an array of primitive features
+	-- we know the size for each primitive feature so we can get the sizes for elements and vectors.
+	- features are always binary; i.e. a feature vector can be seen as a binary vector or a list of integers (for nonzero positions)
+	- unfortunately bool matrices have no mmul, but sparse bool matrices do
+	- we can do Int8, or just keep Float32.
+	- there is also a bitarray
+	- sparse.colptr always has number of columns entries, this limits the number of instances.
+	- rowval and nzval have number of nonzero entries, this means xrows can be up to 1<<64.
+	;;; So let's use sparse matrices and the rest of kuparser, kunet.
+	; we just need to rewrite features.jl to support sparse / compound features.
+	; we need dictionaries of words and pos: available via corpus
+	; currently corpus has deprel and postag dictionaries.
+	; in the sentences head, deprel, postag are Uint8 arrays, form is
+	UTF8String array.
+	; deprel, postag are closed class, but what to do with unknown
+	words in test set.  Use a closed vocabulary with unk.
+	; acl11.trn.wvec has 44389 unique words, 20162 used more than
+	once.  decide on an unknown word policy.  what do zhang and
+	goldberg do?  it turns out nothing.  unknown words just have zero weights in the perceptron.
+	; acl11 uses perceptron training!  so I should be able to
+	replicate exactly!  what kind of perceptron?  seems to be weighted perceptron.
+	??? acl11/src/english/dependency/rules/penn.h has a bunch of
+	constraints on which labels can link to each other etc.  cheating?
+	should look carefully at this code...
+
+	; figure out the vocab (fixed,open,encoding?), features (numeric
+	encoding,can we spit out the actual feature vectors?), and
+	perceptron details (averaged, structured?) and replicate acl11
+	first (would require beam to work with sparse).  then use kernel
+	perceptron to compare.  In fact if we could spit out the features
+	we could do a simple static test of kernels (not beam).
+
+	; run.en.log in acl11... started 1:45AM Jun 11 parcore-6-0.
+	; 1 epoch trn takes 520 secs, dev takes 39, tst takes 53.
+	; what are the 3 numbers printed out by eval.py? UAS, LAS, UEM
+	; was able to confirm the results in the paper dev=9314 tst=9290 running run.en.sh in acl11.
+	? does this not use the gold postags? devi.txt and tsti.txt could have generated postags. check.
+	; data/en/model might be readable
+
+	* ACL11-MODEL: probably we can answer most questions about the
+	acl11 results using the model file data/en/model:
+
+	Text file with dependency labels on the first two lines followed by
+	blocks for each feature separated by empty lines.
+	Ending with a Rules={0,1} line.
+	Each block starts with a line with the feature name and a count.
+	? Is the count the number of unique values?
+	Each subsequent line in block has a value, colon, list of weights in {}.
+	Each weight has (a : b / c)
+	? a is the move
+	? b is the perceptron weight
+	? c is the summed perceptron weight for averaged perceptron
+
+	;; maybe we leave the unknowns alone, the perceptron simply pretends they have zero weight.
+	;; StackWord can be less than the actual words due to early stopping?  pruning?
+
+	* ACL11-MODEL-BLOCKS: perl -ne 'print if $prev !~/\S/; $prev=$_;' data/en/model
+	Q: what is the deal with the word counts?  Seems to be upper bound.
+	Q: StackLabel duplicated, is it really a different feature?
+	Q: how are the penn rules used?
+	Q: what is the deal with the moves / weights?
+
+	Dependency labels:	;; not a real block
+	StackWord 31308		;; [In] unique words? 29874 entries?
+	StackTag 45		;; DT  really has 45 entries.
+	StackWordTag 37111	;; moment/NN  unique word-tag pairs? word/POS format
+	NextWord 28572		;; [In] 27040 actual
+	NextTag 45
+	NextWordTag 33317
+	Next+1Word 26850
+	Next+1Tag 45
+	Next+1WordTag 31120
+	Next+2Word 28530
+	Next+2Tag 45
+	Next+2WordTag 32602
+	StackHeadWord 20415
+	StackHeadTag 45
+	StackLabel 12		;; 10  represented by numbers 1-12
+	StackHeadHeadWord 17491
+	StackHeadHeadTag 45
+	StackLabel 12		;; duplicate?? entries different!
+	StackLDWord 22188
+	StackLDTag 45
+	StackLDLabel 12
+	StackRDWord 20933
+	StackRDTag 44		;; one tag missing?  44 actual.
+	StackRDLabel 12
+	NextLDWord 23384
+	NextLDTag 45
+	NextLDLabel 12
+	StackL2DWord 13754
+	StackL2DTag 44		;; one tag missing?
+	StackL2DLabel 9		;; three labels missing?
+	StackR2DWord 13535
+	StackR2DTag 44
+	StackR2DLabel 11
+	NextL2DWord 17555
+	NextL2DTag 45
+	NextL2DLabel 12
+	HeadStackWord		;; HeadStack not used
+	HeadStackTag
+	HeadStackWordTag
+	StackWordTagNextWordTag 476465	;; books/NNS , estimates/NNS  bigrams?
+	StackWordTagNextWord 467993	;; [push] , [for] , NN
+	StackWordNextWordTag 461620	;; [became] , [would] , MD
+	StackTagNextWordTag 158043	;; [subsidizing] , VB , VBG
+	StackWordTagNextTag 176869	;; [TIGRs] , NNP , NN
+	StackWordNextWord 452725	;; [colors] , [times]
+	StackTagNextTag 1627		;; [ $ CC ]  45*45=2025
+	NextTagNext+1Tag 1302		;; [ $ CD ]
+	NextTagTrigram 12851		;; [ RBR `` JJ ] 45*45*45=91125
+	StackTagNextTagNext+1Tag 21029	;; tagtrigram: uses special symbol -NONE-
+	StackTagNextTagNextLDTag 13981	;; tagtrigram
+	StackTagNextTagNextLDTagNextTagNextL2DTag 7439	;; tagtrigrams from here on
+	StackHeadTagStackTagNextTag 19698
+	HeadStackTagHeadStack2TagNextTag	;; not used.
+	StackHeadHeadTagStackHeadTagStackTag 10904
+	StackTagStackLDTagNextTag 15297
+	StackTagStackLDTagStackL2DTag 6342
+	StackTagStackRDTagNextTag 14382
+	StackTagStackRDTagStackR2DTag 8998
+	StackWordDist 94347	;; [nature] , 4  ;; 1-6, 5:[5-10], 6:[11+]
+	StackTagDist 269	;; Dist does not appear by itself
+	NextWordDist 82991
+	NextTagDist 261
+	StackWordNextWordDist 561392
+	StackTagNextTagDist 6708
+	StackWordRightArity 75076	;; [crabby] , 0
+	StackTagRightArity 337		;; 0-21, 51-53 arity unfiltered
+	StackWordLeftArity 73590
+	StackTagLeftArity 353
+	NextWordRightArity 83417
+	NextTagRightArity 422
+	StackWordRightSetoftags 84925	;; [forever] , [ AMOD P ]
+	StackTagRightSetoftags 1434	;; Setoftags alphabetically sorted and uniqued
+	StackWordLeftSetoftags 68065	;; 206 uniq setoftags
+	StackTagLeftSetoftags 920
+	Next0WordLeftSetoftags 73823
+	Next0TagLeftSetoftags 1058
+	StackLemma		;; Lemma, CPOS, Feats not used
+	StackCPOS
+	StackFeats
+	NextLemma
+	NextCPOS
+	NextFeats
+	Next+1Lemma
+	Next+1CPOS
+	Next+1Feats
+	Rules=0			;; Don't know what this is, but it is an empty block
+
+	* ACL11-SRC:
+	./src/common/parser/main.cpp
+	;; args: input, output, model
+	;; main -> process -> parser.parse( input_sent , outout_sent , nBest , scores )
+
+	./src/common/parser/train.cpp
+	;; args: data, model, iters
+	;; main -> auto_train(options.args[1], options.args[2], bRules, sSuperPath, bCoNLL);
+	;; -> parser.train( ref_sent, nCount );
+	;; -> parser.finishtraining();
+
+	./src/common/parser/implementations/arceager/depparser.cpp: %.h, depparser_weight.h
+	;; 716:parse -> work(false, sentence, retval, empty, nBest, scores )
+	;; 738:train -> work( true , sentence , &outout , correct , 1 , 0 )
+	;; 513:work
+	;; -> bool bContradictsRules?
+	;; set to true if:
+	;;         if ( correct[index].head == DEPENDENCY_LINK_NO_HEAD && canBeRoot(m_lCache[index].tag.code())==false) {
+	;;         if ( correct[index].head < index && hasLeftHead(m_lCache[index].tag.code())==false) {
+	;;         if ( correct[index].head > index && hasRightHead(m_lCache[index].tag.code())==false) {
+	;;         if (m_weights->rules() && !canAssignLabel(m_lCache, correct[index].head, index, m_lCacheLabel[index])) {
+	;; so we use canBeRoot, hasLeftHead, hasRightHead, canAssignLabel built-in?
+	;; do we have supertags?
+	;; 539:      if (bTrain && m_weights->rules()) { does a bunch of rule checking during training and skips stuff
+	;; 585:skip training example if it contradicts rules (but not testing?)
+	;; 613:moves: reduce, poproot at the end. shift, arcleft, arcright.
+	;; 620:keep only one global root?
+	;; 618:move preconditions here, uses canBeRoot, canShift, canBeRoot, hasRightHead
+	;; 628:canArcRight, hasLeftHead
+	;; we have conditions based on supertags and rules! (is it one or the other?)
+	;; 642:canArcLeft, hasRightHead
+	;; 667:EARLY_UPDATE
+	;; 675:adding labels and making move
+	;; does not seem to look at rules.  m_weights->rules()=0.  RULES=0 at the end of model file?
+	;; m_supertags is 0 as well. so ignore all that code.
+	;; foo.model: single sentence training, supertags and rules both 0.
+	;; error at 4th word out of 49 (early stop, only the first 3 words enter model)
+	;; foo2.model: single sentence starting from date/en/model.
+	;; the third number is definitely the sum for averaged perceptron
+	;; 0 error so initial numbers did not change, but the sums did.
+	;; for all features, not just the sentences parsed.
+	;; sum per epoch or sum per sentence? -- per sentence
+	;; the new models have the counts correct as well
+	;; maybe the other model had it wrong because of not taking the last epoch?
+	;; TODO: can we have it spit out (oracle) features?
+	;; DONE: is he keeping weights as integers?  64bit?
+	;; scores read in score_packed_list.h:41?  does not handle / sum.
+	;; defined in score.h:45, fields SCORE_TYPE current and total.
+	;; depparser_macros.h defines SCORE_TYPE as long, i.e. Int32
+	;; it also has encode_link_distance:
+	if (diff>10) diff = 6;
+	else if (diff>5) diff = 5;
+	return diff;
+	;; TODO: we need to make sure right features, feature combos (beware of duplicate) and move set move conditions.
+	;;; loading scores: find out what happens to duplicate featurename: done, a number of misspellings
+	;;; TODO: parsing: see if we can output the features as the parser moves
+	;;;; TODO: which instances does acl11 train on?
+	;;;; DONE: what beam size? AGENDA_SIZE=64 in depparser_macros.h
+
+	./src/common/parser/implementations/arceager/depparser_weight.cpp: %.h
+	./src/libs/linguistics/lemma.cpp: %.h
+	./src/libs/linguistics/conll.cpp: %.h
+	./src/libs/options.cpp: %.h
+	./src/libs/reader.cpp: %.h
+	./src/libs/writer.cpp: %.h
+
+	;; headers
+	./src/include/definitions.h: sentence_string.h
+	./src/include/linguistics/sentence_string.h: utf.h
+	./src/include/linguistics/lemma.h: tokenizer.h
+	./src/include/options.h: definitions.h
+	./src/include/reader.h: definitions.h, file_utils.h, sentence_string.h
+	./src/include/writer.h: definitions.h, sentence_string.h
+	./src/include/file_utils.h:
+	./src/include/utf.h:
+
+	./src/include/linguistics/conll.h: utils.h dependency.h dependencylabel.h generictag.h
+	./src/include/linguistics/dependencylabel.h: dependency.h
+	./src/include/linguistics/dependency.h: sentence_template, dependency_utils
+	./src/include/linguistics/generictag.h: tokenizer
+	./src/include/linguistics/dependency_utils.h: sentence_string
+	./src/include/linguistics/sentence_template.h:
+	./src/include/utils.h: definitions.h
+
+	./src/common/parser/implementations/arceager/depparser.h: depparser_base.h, state.h, depparser_weight.h
+	./src/common/parser/implementations/arceager/depparser_weight.h: depparser_weight_base.h
+	./src/common/parser/implementations/arceager/state.h:
+	./src/common/parser/depparser_base.h: depparser_base_include.h, depparser_weight_base.h
+	./src/common/parser/depparser_weight_base.h: depparser_base_include.h
+
+	./src/common/parser/depparser_base_include.h: definitions, utils, tags, word_tokenized, taggedword, dependency, dependencylabel, dep, depparser_macros, conll, depparser_impl_inc, tagset, options, supertag
+	./src/english/tags.h: pos/penn.h pos/penn_morph.h
+	./src/english/dep.h: dependency/label/penn.h dependency/rules/penn.h
+	./src/include/linguistics/word_tokenized.h: tokenizer, bigram, word_common
+	./src/include/linguistics/taggedword.h:
+	./src/include/linguistics/tagset.h:
+	./src/common/parser/implementations/arceager/depparser_macros.h: action.h
+	./src/common/parser/supertag.h:
+	./src/english/pos/penn.h:
+	./src/english/pos/penn_morph.h: tagdict.h
+	./src/include/knowledge/tagdict.h: hash.h
+	./src/english/dependency/label/penn.h: tags
+	./src/english/dependency/rules/penn.h: tags, dependency/label/penn.h
+	./src/include/bigram.h:
+	./src/include/linguistics/word_common.h:
+	./src/common/parser/implementations/arceager/action.h:
+
+	./src/common/parser/implementations/arceager/depparser_impl_inc.h: agenda, pair_stream, hashmap_score_packed, bigram, tuple{2,3,4}, lemma, charcat
+	./src/include/agenda.h: definitions
+	./src/include/pair_stream.h:
+	./src/english/charcat.h:
+	./src/include/tuple4.h:
+	./src/include/tuple3.h:
+	./src/include/tuple2.h:
+
+	./src/include/learning/perceptron/hashmap_score_packed.h: hash, hash_small, score, score_packed_list
+	./src/include/hash_small.h: pool.h
+	./src/include/learning/perceptron/score_packed_list.h: hash, score, linkedlist
+	./src/include/learning/perceptron/score.h:
+	./src/include/linkedlist.h: pool.h
+
+	./src/include/tokenizer.h: hash.h
+	./src/include/hash.h: hash_utils, hash_simple, hash_stream
+	./src/include/hash_utils.h: definitions
+	./src/include/hash_simple.h: pool.h
+	./src/include/hash_stream.h:
+	./src/include/pool.h:
+
+	;; unused?
+	./src/libs/linguistics/cfg/generic.cpp
+	./src/libs/linguistics/constituent.cpp
+	./src/common/parser/test.cpp
+
+	;; chinese specific
+	./src/chinese/doc2snt/main.cpp
+	./src/chinese/doc2snt/doc2snt.cpp
+
+	;; labeler, when does it get used? run.en.sh uses data/en/*.txt files which have gold tags?
+	./src/common/deplabeler/main.cpp
+	./src/common/deplabeler/train.cpp
+	./src/common/deplabeler/implementations/naive/deplabeler.cpp
+	./src/common/deplabeler/implementations/naive/weight.cpp
+
+2015-06-10    <dyuret@ku.edu.tr>
+
+	* TODO: copy :gpu and :cpu does not work any more.  Supposed to
+	use KUnet.atype before copy?  But we need to rethink atype in
+	light of sparse arrays.  Until then multi-core stuff fails in
+	KUparser.
+
+	* TODO: add one-hot word and pos to features.jl.  test it with
+	sparse arrays.  run the first half of the kernel vs linear
+	experiment.
+	; or extract strings and run kunet separately, easier debug?
+	Figure out how to extract the combo features.
+	; write special code just for this?
+	Use
+	; strings and liblinear?
+	; Or perceptron with sparse features.
+	;; but w will be full, is the dimensionality enough?
+
+
 2015-05-05    <dyuret@ku.edu.tr>
 
 	* paper: ideas:
@@ -845,95 +1255,6 @@ DATA:	194	0.98414147	0.8794723
 	+ extend training to 2x best
 	+ use dev set or fixed epochs
 
-	* acl11hybrid: dictionary.
-
-		paper		GN13		acl11		label
-		:----		:---		:----		:----
-	single	S0wp		s0wp		STwt		StackWordTag
-		S0w		s0w		STw		StackWord
-		S0p		s0p		STt		StackTag
-		N0wp		n0wp		N0wt		NextWordTag
-		N0w		n0w		N0w		NextWord
-		N0p		n0p		N0t		NextTag	
-		N1wp		n1wp		N1wt		Next+1WordTag
-		N1w		n1w		N1w		Next+1Word
-		N1p		n1p		N1t		Next+1Tag
-		N2wp		n2wp		N2wt		Next+2WordTag
-		N2w		n2w		N2w		Next+2Word
-		N2p		n2p		N2t		Next+2Tag
-	???					HTw		HeadStackWord	
-						HTt		HeadStackTag	
-						HTwt		HeadStackWordTag
-	pair	S0wpN0wp	s0wp,n0wp	STwtN0wt	StackWordTagNextWordTag	
-		S0wpN0w		s0wp,n0w	STwtN0w		StackWordTagNextWord	
-		S0wN0wp		s0w,n0wp	STwN0wt		StackWordNextWordTag	
-		S0wpN0p		s0wp,n0p	STwtN0t		StackWordTagNextTag	
-		S0pN0wp		s0p,n0wp	STtN0wt		StackTagNextWordTag	
-		S0wN0w		s0w,n0w		STwN0w		StackWordNextWord	
-		S0pN0p		s0p,n0p		STtN0t		StackTagNextTag		
-		N0pN1p		n0p,n1p		N0tN1t		NextTagNext+1Tag	
-	three	N0pN1pN2p	n0p,n1p,n2p	N0tN1tN2t	NextTagTrigram		
-		S0pN0pN1p	s0p,n0p,n1p	STtN0tN1t	StackTagNextTagNext+1Tag
-		S0hpS0pN0p	s0hp,s0p,n0p	STHtSttN0t	StackHeadTagStackTagNextTag
-		S0pS0lpN0p	s0p,s0lp,n0p	STtSTLDtN0t	StackTagStackLDTagNextTag
-		S0pS0rpN0p	s0p,s0rp,n0p	STtSTRDtN0t	StackTagStackRDTagNextTag
-		S0pN0pN0lp	s0p,n0p,n0lp	STtN0tN0LDt	StackTagNextTagNextLDTag
-	???					HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
-	dist	S0wd		s0wd		STwd		StackWordDist	
-		S0pd		s0pd		STtd		StackTagDist	
-		N0wd		n0wd		N0wd		NextWordDist	
-		N0pd		n0pd		N0td		NextTagDist	
-		S0wN0wd		s0w,n0w,d	STwN0wd		StackWordNextWordDist
-		S0pN0pd		s0p,n0p,d	STtN0td		StackTagNextTagDist
-	valency	S0wvr		s0wvr		STwra		StackWordRightArity
-		S0pvr		s0pvr		STtra		StackTagRightArity
-		S0wvl		s0wvl		STwla		StackWordLeftArity
-		S0pvl		s0pvl		STtla		StackTagLeftArity
-		N0wvl		n0wvl		N0wla		NextWordRightArity ?? NextWordLeftArity
-		N0pvl		n0pvl		N0tla		NextTagRightArity  ?? NextTagLeftArity
-	unigram	S0hw		s0hw		STHw		StackHeadWord
-		S0hp		s0hp		STHt		StackHeadTag
-		S0L		s0L		STi		StackLabel
-		S0lw		s0lw		STLDw		StackLDWord
-		S0lp		s0lp		STLDt		StackLDTag
-		S0lL		s0lL		STLDi		StackLDLabel
-		S0rw		s0rw		STRDw		StackRDWord
-		S0rp		s0rp		STRDt		StackRDTag
-		S0rL		s0rL		STRDi		StackRDLabel
-		N0lw		n0lw		N0LDw		NextLDWord
-		N0lp		n0lp		N0LDt		NextLDTag
-		N0lL		n0lL		N0LDi		NextLDLabel
-	third	S0h2w		s0h2w		STHHw		StackHeadHeadWord
-		S0h2p		s0h2p		STHHt		StackHeadHeadTag
-		S0hL		s0hL		STHi		StackLabel ?? StackHeadLabel	
-		S0l2w		s0l2w		STL2Dw		StackL2DWord	
-		S0l2p		s0l2p		STL2Dt		StackL2DTag	
-		S0l2L		s0l2L		STL2Di		StackL2DLabel	
-		S0r2w		s0r2w		STR2Dw		StackR2DWord	
-		S0r2p		s0r2p		STR2Dt		StackR2DTag	
-		S0r2L		s0r2L		STR2Di		StackR2DLabel	
-		N0l2w		n0l2w		N0L2Dw		NextL2DWord	
-		N0l2p		n0l2p		N0L2Dt		NextL2DTag	
-		N0l2L		n0l2L		N0L2Di		NextL2DLabel
-		S0pS0lpS0l2p	s0p,s0lp,s0l2p	STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
-		S0pS0rpS0r2p	s0p,s0rp,s0r2p	STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
-		S0pS0hpS0h2p	s0p,s0hp,s0h2p	STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
-		N0pN0lpN0l2p	n0p,n0lp,n0l2p	N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextTagNextL2DTag
-	labset	S0wsr		s0wsr		STwrp		StackWordRightSetoftags
-		S0psr		s0psr		STtrp		StackTagRightSetoftags
-		S0wsl		s0wsl		STwlp		StackWordLeftSetoftags
-		S0psl		s0psl		STtlp		StackTagLeftSetoftags
-		N0wsl		n0wsl		N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
-		N0psl		n0psl		N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
-	lcf					STl		StackLemma
-						STc		StackCPOS
-						STf		StackFeats
-						N0l		NextLemma
-						N0c		NextCPOS
-						N0f		NextFeats
-						N1l		Next+1Lemma
-						N1c		Next+1CPOS
-						N1f		Next+1Feats
 
 2015-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
 
