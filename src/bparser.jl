@@ -60,7 +60,8 @@ end
 # Data structure for beam search:
 type Beam cmove; cost; cparser; cscore; csorted; nbeam; parser; parser2; pscore; pscore2; sentence; 
     function Beam(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer)
-        @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer for beam parser"
+        # @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer for beam parser"
+        @assert isa(net[end], LogpLoss) "Need LogpLoss final layer for beam parser"
         b = new()
         nword = wcnt(s)
         ftype = wtype(s)
