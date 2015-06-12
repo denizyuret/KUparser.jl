@@ -84,4 +84,27 @@ zn11punct(w)=ismatch(r"^[,?!:;]$|^-LRB-$|^-RRB-$|^[.]+$|^[`]+$|^[']+$|^（$|^）
 # KCC08 uses postags rather than wordforms, but for some reason skips #, $, -LRB-, -RRB- etc.
 kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
 
+# Copying net between cpu and gpu
 testnet(net)=copy(net,:test)
+
+import Base: copy
+using CUDArt: CudaArray
+
+function copy(net::Net, to::Symbol)
+    ncopy = nothing
+    a = KUnet.atype()
+    if to == :gpu
+        KUnet.atype(CudaArray)
+        ncopy = copy(net)
+    elseif to == :cpu
+        KUnet.atype(Array)
+        ncopy = copy(net)
+    elseif to == :test
+        KUnet.atype(Array)
+        ncopy = copy(net)
+    else
+        error("Don't know how to copy net to $to")
+    end
+    KUnet.atype(a)
+    return ncopy
+end
