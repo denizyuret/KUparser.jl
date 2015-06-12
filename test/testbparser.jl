@@ -11,10 +11,15 @@ p0 = pt(1,ndeps)
 s1 = corpus[1]
 
 info("Let's train a reasonable model")
-net = newnet(relu, flen(p0,s1,ft), 20000, p0.nmove; learningRate=1)
-net[end].f = logp
+# net = newnet(relu, flen(p0,s1,ft), 20000, p0.nmove; learningRate=1)
+# net[end].f = logp
+h0 = 20000
+net = [Mmul(h0, flen(p0,s1,ft)), Bias(h0), Relu(), 
+       Mmul(p0.nmove, h0), Bias(p0.nmove), Logp(), 
+       LogpLoss()]
 @date (p,x,y)=oparse(pt, corpus, ndeps, ft)
-@date train(net, x, y; loss=logploss)
+# @date train(net, x, y; loss=logploss)
+@date train(net, x, y)
 
 info("Use gparser as reference for beam=1")
 @date gxy=(gp,gx,gy)=gparse(pt, corpus, ndeps, ft, net; xy=true)
