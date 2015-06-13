@@ -1,5 +1,8 @@
 type Sentence form; postag; head; deprel; wvec; Sentence()=new(); end
 typealias Corpus AbstractVector{Sentence}
-wdim(s)=size(s.wvec,1)
-wcnt(s)=size(s.wvec,2)
-wtype(s)=eltype(s.wvec)
+wdim(s::Sentence)=size(s.wvec,1)
+wcnt(s::Sentence)=size(s.wvec,2)
+wtype(s::Sentence)=eltype(s.wvec)
+wdim(c::Corpus)=size(c[1].wvec,1)
+wcnt(c::Corpus)=(n=0;for s in c; n+=wcnt(s); end; n)
+wtype(c::Corpus)=eltype(c[1].wvec)
