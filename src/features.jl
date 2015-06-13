@@ -1,8 +1,14 @@
-# features() returns a feature vector given a parser, a sentence,
-# and a FeatureList.  An optional last argument can provide the
-# preallocated output vector which should have length flen().
+# features(p,s,f,x,n) returns a feature vector given a parser, a
+# sentence, and an Fvec (feature specification vector, explained
+# below).  The last two arguments (optional) can provide a
+# preallocated output matrix which should have height flen(), and the
+# column number in that matrix to be filled.
 #
-# A FeatureList is a ASCIIString array specifying a set of features.
+# Features can be dense or sparse.  Dense features are specified by
+# string names:
+
+typealias DFeature String
+
 # Each string specifies a particular feature and has the form:
 #   [sn]\d?([hlr]\d?)*[wpdLabAB]
 # 
@@ -24,10 +30,17 @@
 # A: set of left dependency labels
 # B: set of right dependency labels
 
-typealias Feature String
-typealias Fvec{T<:String} Vector{T}
+# A DFvec is a String vector specifying a set of dense features.
 
-function features(p::Parser, s::Sentence, feats::Fvec,
+typealias DFvec{T<:String} Vector{T}
+
+# Fvec is a union of DFvec and SFvec, which specify dense and sparse
+# features respectively.  The user controls what kind of features are
+# used by using the appropriate type of feature vector.
+
+typealias Fvec Union(DFvec,SFvec)
+
+function features(p::Parser, s::Sentence, feats::DFvec,
                   x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
     wrows = wdim(s)             # first half word, second half context
@@ -98,7 +111,7 @@ function features(p::Parser, s::Sentence, feats::Fvec,
     return x
 end
 
-function flen(p::Parser, s::Sentence, feats::Fvec)
+function flen(p::Parser, s::Sentence, feats::DFvec)
     nx = 0
     nw = wdim(s) >> 1
     nd = p.ndeps
@@ -120,7 +133,11 @@ function flen1(c::Char, nw::Integer,nd::Integer)
     error("Unknown feature character $c")
 end
 
+# Utility functions to calculate the size of the feature matrix
+
 xsize(p::Parser, s::Sentence, f::Fvec)=(flen(p,s,f),nmoves(p,s))
 xsize(p::Parser, c::Corpus, f::Fvec)=(flen(p,c[1],f),nmoves(p,c))
+xsize{T<:Parser}(p::Vector{T}, c::Corpus, f::Fvec)=xsize(p[1],c,f)
 ysize(p::Parser, s::Sentence)=(nmoves(p),nmoves(p,s))
 ysize(p::Parser, c::Corpus)=(nmoves(p),nmoves(p,c))
+ysize{T<:Parser}(p::Vector{T}, c::Corpus)=ysize(p[1],c)
