@@ -4,6 +4,7 @@
 *.dp
 *.mat
 *.job
+*.bak
 foo*
 *_dbg.jl
 *.out.*
