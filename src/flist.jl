@@ -255,6 +255,96 @@ acl11eager = ASCIIString[
 eager39 = acl11eager
 # fs11e39e39 (8906): eager39 also local best for acl11, ArcEager13, start=eager39, all=eager39
 
+# The original zn11 set in sparse format with feature conjunctions
+zn11orig = Array[
+["sw"]                  # STw		StackWord
+["sp"]                  # STt		StackTag
+["sw","sp"]             # STwt		StackWordTag
+["nw"]                  # N0w		NextWord
+["np"]                  # N0t		NextTag
+["nw","np"]             # N0wt		NextWordTag
+["n1w"]                 # N1w		Next+1Word
+["n1p"]                 # N1t		Next+1Tag
+["n1w","n1p"]           # N1wt		Next+1WordTag
+["n2w"]                 # N2w		Next+2Word
+["n2p"]                 # N2t		Next+2Tag
+["n2w","n2p"]           # N2wt		Next+2WordTag
+["shw"]                 # STHw		StackHeadWord
+["shp"]                 # STHt		StackHeadTag
+["sL"]                  # STi		StackLabel
+["sh2w"]                # STHHw		StackHeadHeadWord
+["sh2p"]                # STHHt		StackHeadHeadTag
+["shL"]                 # STHi		StackLabel ?? StackHeadLabel
+["slw"]                 # STLDw		StackLDWord
+["slp"]                 # STLDt		StackLDTag
+["slL"]                 # STLDi		StackLDLabel
+["srw"]                 # STRDw		StackRDWord
+["srp"]                 # STRDt		StackRDTag
+["srL"]                 # STRDi		StackRDLabel
+["nlw"]                 # N0LDw		NextLDWord
+["nlp"]                 # N0LDt		NextLDTag
+["nlL"]                 # N0LDi		NextLDLabel
+["sl2w"]                # STL2Dw	StackL2DWord
+["sl2p"]                # STL2Dt	StackL2DTag
+["sl2L"]                # STL2Di	StackL2DLabel
+["sr2w"]                # STR2Dw	StackR2DWord
+["sr2p"]                # STR2Dt	StackR2DTag
+["sr2L"]                # STR2Di	StackR2DLabel
+["nl2w"]                # N0L2Dw	NextL2DWord
+["nl2p"]                # N0L2Dt	NextL2DTag
+["nl2L"]                # N0L2Di	NextL2DLabel
+			## HTw		HeadStackWord
+			## HTt		HeadStackTag
+			## HTwt		HeadStackWordTag
+["sw","sp","nw","np"]	# STwtN0wt	StackWordTagNextWordTag
+["sw","sp","np"]	# STwtN0w	StackWordTagNextWord
+["sw","nw","np"]	# STwN0wt	StackWordNextWordTag
+["sp","nw","np"]	# STtN0wt	StackTagNextWordTag
+["sw","sp","np"]	# STwtN0t	StackWordTagNextTag
+["sw","nw"]             # STwN0w	StackWordNextWord
+["sp","np"]             # STtN0t	StackTagNextTag
+["np","n1p"]            # N0tN1t	NextTagNext+1Tag
+["np","n1p","n2p"]	# N0tN1tN2t	NextTagTrigram
+["sp","np","n1p"]	# STtN0tN1t	StackTagNextTagNext+1Tag
+["sp","np","nlp"]	# STtN0tN0LDt	StackTagNextTagNextLDTag
+["np","nlp","nl2p"]     # N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextL2DTag
+["shp","sp","np"]       # STHtSTtN0t	StackHeadTagStackTagNextTag
+			## HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
+["sh2p","shp","sp"]     # STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
+["sp","slp","np"]       # STtSTLDtN0t	StackTagStackLDTagNextTag
+["sp","slp","sl2p"]     # STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
+["sp","srp","np"]       # STtSTRDtN0t	StackTagStackRDTagNextTag
+["sp","srp","sr2p"]     # STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
+["sw","sd"]             # STwd		StackWordDist
+["sp","sd"]             # STtd		StackTagDist
+["nw","sd"]             # N0wd		NextWordDist
+["np","sd"]             # N0td		NextTagDist
+["sw","nw","sd"]        # STwN0wd	StackWordNextWordDist
+["sp","np","sd"]        # STtN0td	StackTagNextTagDist
+["sw","sb"]             # STwra		StackWordRightArity
+["sp","sb"]             # STtra		StackTagRightArity
+["sw","sa"]             # STwla		StackWordLeftArity
+["sp","sa"]             # STtla		StackTagLeftArity
+["nw","na"]             # N0wla		NextWordRightArity ?? NextWordLeftArity
+["np","na"]             # N0tla		NextTagRightArity  ?? NextTagLeftArity
+["sw","sB"]             # STwrp		StackWordRightSetoftags
+["sp","sB"]             # STtrp		StackTagRightSetoftags
+["sw","sA"]             # STwlp		StackWordLeftSetoftags
+["sp","sA"]             # STtlp		StackTagLeftSetoftags
+["nw","nA"]             # N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
+["np","nA"]             # N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
+			## STl		StackLemma
+			## STc		StackCPOS
+			## STf		StackFeats
+			## N0l		NextLemma
+			## N0c		NextCPOS
+			## N0f		NextFeats
+			## N1l		Next+1Lemma
+			## N1c		Next+1CPOS
+			## N1f		Next+1Feats
+]
+
+
 # Old feature format before we switched to ints:
 # f::Features is a nx3 matrix whose rows determine which features to extract
 # Each row of f consists of the following three values:
