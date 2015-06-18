@@ -1,4 +1,25 @@
+2015-06-16    <dyuret@ku.edu.tr>
+
+	* TODO: use Daume's trick for averaging?
+
+	* TODO: kernel.jl currently uses averaged weights for both
+	training and testing?  we need a training and testing mode?  why
+	can't we use averaged weights during training as well?
+
 2015-06-12    <dyuret@ku.edu.tr>
+
+	* TODO: compare sfeatures vs dfeatures using the same feature set
+	and algorithm to make sure they give the same result?  Or extract
+	features on a short sentence using oparser?
+
+	* TODO: implement averaging in perceptron.
+
+	* TODO: implement ZN11 features (both simple and compound) in
+	flist.
+
+	* TODO: extract features using oparser and run compound feature
+	and perceptron vs simple feature and kernel perceptron
+	experiments.
 
 	* acl11hybrid: dictionary.
 
