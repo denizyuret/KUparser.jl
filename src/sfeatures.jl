@@ -27,7 +27,7 @@ typealias SFeature{T<:String} Vector{T}
 # Sparse compound feature vectors are specified using a vector of
 # SFeature's (possibly headed by a hash?)
 
-typealias SFvec Vector
+typealias SFvec{T<:String} Vector{SFeature{T}}
 
 # It does not cost anything to increase the height of a
 # SparseMatrixCSC, so we'll just use a large fixed height
@@ -46,17 +46,39 @@ SFhash = Dict{Any,Int}()
 # the index of the key-value pair from SFhash, and set the
 # corresponding entry in the feature hash x to 1.
 
-function features(p::Parser, s::Sentence, feats::SFvec,
+function features0(p::Parser, s::Sentence, feats::SFvec,
                   x::AbstractSparseArray=spzeros(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
-    x[:,xcol] = zero(eltype(x)) # how fast is this?
+    x[:,xcol] = zero(eltype(x)) # 117
     for f in feats
-        fv = (f, map(x->features1(p, s, x), f)) # how fast is this?
-        idx = get!(SFhash, fv, 1+length(SFhash))
+        # fv = (f, map(x->features1(p, s, x), f)) # 869
+        # Removing map gives some speedup:
+        v = Array(Any,length(f))
+        for i=1:length(f); v[i] = features1(p,s,f[i]); end # 491
+        # This cost is unavoidable:
+        idx = get!(SFhash, (f,v), 1+length(SFhash)) # 840
         @assert idx < SFmax
-        x[idx, xcol] = one(eltype(x)) # how fast is this?
+        # Figure out how to do this faster:
+        @assert x[idx,xcol]==0 "Duplicate fv $((f,v))"
+        x[idx, xcol] = one(eltype(x)) # 1149
     end
     return x
+end
+
+# Faster grow sparse array: we have a SparseMatrixCSC: m,n,colptr,rowval,nzval
+# rowval is the only array features needs to set.
+
+function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector=Array(Int, length(feats)), idx=0)
+    @assert length(rowval) >= idx + length(feats) "$((length(rowval),idx,length(feats)))"
+    for i=1:length(feats)
+        f = feats[i]
+        v = Array(Any, length(f))
+        for j=1:length(f); v[j] = features1(p,s,f[j]); end # 422
+        rowval[idx+i] = get!(SFhash, (f,v), 1+length(SFhash)) # 779
+    end
+    sort!(sub(rowval, (idx+1):(idx+length(feats)))) # 10
+    @assert rowval[idx+length(feats)] < SFmax
+    return rowval
 end
 
 # Here is where the actual feature lookup happens.  Similar to the
