@@ -91,7 +91,7 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer)
     return p
 end
 
-function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, x=nothing, y=nothing, nx=0)
+function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::DFvec, x=nothing, y=nothing, nx=0)
     (x,y) = initoparse(p,s,ndeps,feats,x,y,nx)
     c = Array(Position, p.nmove)
     totalcost = 0; nx0 = nx
@@ -100,6 +100,28 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, x=nothing, 
         (bestcost,bestmove) = findmin(c)
         totalcost += bestcost
         features(p, s, feats, x, (nx+=1))
+        y[:, nx] = zero(eltype(y))
+        y[bestmove, nx] = one(eltype(y))
+        move!(p, bestmove)
+    end
+    @assert (nx0 + nmoves(p,s) == nx)
+    @assert (totalcost == truecost(p,s))
+    return (p,x,y)
+end
+
+function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::SFvec, x::AbstractSparseMatrix, y::AbstractArray, nx::Integer)
+    c = Array(Position, p.nmove)
+    totalcost = 0; nx0 = nx
+    while anyvalidmoves(p)
+        movecosts(p, s.head, s.deprel, c)
+        (bestcost,bestmove) = findmin(c)
+        totalcost += bestcost
+        # We let features directly write in x.rowval[x.colptr[nx]:x.colptr[nx+1]-1]
+        features(p, s, feats, x.rowval, x.colptr[nx+=1]-1)
+        # features() sorts rowval so the max can be found at the end
+        maxrow = x.rowval[x.colptr[nx+1]-1]
+        # If max rowval exceeds matrix height, we update the height
+        maxrow > x.m && (x.m = maxrow)
         y[:, nx] = zero(eltype(y))
         y[bestmove, nx] = one(eltype(y))
         move!(p, bestmove)
@@ -122,8 +144,11 @@ function initoparse(p, s, d, f, x, y, n)
         (x==nothing) && (x = Array(xtype, xrows, mincols))
         @assert isa(x,AbstractMatrix{xtype}) && (size(x,1)==xrows) && (size(x,2)>=mincols)
     elseif isa(f, SFvec)
-        (x==nothing) && (x = spzeros(xtype, xrows, mincols))
-        @assert isa(x,SparseMatrixCSC{xtype}) && (size(x,1)==xrows) && (size(x,2)>=mincols)
+        if x == nothing
+            # Each column of x should have length(f) nonzero entries, this allocates enough space
+            x = convert(SparseMatrixCSC{xtype,Int32}, ones(xtype, length(f), mincols))
+        end
+        @assert isa(x,SparseMatrixCSC{xtype}) && (size(x,2)>=mincols) # && (size(x,1)==xrows)
     else
         error("Do not recognize fvec")
     end
