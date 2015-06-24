@@ -1,4 +1,5 @@
 module Flist                    # feature matrices
+using KUparser: SFeature, DFeature
 
 # fs11h54h27 (9144): local best for acl11, ArcHybrid13, start=hybrid27, all=hybrid54, bparser10, shuffled
 hybrid25 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0rL s0w s1A s1B s1a s1rL s1rp s1rw s1w s2w")
@@ -44,7 +45,7 @@ eager21 = split("n0A n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0a s0h2p s0hw s0l2L s
 hybrid28 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
 
 # Features that may be relevant for ArcHybrid13
-hybrid54 = ASCIIString[
+hybrid54 = DFeature[
 "n0w", "n0p", "n0A", "n0a",
 "s0w", "s0p", "s0A", "s0a", "s0B", "s0b", "s0d",
 "s1w", "s1p", "s1A", "s1a", "s1B", "s1b", "s1d",
@@ -62,7 +63,7 @@ hybrid54 = ASCIIString[
 # use word half of vector (c=+4) for form, context half of vector (c=-4) for tag
 # No need for feature combinations, we have a nonlinear model.
 
-tacl13hybrid = ASCIIString[
+tacl13hybrid = DFeature[
 	# (1)
 "s0w"	# append("s0_%s" % s0)
 "s0p"	# append("Ts0_%s" % Ts0)
@@ -136,8 +137,8 @@ tacl13hybrid = ASCIIString[
 
 # Variants of tacl13hybrid:
 
-tacl13words = ASCIIString["s0lw", "s0w", "s0rw", "s1lw", "s1w", "s1rw", "n0lw", "n0w", "n1w"]
-tacl13tags  = ASCIIString["s0lp", "s0p", "s0rp", "s1lp", "s1p", "s1rp", "n0lp", "n0p", "n1p"]
+tacl13words = DFeature["s0lw", "s0w", "s0rw", "s1lw", "s1w", "s1rw", "n0lw", "n0w", "n1w"]
+tacl13tags  = DFeature["s0lp", "s0p", "s0rp", "s1lp", "s1p", "s1rp", "n0lp", "n0p", "n1p"]
 tacl13wordtag = [tacl13words; tacl13tags]
 
 # Renamed:
@@ -157,7 +158,7 @@ hybrid13 = tacl13hybrid
 # s0L: dependency label for s0 (NA for n0!)
 # s0sl,s0sr: set of dependency labels to the left/right of s0
 
-acl11eager = ASCIIString[
+acl11eager = DFeature[
 	# # Single Words
 	# f("s0wp_%s" % (s0wp))
 "s0w"	# f("s0w_%s"  % (s0w))
@@ -256,7 +257,7 @@ eager39 = acl11eager
 # fs11e39e39 (8906): eager39 also local best for acl11, ArcEager13, start=eager39, all=eager39
 
 # The original zn11 set in sparse format with feature conjunctions
-zn11orig = Array[
+zn11orig = SFeature[
 ["sw"]                  # STw		StackWord
 ["sp"]                  # STt		StackTag
 ["sw","sp"]             # STwt		StackWordTag
@@ -345,7 +346,7 @@ zn11orig = Array[
 ]
 
 # The reduced zn11 set in sparse format with singleton features
-zn11single = Array[
+zn11single = SFeature[
 ["sw"]                  # STw		StackWord
 ["sp"]                  # STt		StackTag
 #["sw","sp"]             # STwt		StackWordTag
