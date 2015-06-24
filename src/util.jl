@@ -1,9 +1,5 @@
 using KUnet
 
-# Print date, expression and elapsed time after execution
-VERSION < v"0.4-" && eval(Expr(:using,:Dates))
-macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
-
 # findprev does not exist in v0.3
 if VERSION < v"0.4-"
 function findprev(A, v, start)
@@ -88,23 +84,19 @@ kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
 testnet(net)=copy(net,:test)
 
 import Base: copy
-using CUDArt: CudaArray
+KUnet.GPU && eval(Expr(:using,:CUDArt))
 
 function copy(net::Net, to::Symbol)
     ncopy = nothing
-    a = KUnet.atype()
     if to == :gpu
-        KUnet.atype(CudaArray)
-        ncopy = copy(net)
+        KUnet.GPU || error("GPU not available")
+        ncopy = gpucopy(net)
     elseif to == :cpu
-        KUnet.atype(Array)
-        ncopy = copy(net)
+        ncopy = cpucopy(net)
     elseif to == :test
-        KUnet.atype(Array)
-        ncopy = copy(net)
+        ncopy = cpucopy(net)
     else
         error("Don't know how to copy net to $to")
     end
-    KUnet.atype(a)
     return ncopy
 end
