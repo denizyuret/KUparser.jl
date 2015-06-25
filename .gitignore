@@ -13,6 +13,7 @@ unused
 v0.3
 v0.4
 *.cache
+*.log*
 
 # Object files
 *.o

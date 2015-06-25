@@ -1,20 +1,64 @@
+2015-06-19    <dyuret@ku.edu.tr>
+
+	* zn11train.jl:  Using perceptron.jl training with zn11orig xtst
+	takes 500-600s (~100wps) and testing with xdev+xtst takes
+	130-140s (~733wps).  At this speed training with xtrn would take
+	9500s/epoch (158 min).  We can get 20 epochs in 52 hours.
+	:(trn02-21:39832s,950028w,1820392m;dev22:1700s,40117w,76834m;tst23:2416s,56684w,108536m)
+
+	Keeping w full instead of sparse may speed things up.  Also remove
+	transpose and implement special purpose addx! function for update.
+	New speed: 27.9s for xtrn (34051 wps).
+
+	* zn11train2.jl: Using kperceptron.jl training with zn11single
+	data.  100 iter x 128 batch training takes 15.33s (417 wps) for
+	epoch1, 47.42s for epoch2.  Testing with dev+tst takes
+	270.85s (357 wps).
+
+	* TODO: Keeping K full instead of sparse may speed things up.
+	:(Correction: K is already full.  It becomes full after the +p[1]
+	operation).  Writing a more efficient Ac_mul_B may help.  If we do
+	that we could keep sv as an array of vectors rather than a matrix.
+	:(A sequence of dot products is 4 times slower than the fast mul
+	implemented in julia, w product is negligible, the whole cost is
+	in kpoly). Otherwise may have to do GPU.
+
+	* DONE: zn11train.jl: running 100 epochs, try shuffling next.  what
+	is the unlabeled move accuracy?  what is the parsing accuracy?
+	Result is monotonically increasing, here is trn/dev/tst at epoch100:
+	:(100,0.8464457105942017,0.8366738683395372,0.8390211542713938)
+
+	* TODO: @@zn11train.jl: with shuffling this time: shuffling takes
+	too long.  Do implicit shuffling by having an array of indices
+	shuffled (randperm?)  But that would mess with the x2b copy
+	procedure.
+
+	* TODO: test comparing kperceptron with linear kernel and perceptron.
+
+	* DONE: very large height impractical when taking transpose of w in perceptron.
+	- cap the size in oparse.
+	- investigate transpose vs no transpose.
+	- implement mmul in terms of dot products. (but then regular arrays? override if sparse arrays? what is Ac_mul_B doing anyway?)
+
+	* DONE: rewrite kernel perceptron.
+
 2015-06-16    <dyuret@ku.edu.tr>
 
-	* TODO: use Daume's trick for averaging?
+	* DONE: use Daume's trick for averaging?
 
-	* TODO: kernel.jl currently uses averaged weights for both
+	* DONE: kernel.jl currently uses averaged weights for both
 	training and testing?  we need a training and testing mode?  why
 	can't we use averaged weights during training as well?
 
 2015-06-12    <dyuret@ku.edu.tr>
 
-	* TODO: compare sfeatures vs dfeatures using the same feature set
+	* DONE: compare sfeatures vs dfeatures using the same feature set
 	and algorithm to make sure they give the same result?  Or extract
 	features on a short sentence using oparser?
 
-	* TODO: implement averaging in perceptron.
+	* DONE: implement averaging in perceptron.
 
-	* TODO: implement ZN11 features (both simple and compound) in
+	* DONE: implement ZN11 features (both simple and compound) in
 	flist.
 
 	* TODO: extract features using oparser and run compound feature
