@@ -1,3 +1,12 @@
+2015-06-26  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* plan:
+	Experiment 1: nonlinear vs linear (using perceptron)
+	Experiment 2: sparse vs dense (using nonlinear)
+	Experiment 3: perceptron vs nnet (using dense)
+	Experiment 4: scode vs other (using nnet)
+	Experiment 5: postags vs context vectors (using scode)
+
 2015-06-19    <dyuret@ku.edu.tr>
 
 	* zn11train.jl:  Using perceptron.jl training with zn11orig xtst
