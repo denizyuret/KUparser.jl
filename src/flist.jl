@@ -2,9 +2,9 @@ module Flist                    # feature matrices
 using KUparser: SFeature, DFeature # sparse and dense features
 
 # ZN11 dense variants.  The original has:
-# (w,p) for (s,n,n1,n2,sh,sh2,sl,sr,nl,sl2,sr2,nl2): 24 features
-# L for (s,sh,sl,sr,nl,sl2,sr2,nl2): 8 features
-# sd, sa, sb, sA, sB, na, nA: 7 features = 39
+# (w,p) for (s,n,n1,n2,sh,sh2,sl,sr,nl,sl2,sr2,nl2): 24 features, 1200 dims for v,c; 540 dims for p
+# L for (s,sh,sl,sr,nl,sl2,sr2,nl2): 8 features, 96 dims
+# sd, sa, sb, sA, sB, na, nA: 7 features, 69 dims
 # We replace (w,p) with 8 subsets of (v,c,p)
 
 zn11n = DFeature["sA","nA","sa","na","sB","sb","sd",
