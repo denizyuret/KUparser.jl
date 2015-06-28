@@ -112,7 +112,7 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                 error("Unknown feature $(fn)")
             end
         end # if (a > 0)
-        @show nx += flen1(fn, nw, nd, np)
+        nx += flen1(fn, nw, nd, np)
     end
     @assert nx == xrows
     return x
