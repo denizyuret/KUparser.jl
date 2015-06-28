@@ -44,6 +44,7 @@ typealias Fvec Union(DFvec,SFvec)
 function features(p::Parser, s::Sentence, feats::DFvec,
                   x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
+    @assert xcol <= size(x,2)
     wrows = wdim(s)             # first half word, second half context
     xrows = size(x, 1)
     x0 = zero(eltype(x))
@@ -93,16 +94,16 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                 copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw)
             elseif fn == 'p'
                 @assert s.postag[a] <= np
-                x[nx+1+s.postag[a], xcol] = x1
+                x[nx+s.postag[a], xcol] = x1
             elseif fn == 'd'
                 (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1)
             elseif fn == 'L'
                 @assert p.deprel[a] <= nd
-                x[nx+1+p.deprel[a], xcol] = x1
+                x[nx+1+p.deprel[a], xcol] = x1 # first bit for deprel=0 (ROOT)
             elseif fn == 'a'
-                x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1
+                x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1 # 0-9
             elseif fn == 'b'
-                x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a]), xcol] = x1
+                x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a]), xcol] = x1 # 0-9
             elseif fn == 'A'
                 for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]], xcol] = x1; end
             elseif fn == 'B'
@@ -111,7 +112,7 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                 error("Unknown feature $(fn)")
             end
         end # if (a > 0)
-        nx += flen1(fn, nw, nd, np)
+        @show nx += flen1(fn, nw, nd, np)
     end
     @assert nx == xrows
     return x
