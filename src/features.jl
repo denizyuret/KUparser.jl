@@ -10,7 +10,7 @@
 typealias DFeature String
 
 # Each string specifies a particular feature and has the form:
-#   [sn]\d?([hlr]\d?)*[wpdLabAB]
+#   [sn]\d?([hlr]\d?)*[vcpdLabAB]
 # 
 # The meaning of each letter is below.  In the following i is a single
 # digit integer which is optional if the default value is used:
@@ -20,8 +20,9 @@ typealias DFeature String
 # hi: i'th degree head, default i=1 means direct head
 # li: i'th leftmost child, default i=1 means the leftmost child 
 # ri: i'th rightmost child, default i=1 means the rightmost child
-# w: word vector
-# p: context vector
+# v: word vector
+# c: context vector
+# p: postag
 # d: distance to the right.  e.g. s1d is s0s1 distance, s0d is s0n0
 #    distance.  encoding: 1,2,3,4,5-10,10+ (from ZN11)
 # L: dependency label (0 is ROOT or NONE)
@@ -51,6 +52,7 @@ function features(p::Parser, s::Sentence, feats::DFvec,
     nx = 0                      # last entry in x
     nw = wrows >> 1
     nd = p.ndeps
+    np = 45                     # hardcoding the ptb postag count for now
     for f in feats
         @assert in(f[1], "sn") "feature string should start with [sn]"
         (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2)
@@ -85,13 +87,17 @@ function features(p::Parser, s::Sentence, feats::DFvec,
         @assert n == length(f)
         fn = f[n]
         if (a > 0)
-            if fn == 'w'
+            if fn == 'v'
                 copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nw)
-            elseif fn == 'p'
+            elseif fn == 'c'
                 copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw)
+            elseif fn == 'p'
+                @assert s.postag[a] <= np
+                x[nx+1+s.postag[a], xcol] = x1
             elseif fn == 'd'
                 (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1)
             elseif fn == 'L'
+                @assert p.deprel[a] <= nd
                 x[nx+1+p.deprel[a], xcol] = x1
             elseif fn == 'a'
                 x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1
@@ -105,7 +111,7 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                 error("Unknown feature $(fn)")
             end
         end # if (a > 0)
-        nx += flen1(fn, nw, nd)
+        nx += flen1(fn, nw, nd, np)
     end
     @assert nx == xrows
     return x
@@ -121,16 +127,17 @@ function flen(p::Parser, s::Sentence, feats::DFvec)
     return nx
 end
 
-function flen1(c::Char, nw::Integer,nd::Integer)
-    c == 'w' && return nw
-    c == 'p' && return nw
-    c == 'd' && return 6
-    c == 'L' && return(nd+1)
-    c == 'a' && return 10
-    c == 'b' && return 10
-    c == 'A' && return nd
-    c == 'B' && return nd
-    error("Unknown feature character $c")
+function flen1(c::Char, nw::Integer=100, nd::Integer=11, np::Integer=45)
+    (c == 'v' ? nw :
+     c == 'c' ? nw :
+     c == 'p' ? np :
+     c == 'd' ? 6 :
+     c == 'L' ? (nd+1) :        # ROOT is not included in nd
+     c == 'a' ? 10 :
+     c == 'b' ? 10 :
+     c == 'A' ? nd :
+     c == 'B' ? nd :
+     error("Unknown feature character $c"))
 end
 
 # Utility functions to calculate the size of the feature matrix

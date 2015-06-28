@@ -1,260 +1,71 @@
 module Flist                    # feature matrices
-using KUparser: SFeature, DFeature
+using KUparser: SFeature, DFeature # sparse and dense features
 
-# fs11h54h27 (9144): local best for acl11, ArcHybrid13, start=hybrid27, all=hybrid54, bparser10, shuffled
-hybrid25 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0rL s0w s1A s1B s1a s1rL s1rp s1rw s1w s2w")
+# ZN11 dense variants.  The original has:
+# (w,p) for (s,n,n1,n2,sh,sh2,sl,sr,nl,sl2,sr2,nl2): 24 features
+# L for (s,sh,sl,sr,nl,sl2,sr2,nl2): 8 features
+# sd, sa, sb, sA, sB, na, nA: 7 features = 39
+# We replace (w,p) with 8 subsets of (v,c,p)
 
-# fs11e64e27 (9098): local best for acl11, ArcEager13, start=eager27=hybrid27, all=eager64, bparser10, shuffled
-eager25 = split("n0A n0a n0l2L n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0B s0p s0w s1A s1B s1a s1d s1p s1rL s1rp s1w s2p s2w")
+zn11n = DFeature["sA","nA","sa","na","sB","sb","sd",
+                 "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L"]
 
-# fs11h54h28 (8997): local best in acl11, ArcEager13 (by mistake), start=hybrid28, all=hybrid54
-hybrid27 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
-eager27 = hybrid27
+zn11p = DFeature["sA","nA","sa","na","sB","sb","sd",
+                 "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                 "sp","np","n1p","n2p","shp","sh2p","slp","srp","nlp","sl2p","sr2p","nl2p"]
 
-# fs11h54h14 (8992): local best for acl11, ArcHybrid13, start=hybrid14, all=hybrid54
-hybrid25b = split("n0a n0l2p n0l2w n0lp n0lw n0w n1p n1w n2w s0B s0a s0d s0l2L s0lL s0lp s0p s0rp s0w s1B s1b s1lL s1lp s1p s1r2p s1w")
+zn11v = DFeature["sA","nA","sa","na","sB","sb","sd",
+                 "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                 "sv","nv","n1v","n2v","shv","sh2v","slv","srv","nlv","sl2v","sr2v","nl2v"]
 
-# fs11e64e20 (8926): local best for acl11, ArcEager13, start=eager20, all=eager64
-eager20 = split("n0A n0a n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
+zn11c = DFeature["sA","nA","sa","na","sB","sb","sd",
+                 "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                 "sc","nc","n1c","n2c","shc","sh2c","slc","src","nlc","sl2c","sr2c","nl2c"]
 
-# fs11e39e21 (8906): local best for acl11, ArcEager13, start=eager21, all=eager39
-eager23 = split("n0A n0lL n0lp n0p n0w n1p n1w n2p n2w s0B s0L s0a s0b s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
+zn11pv = DFeature["sA","nA","sa","na","sB","sb","sd",
+                  "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                  "sp","np","n1p","n2p","shp","sh2p","slp","srp","nlp","sl2p","sr2p","nl2p",
+                  "sv","nv","n1v","n2v","shv","sh2v","slv","srv","nlv","sl2v","sr2v","nl2v"]
 
-# fs07h54h28 (8797): local best for conll07, ArcHybrid13, start=hybrid28, all=hybrid54
-hybrid28b = split("n0A n0a n0l2w n0lL n0lp n0p n0w n1p n1w n2w s0A s0B s0a s0b s0d s0p s0w s1A s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
+zn11cv = DFeature["sA","nA","sa","na","sB","sb","sd",
+                  "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                  "sc","nc","n1c","n2c","shc","sh2c","slc","src","nlc","sl2c","sr2c","nl2c",
+                  "sv","nv","n1v","n2v","shv","sh2v","slv","srv","nlv","sl2v","sr2v","nl2v"]
 
-# fs07h54h13 (8791): Local best for conll07, ArcHybrid13, start=tacl13hybrid (aka hybrid13), all=hybrid54
-hybrid14 = split("n0lp n0lw n0w n1p n1w s0d s0lp s0p s0rp s0w s1B s1lp s1p s1w")
+zn11cp = DFeature["sA","nA","sa","na","sB","sb","sd",
+                  "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                  "sc","nc","n1c","n2c","shc","sh2c","slc","src","nlc","sl2c","sr2c","nl2c",
+                  "sp","np","n1p","n2p","shp","sh2p","slp","srp","nlp","sl2p","sr2p","nl2p"]
 
-# fs07e39e39 (8725): local best in conll07, ArcEager13, start=acl11eager, all=acl11eager
-eager36 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0b s0d s0h2p s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2p s0r2w s0rL s0rp s0rw s0w")
+zn11cpv = DFeature["sA","nA","sa","na","sB","sb","sd",
+                   "sL","shL","slL","srL","nlL","sl2L","sr2L","nl2L",
+                   "sc","nc","n1c","n2c","shc","sh2c","slc","src","nlc","sl2c","sr2c","nl2c",
+                   "sp","np","n1p","n2p","shp","sh2p","slp","srp","nlp","sl2p","sr2p","nl2p",
+                   "sv","nv","n1v","n2v","shv","sh2v","slv","srv","nlv","sl2v","sr2v","nl2v"]
 
-# fs07e39e21 (8705): Local best for conll07, ArcEager13, start=eager21, all=eager39
-eager20b = split("n0l2L n0lw n0p n0w n1w n2p n2w s0B s0L s0a s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
+# Sparse feature sets
+#
+# Each string specifies a particular feature and has the form:
+#   [sn]\d?([hlr]\d?)*[wpdLabAB]
+# 
+# The meaning of each letter is below.  In the following i is a single
+# digit integer which is optional if the default value is used:
+#
+# si: i'th stack word, default i=0 means top
+# ni: i'th buffer word, default i=0 means first
+# hi: i'th degree head, default i=1 means direct head
+# li: i'th leftmost child, default i=1 means the leftmost child 
+# ri: i'th rightmost child, default i=1 means the rightmost child
+# w: word
+# p: postag
+# d: distance to the right.  e.g. s1d is s0s1 distance, s0d is s0n0
+#    distance.  encoding: 1,2,3,4,5-10,10+ (from ZN11)
+# L: dependency label (0 is ROOT or NONE)
+# a: number of left children.  following ZN11, any number is allowed.
+# b: number of right children.  following ZN11, any number is allowed.
+# A: set of left dependency labels
+# B: set of right dependency labels
 
-# fs07e64e20 (8677): Local best for conll07, ArcEager13, start=eager20, all=eager64
-eager21b = split("n0A n0a n0l2L n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0b s0d s0hp s0hw s0p s0rL s0w s1p s1w")
-
-# more complete set than acl11eager: added s1 features
-eager64 = split("n0A n0a n0l2L n0l2p n0l2w n0lL n0lp n0lw n0p n0w n1p n1w n2p n2w s0A s0B s0L s0a s0b s0d s0h2p s0h2w s0hL s0hp s0hw s0l2L s0l2p s0l2w s0lL s0lp s0lw s0p s0r2L s0r2p s0r2w s0rL s0rp s0rw s0w s1A s1B s1L s1a s1b s1d s1h2p s1h2w s1hL s1hp s1hw s1l2L s1l2p s1l2w s1lL s1lp s1lw s1p s1r2L s1r2p s1r2w s1rL s1rp s1rw s1w")
-
-# Manually constructed starting point
-eager21 = split("n0A n0lL n0p n0w n1p n1w n2p n2w s0B s0L s0a s0h2p s0hw s0l2L s0l2p s0l2w s0lp s0p s0r2L s0r2p s0w")
-
-# Manually constructed starting point
-hybrid28 = split("n0A n0a n0lL n0lp n0lw n0p n0w n1p n1w s0A s0B s0a s0b s0d s0p s0w s1A s1B s1a s1b s1d s1p s1rL s1rp s1rw s1w s2p s2w")
-
-# Features that may be relevant for ArcHybrid13
-hybrid54 = DFeature[
-"n0w", "n0p", "n0A", "n0a",
-"s0w", "s0p", "s0A", "s0a", "s0B", "s0b", "s0d",
-"s1w", "s1p", "s1A", "s1a", "s1B", "s1b", "s1d",
-"n1w", "n1p", "n2w", "n2p", "s2w", "s2p",
-"n0lw", "n0l2w", "s0lw", "s0l2w", "s0rw", "s0r2w", "s1lw", "s1l2w", "s1rw", "s1r2w",
-"n0lp", "n0l2p", "s0lp", "s0l2p", "s0rp", "s0r2p", "s1lp", "s1l2p", "s1rp", "s1r2p",
-"n0lL", "n0l2L", "s0lL", "s0l2L", "s0rL", "s0r2L", "s1lL", "s1l2L", "s1rL", "s1r2L"
-]
-
-# Goldberg&Nivre TACL13 ArcHybrid features from: tacl2013dynamicoracles/lefttoright/features:HybridFeatures
-# s0,s1,s2: stack word forms: a=-1,-2,-3 b=0 c=4
-# w0,w1: buffer word forms: a=0,1 b=0 c=4
-# Ts0: tag of s0 (-1 0 -4)
-# Trcs1: tag of rightmost child of s1 (-2 1 -4)
-# use word half of vector (c=+4) for form, context half of vector (c=-4) for tag
-# No need for feature combinations, we have a nonlinear model.
-
-tacl13hybrid = DFeature[
-	# (1)
-"s0w"	# append("s0_%s" % s0)
-"s0p"	# append("Ts0_%s" % Ts0)
-        # append("Ts0s0_%s_%s" % (Ts0, s0))
-
-"s1w"	# append("s1_%s" % s1)
-"s1p"	# append("Ts1_%s" % Ts1)
-     	# append("Ts1s1_%s_%s" % (Ts1, s1))
-
-"n0w"	# append("w0_%s" % w0)
-"n0p"	# append("Tw0_%s" % Tw0)
-	# append("Tw0w0_%s_%s" % (Tw0, w0))
-	# +hybrid
-"n1w"	# append("w1_%s" % w1)
-"n1p"	# append("Tw1_%s" % Tw1)
-	# append("Tw1w1_%s_%s" % (Tw1, w1))
-
-	# (2)
-	# append("s0s1_%s_%s" % (s0,s1))
-	# append("Ts0Ts1_%s_%s" % (Ts0,Ts1))
-	# append("Ts0Tw0_%s_%s" % (Ts0,Tw0))
-	# append("s0Ts0Ts1_%s_%s_%s" % (s0,Ts0,Ts1))
-	# append("Ts0s1Ts1_%s_%s_%s" % (Ts0,s1,Ts1))
-	# append("s0s1Ts1_%s_%s_%s" % (s0,s1,Ts1))
-	# append("s0Ts0s1_%s_%s_%s" % (s0,Ts0,s1))
-	# append("s0Ts0Ts1_%s_%s_%s" % (s0,Ts0,Ts1))
-	# +hybrid   
-	# append("s0w0_%s_%s" % (s0,w0))
-	# append("Ts0Tw0_%s_%s" % (Ts0,Tw0))
-	# append("Ts0Tw1_%s_%s" % (Ts0,Tw1))
-	# append("s0Ts0Tw0_%s_%s_%s" % (s0,Ts0,Tw0))
-	# append("Ts0w0Tw0_%s_%s_%s" % (Ts0,w0,Tw0))
-	# append("s0w0Tw0_%s_%s_%s" % (s0,w0,Tw0))
-	# append("s0Ts0w0_%s_%s_%s" % (s0,Ts0,w0))
-	# append("w0Tw0Tw1_%s_%s_%s" % (w0,Tw0,Tw1)) #
-	
-	# (3)
-	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
-	# append("Ts1Ts0Tw0_%s_%s_%s" % (Ts1,Ts0,Tw0))
-	# append("s0Tw0Tw1_%s_%s_%s" % (s0,Tw0,Tw1))
-	# append("Ts1s0Tw0_%s_%s_%s" % (Ts1,s0,Tw0))
-	
-	# (4) rc -1  lc 1
-"s1rp"	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
-	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Ts0))
-"s1lp"	# append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
-"s0lp"	# append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
-"s0rp"	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
-	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Tlcs1, s0))
-	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Trcs0))
-	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Trcs1, s0))
-	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Tlcs0))
-	
-	# +hybrid
-	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw0))
-	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw1))
-	# append("Ts0Tlcs0Tw0_%s_%s_%s" % (Ts0,Tlcs0,Tw0))
-"n0lp"	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
-	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Tlcs0,w0))
-	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Trcs0,w0))
-	# append("Ts0w0Tlcw0_%s_%s_%s" % (Ts0,w0,Tlcw0))
-	
-	# append("Ts0Tw0Trcs0Tlcw0_%s_%s_%s_%s" % (Ts0,Tw0,Tlcw0,Trcs0))
-	# append("Ts0Ts1Trcs1Tlcs0_%s_%s_%s_%s" % (Ts0,Ts1,Tlcs0,Trcs1))
-	
-	# (5)
-	# append("Ts2Ts1Ts0_%s_%s_%s" % (Ts2,Ts1,Ts0))
-	# append("Ts1Ts0Tw0_%s_%s_%s" % (Ts1,Ts0,Tw0))
-	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
-] # tacl13hybrid
-
-# Variants of tacl13hybrid:
-
-tacl13words = DFeature["s0lw", "s0w", "s0rw", "s1lw", "s1w", "s1rw", "n0lw", "n0w", "n1w"]
-tacl13tags  = DFeature["s0lp", "s0p", "s0rp", "s1lp", "s1p", "s1rp", "n0lp", "n0p", "n1p"]
-tacl13wordtag = [tacl13words; tacl13tags]
-
-# Renamed:
-hybrid13 = tacl13hybrid
-
-# Goldberg&Nivre TACL13 ArcEager features from: 
-# tacl2013dynamicoracles/lefttoright/features:EagerZhangNivre2011Extractor
-# (seems to be the ones used in acl11)
-# s0: top of stack (a=-1)
-# n0,n1,n2: buffer (a=0,1,2)
-# s0h,s0h2: parent and grandparent of s0
-# s0l,s0r: left/rightmost child of s0
-# s0l2,s0r2: second left/rightmost child of s0
-# s0w,s0p,s0wp: form, postag, form-postag for s0
-# d: refers to s0-n0 distance, encoded 1,2,3,...,9,10+
-# s0vl,s0vr: number of left/right children of s0, flat encoding
-# s0L: dependency label for s0 (NA for n0!)
-# s0sl,s0sr: set of dependency labels to the left/right of s0
-
-acl11eager = DFeature[
-	# # Single Words
-	# f("s0wp_%s" % (s0wp))
-"s0w"	# f("s0w_%s"  % (s0w))
-"s0p"	# f("s0p_%s"  % (s0p))
-	# f("n0wp_%s" % (n0wp))
-"n0w"	# f("n0w_%s"  % (n0w))
-"n0p"	# f("n0p_%s"  % (n0p))
-	# f("n1wp_%s" % (n1wp))
-"n1w"	# f("n1w_%s"  % (n1w))
-"n1p"	# f("n1p_%s"  % (n1p))
-	# f("n2wp_%s" % (n2wp))
-"n2w"	# f("n2w_%s"  % (n2w))
-"n2p"	# f("n2p_%s"  % (n2p))
-	# 
-	# # Pairs
-	# f("s0wp,n0wp_%s_%s" % (s0wp, n0wp))
-	# f("s0wp,n0w_%s_%s" % (s0wp, n0w))
-	# f("s0w,n0wp_%s_%s" % (s0w, n0wp))
-	# f("s0wp,n0p_%s_%s" % (s0wp, n0p))
-	# f("s0p,n0wp_%s_%s" % (s0p, n0wp))
-	# f("s0w,n0w_%s_%s" % (s0w, n0w)) #?
-	# f("s0p,n0p_%s_%s" % (s0p, n0p))
-	# f("n0p,n1p_%s_%s" % (n0p, n1p))
-	# 
-	# # Tuples
-	# f("n0p,n1p,n2p_%s_%s_%s" % (n0p, n1p, n2p))
-	# f("s0p,n0p,n1p_%s_%s_%s" % (s0p, n0p, n1p))
-	# f("s0hp,s0p,n0p_%s_%s_%s" % (s0hp, s0p, n0p)) => s0hp (handled in unigram section)
-	# f("s0p,s0lp,n0p_%s_%s_%s" % (s0p, s0lp, n0p)) => s0lp (handled in unigram section)
-	# f("s0p,s0rp,n0p_%s_%s_%s" % (s0p, s0rp, n0p)) => s0rp (handled in unigram section)
-	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp)) => n0lp (handled in unigram section)
-	# 
-	# # Distance
-"s0d"	# f("s0wd_%s:%s" % (s0w, d)) => d
-	# f("s0pd_%s:%s" % (s0p, d))
-	# f("n0wd_%s:%s" % (n0w, d))
-	# f("n0pd_%s:%s" % (n0p, d))
-	# f("s0w,n0w,d_%s:%s:%s" % (s0w, n0w, d))
-	# f("s0p,n0p,d_%s:%s:%s" % (s0p, n0p, d))
-	# 
-	# # Valence
-"s0b"	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
-	# f("s0pvr_%s:%s" % (s0p, s0vr))
-"s0a"	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
-	# f("s0pvl_%s:%s" % (s0p, s0vl))
-"n0a"	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
-	# f("n0pvl_%s:%s" % (n0p, n0vl))
-	# 
-	# # Unigrams
-"s0hw"	# f("s0hw_%s" % (s0hw))
-"s0hp"	# f("s0hp_%s" % (s0hp))
-"s0L"	# f("s0L_%s" % (s0L))
-	# 
-"s0lw"	# f("s0lw_%s" % (s0lw))
-"s0lp"	# f("s0lp_%s" % (s0lp))
-"s0lL"	# f("s0lL_%s" % (s0lL))
-	# 
-"s0rw"	# f("s0rw_%s" % (s0rw))
-"s0rp"	# f("s0rp_%s" % (s0rp))
-"s0rL"	# f("s0rL_%s" % (s0rL))
-	# 
-"n0lw"	# f("n0lw_%s" % (n0lw))
-"n0lp"	# f("n0lp_%s" % (n0lp))
-"n0lL"	# f("n0lL_%s" % (n0lL))
-	# 
-	# # Third-order
-	# #do we really need the non-grandparent ones?
-"s0h2w"	# f("s0h2w_%s" % (s0h2w))
-"s0h2p"	# f("s0h2p_%s" % (s0h2p))
-"s0hL"	# f("s0hL_%s"  % (s0hL))
-"s0l2w"	# f("s0l2w_%s" % (s0l2w))
-"s0l2p"	# f("s0l2p_%s" % (s0l2p))
-"s0l2L"	# f("s0l2L_%s" % (s0l2L))
-"s0r2w"	# f("s0r2w_%s" % (s0r2w))
-"s0r2p"	# f("s0r2p_%s" % (s0r2p))
-"s0r2L"	# f("s0r2L_%s" % (s0r2L))
-"n0l2w"	# f("n0l2w_%s" % (n0l2w))
-"n0l2p"	# f("n0l2p_%s" % (n0l2p))
-"n0l2L"	# f("n0l2L_%s" % (n0l2L))
-	# f("s0p,s0lp,s0l2p_%s_%s_%s" % (s0p, s0lp, s0l2p))
-	# f("s0p,s0rp,s0r2p_%s_%s_%s" % (s0p, s0rp, s0r2p))
-	# f("s0p,s0hp,s0h2p_%s_%s_%s" % (s0p, s0hp, s0h2p))
-	# f("n0p,n0lp,n0l2p_%s_%s_%s" % (n0p, n0lp, n0l2p))
-	# 
-	# # Labels
-"s0B"	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
-	# f("s0psr_%s_%s" % (s0p, s0sr))
-"s0A"	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
-	# f("s0psl_%s_%s" % (s0p, s0sl))
-"n0A"	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
-	# f("n0psl_%s_%s" % (n0p, n0sl))
-] # tacl13eager
-
-# Renamed:
-eager39 = acl11eager
-# fs11e39e39 (8906): eager39 also local best for acl11, ArcEager13, start=eager39, all=eager39
 
 # The original zn11 set in sparse format with feature conjunctions
 zn11orig = SFeature[
@@ -440,6 +251,288 @@ zn11single = SFeature[
 			## N1c		Next+1CPOS
 			## N1f		Next+1Feats
 ]
+
+
+# Dense feature sets:
+
+# Each string specifies a particular feature and has the form:
+#   [sn]\d?([hlr]\d?)*[vcpdLabAB]
+# 
+# The meaning of each letter is below.  In the following i is a single
+# digit integer which is optional if the default value is used:
+#
+# si: i'th stack word, default i=0 means top
+# ni: i'th buffer word, default i=0 means first
+# hi: i'th degree head, default i=1 means direct head
+# li: i'th leftmost child, default i=1 means the leftmost child 
+# ri: i'th rightmost child, default i=1 means the rightmost child
+# v: word vector
+# c: context vector
+# p: postag
+# d: distance to the right.  e.g. s1d is s0s1 distance, s0d is s0n0
+#    distance.  encoding: 1,2,3,4,5-10,10+ (from ZN11)
+# L: dependency label (0 is ROOT or NONE)
+# a: number of left children.  encoding: 0,1,...,8,9+
+# b: number of right children.  encoding: 0,1,...,8,9+
+# A: set of left dependency labels
+# B: set of right dependency labels
+
+
+# fs11h54h27 (9144): local best for acl11, ArcHybrid13, start=hybrid27, all=hybrid54, bparser10, shuffled
+hybrid25 = split("n0A n0a n0lL n0lc n0lv n0c n0v n1c n1v s0A s0B s0a s0b s0d s0c s0rL s0v s1A s1B s1a s1rL s1rc s1rv s1v s2v")
+
+# fs11e64e27 (9098): local best for acl11, ArcEager13, start=eager27=hybrid27, all=eager64, bparser10, shuffled
+eager25 = split("n0A n0a n0l2L n0lL n0lc n0lv n0c n0v n1c n1v n2c n2v s0B s0c s0v s1A s1B s1a s1d s1c s1rL s1rc s1v s2c s2v")
+
+# fs11h54h28 (8997): local best in acl11, ArcEager13 (by mistake), start=hybrid28, all=hybrid54
+hybrid27 = split("n0A n0a n0lL n0lc n0lv n0c n0v n1c n1v s0A s0B s0a s0d s0c s0v s1A s1B s1a s1b s1d s1c s1rL s1rc s1rv s1v s2c s2v")
+eager27 = hybrid27
+
+# fs11h54h14 (8992): local best for acl11, ArcHybrid13, start=hybrid14, all=hybrid54
+hybrid25b = split("n0a n0l2c n0l2v n0lc n0lv n0v n1c n1v n2v s0B s0a s0d s0l2L s0lL s0lc s0c s0rc s0v s1B s1b s1lL s1lc s1c s1r2c s1v")
+
+# fs11e64e20 (8926): local best for acl11, ArcEager13, start=eager20, all=eager64
+eager20 = split("n0A n0a n0lL n0c n0v n1c n1v n2c n2v s0B s0L s0b s0d s0hc s0hv s0c s0rL s0v s1c s1v")
+
+# fs11e39e21 (8906): local best for acl11, ArcEager13, start=eager21, all=eager39
+eager23 = split("n0A n0lL n0lc n0c n0v n1c n1v n2c n2v s0B s0L s0a s0b s0h2c s0hv s0l2L s0l2c s0l2v s0lc s0c s0r2L s0r2c s0v")
+
+# fs07h54h28 (8797): local best for conll07, ArcHybrid13, start=hybrid28, all=hybrid54
+hybrid28b = split("n0A n0a n0l2v n0lL n0lc n0c n0v n1c n1v n2v s0A s0B s0a s0b s0d s0c s0v s1A s1a s1b s1d s1c s1rL s1rc s1rv s1v s2c s2v")
+
+# fs07h54h13 (8791): Local best for conll07, ArcHybrid13, start=tacl13hybrid (aka hybrid13), all=hybrid54
+hybrid14 = split("n0lc n0lv n0v n1c n1v s0d s0lc s0c s0rc s0v s1B s1lc s1c s1v")
+
+# fs07e39e39 (8725): local best in conll07, ArcEager13, start=acl11eager, all=acl11eager
+eager36 = split("n0A n0a n0l2L n0l2c n0l2v n0lL n0lc n0lv n0c n0v n1c n1v n2c n2v s0A s0B s0L s0b s0d s0h2c s0hL s0hc s0hv s0l2L s0l2c s0l2v s0lL s0lc s0lv s0c s0r2c s0r2v s0rL s0rc s0rv s0v")
+
+# fs07e39e21 (8705): Local best for conll07, ArcEager13, start=eager21, all=eager39
+eager20b = split("n0l2L n0lv n0c n0v n1v n2c n2v s0B s0L s0a s0h2c s0hv s0l2L s0l2c s0l2v s0lc s0c s0r2L s0r2c s0v")
+
+# fs07e64e20 (8677): Local best for conll07, ArcEager13, start=eager20, all=eager64
+eager21b = split("n0A n0a n0l2L n0lL n0c n0v n1c n1v n2c n2v s0B s0L s0b s0d s0hc s0hv s0c s0rL s0v s1c s1v")
+
+# more complete set than acl11eager: added s1 features
+eager64 = split("n0A n0a n0l2L n0l2c n0l2v n0lL n0lc n0lv n0c n0v n1c n1v n2c n2v s0A s0B s0L s0a s0b s0d s0h2c s0h2v s0hL s0hc s0hv s0l2L s0l2c s0l2v s0lL s0lc s0lv s0c s0r2L s0r2c s0r2v s0rL s0rc s0rv s0v s1A s1B s1L s1a s1b s1d s1h2c s1h2v s1hL s1hc s1hv s1l2L s1l2c s1l2v s1lL s1lc s1lv s1c s1r2L s1r2c s1r2v s1rL s1rc s1rv s1v")
+
+# Manually constructed starting point
+eager21 = split("n0A n0lL n0c n0v n1c n1v n2c n2v s0B s0L s0a s0h2c s0hv s0l2L s0l2c s0l2v s0lc s0c s0r2L s0r2c s0v")
+
+# Manually constructed starting point
+hybrid28 = split("n0A n0a n0lL n0lc n0lv n0c n0v n1c n1v s0A s0B s0a s0b s0d s0c s0v s1A s1B s1a s1b s1d s1c s1rL s1rc s1rv s1v s2c s2v")
+
+# Features that may be relevant for ArcHybrid13
+hybrid54 = DFeature[
+"n0v", "n0c", "n0A", "n0a",
+"s0v", "s0c", "s0A", "s0a", "s0B", "s0b", "s0d",
+"s1v", "s1c", "s1A", "s1a", "s1B", "s1b", "s1d",
+"n1v", "n1c", "n2v", "n2c", "s2v", "s2c",
+"n0lv", "n0l2v", "s0lv", "s0l2v", "s0rv", "s0r2v", "s1lv", "s1l2v", "s1rv", "s1r2v",
+"n0lc", "n0l2c", "s0lc", "s0l2c", "s0rc", "s0r2c", "s1lc", "s1l2c", "s1rc", "s1r2c",
+"n0lL", "n0l2L", "s0lL", "s0l2L", "s0rL", "s0r2L", "s1lL", "s1l2L", "s1rL", "s1r2L"
+]
+
+# Goldberg&Nivre TACL13 ArcHybrid features from: tacl2013dynamicoracles/lefttoright/features:HybridFeatures
+# s0,s1,s2: stack word forms: a=-1,-2,-3 b=0 c=4
+# w0,w1: buffer word forms: a=0,1 b=0 c=4
+# Ts0: tag of s0 (-1 0 -4)
+# Trcs1: tag of rightmost child of s1 (-2 1 -4)
+# use word half of vector (c=+4) for form, context half of vector (c=-4) for tag
+# No need for feature combinations, we have a nonlinear model.
+
+tacl13hybrid = DFeature[
+	# (1)
+"s0v"	# append("s0_%s" % s0)
+"s0c"	# append("Ts0_%s" % Ts0)
+        # append("Ts0s0_%s_%s" % (Ts0, s0))
+
+"s1v"	# append("s1_%s" % s1)
+"s1c"	# append("Ts1_%s" % Ts1)
+     	# append("Ts1s1_%s_%s" % (Ts1, s1))
+
+"n0v"	# append("w0_%s" % w0)
+"n0c"	# append("Tw0_%s" % Tw0)
+	# append("Tw0w0_%s_%s" % (Tw0, w0))
+	# +hybrid
+"n1v"	# append("w1_%s" % w1)
+"n1c"	# append("Tw1_%s" % Tw1)
+	# append("Tw1w1_%s_%s" % (Tw1, w1))
+
+	# (2)
+	# append("s0s1_%s_%s" % (s0,s1))
+	# append("Ts0Ts1_%s_%s" % (Ts0,Ts1))
+	# append("Ts0Tw0_%s_%s" % (Ts0,Tw0))
+	# append("s0Ts0Ts1_%s_%s_%s" % (s0,Ts0,Ts1))
+	# append("Ts0s1Ts1_%s_%s_%s" % (Ts0,s1,Ts1))
+	# append("s0s1Ts1_%s_%s_%s" % (s0,s1,Ts1))
+	# append("s0Ts0s1_%s_%s_%s" % (s0,Ts0,s1))
+	# append("s0Ts0Ts1_%s_%s_%s" % (s0,Ts0,Ts1))
+	# +hybrid   
+	# append("s0w0_%s_%s" % (s0,w0))
+	# append("Ts0Tw0_%s_%s" % (Ts0,Tw0))
+	# append("Ts0Tw1_%s_%s" % (Ts0,Tw1))
+	# append("s0Ts0Tw0_%s_%s_%s" % (s0,Ts0,Tw0))
+	# append("Ts0w0Tw0_%s_%s_%s" % (Ts0,w0,Tw0))
+	# append("s0w0Tw0_%s_%s_%s" % (s0,w0,Tw0))
+	# append("s0Ts0w0_%s_%s_%s" % (s0,Ts0,w0))
+	# append("w0Tw0Tw1_%s_%s_%s" % (w0,Tw0,Tw1)) #
+	
+	# (3)
+	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
+	# append("Ts1Ts0Tw0_%s_%s_%s" % (Ts1,Ts0,Tw0))
+	# append("s0Tw0Tw1_%s_%s_%s" % (s0,Tw0,Tw1))
+	# append("Ts1s0Tw0_%s_%s_%s" % (Ts1,s0,Tw0))
+	
+	# (4) rc -1  lc 1
+"s1rc"	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
+	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Ts0))
+"s1lc"	# append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
+"s0lc"	# append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
+"s0rc"	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
+	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Tlcs1, s0))
+	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Trcs0))
+	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Trcs1, s0))
+	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Tlcs0))
+	
+	# +hybrid
+	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw0))
+	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw1))
+	# append("Ts0Tlcs0Tw0_%s_%s_%s" % (Ts0,Tlcs0,Tw0))
+"n0lc"	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
+	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Tlcs0,w0))
+	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Trcs0,w0))
+	# append("Ts0w0Tlcw0_%s_%s_%s" % (Ts0,w0,Tlcw0))
+	
+	# append("Ts0Tw0Trcs0Tlcw0_%s_%s_%s_%s" % (Ts0,Tw0,Tlcw0,Trcs0))
+	# append("Ts0Ts1Trcs1Tlcs0_%s_%s_%s_%s" % (Ts0,Ts1,Tlcs0,Trcs1))
+	
+	# (5)
+	# append("Ts2Ts1Ts0_%s_%s_%s" % (Ts2,Ts1,Ts0))
+	# append("Ts1Ts0Tw0_%s_%s_%s" % (Ts1,Ts0,Tw0))
+	# append("Ts0Tw0Tw1_%s_%s_%s" % (Ts0,Tw0,Tw1))
+] # tacl13hybrid
+
+# Variants of tacl13hybrid:
+
+tacl13words = DFeature["s0lv", "s0v", "s0rv", "s1lv", "s1v", "s1rv", "n0lv", "n0v", "n1v"]
+tacl13tags  = DFeature["s0lc", "s0c", "s0rc", "s1lc", "s1c", "s1rc", "n0lc", "n0c", "n1c"]
+tacl13wordtag = [tacl13words; tacl13tags]
+
+# Renamed:
+hybrid13 = tacl13hybrid
+
+# Goldberg&Nivre TACL13 ArcEager features from: 
+# tacl2013dynamicoracles/lefttoright/features:EagerZhangNivre2011Extractor
+# (seems to be the ones used in acl11)
+# s0: top of stack (a=-1)
+# n0,n1,n2: buffer (a=0,1,2)
+# s0h,s0h2: parent and grandparent of s0
+# s0l,s0r: left/rightmost child of s0
+# s0l2,s0r2: second left/rightmost child of s0
+# s0w,s0p,s0wp: form, postag, form-postag for s0
+# d: refers to s0-n0 distance, encoded 1,2,3,...,9,10+
+# s0vl,s0vr: number of left/right children of s0, flat encoding
+# s0L: dependency label for s0 (NA for n0!)
+# s0sl,s0sr: set of dependency labels to the left/right of s0
+
+acl11eager = DFeature[
+	# # Single Words
+	# f("s0wp_%s" % (s0wp))
+"s0v"	# f("s0w_%s"  % (s0w))
+"s0c"	# f("s0p_%s"  % (s0p))
+	# f("n0wp_%s" % (n0wp))
+"n0v"	# f("n0w_%s"  % (n0w))
+"n0c"	# f("n0p_%s"  % (n0p))
+	# f("n1wp_%s" % (n1wp))
+"n1v"	# f("n1w_%s"  % (n1w))
+"n1c"	# f("n1p_%s"  % (n1p))
+	# f("n2wp_%s" % (n2wp))
+"n2v"	# f("n2w_%s"  % (n2w))
+"n2c"	# f("n2p_%s"  % (n2p))
+	# 
+	# # Pairs
+	# f("s0wp,n0wp_%s_%s" % (s0wp, n0wp))
+	# f("s0wp,n0w_%s_%s" % (s0wp, n0w))
+	# f("s0w,n0wp_%s_%s" % (s0w, n0wp))
+	# f("s0wp,n0p_%s_%s" % (s0wp, n0p))
+	# f("s0p,n0wp_%s_%s" % (s0p, n0wp))
+	# f("s0w,n0w_%s_%s" % (s0w, n0w)) #?
+	# f("s0p,n0p_%s_%s" % (s0p, n0p))
+	# f("n0p,n1p_%s_%s" % (n0p, n1p))
+	# 
+	# # Tuples
+	# f("n0p,n1p,n2p_%s_%s_%s" % (n0p, n1p, n2p))
+	# f("s0p,n0p,n1p_%s_%s_%s" % (s0p, n0p, n1p))
+	# f("s0hp,s0p,n0p_%s_%s_%s" % (s0hp, s0p, n0p)) => s0hp (handled in unigram section)
+	# f("s0p,s0lp,n0p_%s_%s_%s" % (s0p, s0lp, n0p)) => s0lp (handled in unigram section)
+	# f("s0p,s0rp,n0p_%s_%s_%s" % (s0p, s0rp, n0p)) => s0rp (handled in unigram section)
+	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp)) => n0lp (handled in unigram section)
+	# 
+	# # Distance
+"s0d"	# f("s0wd_%s:%s" % (s0w, d)) => d
+	# f("s0pd_%s:%s" % (s0p, d))
+	# f("n0wd_%s:%s" % (n0w, d))
+	# f("n0pd_%s:%s" % (n0p, d))
+	# f("s0w,n0w,d_%s:%s:%s" % (s0w, n0w, d))
+	# f("s0p,n0p,d_%s:%s:%s" % (s0p, n0p, d))
+	# 
+	# # Valence
+"s0b"	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
+	# f("s0pvr_%s:%s" % (s0p, s0vr))
+"s0a"	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
+	# f("s0pvl_%s:%s" % (s0p, s0vl))
+"n0a"	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
+	# f("n0pvl_%s:%s" % (n0p, n0vl))
+	# 
+	# # Unigrams
+"s0hv"	# f("s0hw_%s" % (s0hw))
+"s0hc"	# f("s0hp_%s" % (s0hp))
+"s0L"	# f("s0L_%s" % (s0L))
+	# 
+"s0lv"	# f("s0lw_%s" % (s0lw))
+"s0lc"	# f("s0lp_%s" % (s0lp))
+"s0lL"	# f("s0lL_%s" % (s0lL))
+	# 
+"s0rv"	# f("s0rw_%s" % (s0rw))
+"s0rc"	# f("s0rp_%s" % (s0rp))
+"s0rL"	# f("s0rL_%s" % (s0rL))
+	# 
+"n0lv"	# f("n0lw_%s" % (n0lw))
+"n0lc"	# f("n0lp_%s" % (n0lp))
+"n0lL"	# f("n0lL_%s" % (n0lL))
+	# 
+	# # Third-order
+	# #do we really need the non-grandparent ones?
+"s0h2v"	# f("s0h2w_%s" % (s0h2w))
+"s0h2c"	# f("s0h2p_%s" % (s0h2p))
+"s0hL"	# f("s0hL_%s"  % (s0hL))
+"s0l2v"	# f("s0l2w_%s" % (s0l2w))
+"s0l2c"	# f("s0l2p_%s" % (s0l2p))
+"s0l2L"	# f("s0l2L_%s" % (s0l2L))
+"s0r2v"	# f("s0r2w_%s" % (s0r2w))
+"s0r2c"	# f("s0r2p_%s" % (s0r2p))
+"s0r2L"	# f("s0r2L_%s" % (s0r2L))
+"n0l2v"	# f("n0l2w_%s" % (n0l2w))
+"n0l2c"	# f("n0l2p_%s" % (n0l2p))
+"n0l2L"	# f("n0l2L_%s" % (n0l2L))
+	# f("s0p,s0lp,s0l2p_%s_%s_%s" % (s0p, s0lp, s0l2p))
+	# f("s0p,s0rp,s0r2p_%s_%s_%s" % (s0p, s0rp, s0r2p))
+	# f("s0p,s0hp,s0h2p_%s_%s_%s" % (s0p, s0hp, s0h2p))
+	# f("n0p,n0lp,n0l2p_%s_%s_%s" % (n0p, n0lp, n0l2p))
+	# 
+	# # Labels
+"s0B"	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
+	# f("s0psr_%s_%s" % (s0p, s0sr))
+"s0A"	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
+	# f("s0psl_%s_%s" % (s0p, s0sl))
+"n0A"	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
+	# f("n0psl_%s_%s" % (n0p, n0sl))
+] # tacl13eager
+
+# Renamed:
+eager39 = acl11eager
+# fs11e39e39 (8906): eager39 also local best for acl11, ArcEager13, start=eager39, all=eager39
+
 
 # Old feature format before we switched to ints:
 # f::Features is a nx3 matrix whose rows determine which features to extract
