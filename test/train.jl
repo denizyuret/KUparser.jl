@@ -27,7 +27,7 @@ function parse_commandline()
         help = "One or more hidden layer sizes"
         nargs = '+'
         arg_type = Int
-        default = [20000]
+        default = [16384]
         "--epochs"
         help = "Minimum number of epochs to train"
         arg_type = Int
@@ -61,7 +61,7 @@ function parse_commandline()
         help = "Dropout probability"
         arg_type = Float32
         nargs = '+'
-        default = [0.2f0, 0.7f0]
+        # default = [0.2f0, 0.7f0]
         "--l1reg"
         help = "L1 regularization parameter"
         arg_type = Float32
@@ -70,11 +70,11 @@ function parse_commandline()
         help = "L2 regularization parameter"
         arg_type = Float32
         nargs = '+'
-        "--learningRate"
+        "--lr"
         help = "Learning rate"
         arg_type = Float32
         nargs = '+'
-        default = [2f-2]
+        default = [0.01562]
         "--maxnorm"
         help = "If nonzero upper limit on weight matrix row norms"
         arg_type = Float32
@@ -129,19 +129,22 @@ function main()
     xrows=KUparser.flen(p1, s1, feats)
     yrows=p1.nmove
 
-    net=newnet(relu, [xrows; args["hidden"]; yrows]...)
-    net[end].f=KUnet.logp
-    for k in [fieldnames(UpdateParam); :dropout]
+    net = Layer[]
+    for h in args["hidden"]
+        append!(net, [Mmul(h), Bias(), Relu()])
+    end
+    append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
+    for k in [fieldnames(Param); :dropout]
         haskey(args, string(k)) || continue
         v = args[string(k)]
         if isempty(v)
             continue
         elseif length(v)==1
-            setparam!(net, k, v[1])
+            @eval setparam!($net; $k=$v[1])
         else 
             @assert length(v)==length(net) "$k should have 1 or $(length(net)) elements"
             for i=1:length(v)
-                setparam!(net[i], k, v[i])
+                @eval setparam!($net[$i]; $k=$v[$i])
             end
         end
     end
