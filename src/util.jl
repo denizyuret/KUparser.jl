@@ -87,16 +87,9 @@ import Base: copy
 KUnet.GPU && eval(Expr(:using,:CUDArt))
 
 function copy(net::Net, to::Symbol)
-    ncopy = nothing
-    if to == :gpu
-        KUnet.GPU || error("GPU not available")
-        ncopy = gpucopy(net)
-    elseif to == :cpu
-        ncopy = cpucopy(net)
-    elseif to == :test
-        ncopy = cpucopy(net)
-    else
-        error("Don't know how to copy net to $to")
-    end
-    return ncopy
+    net = KUnet.strip!(net)
+    ((to == :gpu) ? gpucopy(net) :
+     (to == :cpu) ? cpucopy(net) :
+     (to == :test) ? cpucopy(net) :
+     error("Don't know how to copy net to $to"))
 end
