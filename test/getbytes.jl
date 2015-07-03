@@ -22,8 +22,9 @@ function _getbytes(x::DenseArray,d)
 end
 
 function _getbytes(x,d)
-    haskey(d,x) && return 0; d[x]=1
     total = sizeof(x)
+    isbits(x) && return total
+    haskey(d,x) && return 0; d[x]=1
     fieldNames = typeof(x).names
     if fieldNames != ()
         for fieldName in fieldNames

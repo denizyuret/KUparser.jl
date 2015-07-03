@@ -74,7 +74,7 @@ function parse_commandline()
         help = "Learning rate"
         arg_type = Float32
         nargs = '+'
-        default = [0.01562]
+        default = [0.01562f0]
         "--maxnorm"
         help = "If nonzero upper limit on weight matrix row norms"
         arg_type = Float32
@@ -151,10 +151,12 @@ function main()
     @show net
 
     # Initialize training set using oparse on first corpus
-    @date (p,x,y) = oparse(pt, data[1], ndeps, args["ncpu"], feats)
+    # @date (p,x,y) = oparse(pt, data[1], ndeps, args["ncpu"], feats)
+    @date (p,x,y) = oparse(pt, data[1], ndeps, feats)
     @show evalparse(p, data[1]); p=nothing
     for i=2:length(data)
-        @date p = oparse(pt, data[i], ndeps, args["ncpu"])
+        #@date p = oparse(pt, data[i], ndeps, args["ncpu"])
+        @date p = oparse(pt, data[i], ndeps)
         @show evalparse(p, data[i]); p=nothing
     end
     accuracy = Array(Float32, length(data))
@@ -163,8 +165,9 @@ function main()
     while true
         @show epoch += 1
         @show map(size, (x, y))
-        @date train(net, x, y; batch=args["tbatch"], loss=KUnet.logploss, shuffle=true)
+        @date train(net, x, y; batch=args["tbatch"], shuffle=true)
         if epoch % args["pepochs"] == 0
+            net = cpucopy(net); gc()
             @meminfo
             if (args["parser"] == "oparser")
                 # We never change the training set with oparser, just report accuracy
@@ -217,8 +220,9 @@ function main()
             
             (epoch >= args["epochs"]) && (epoch >= 2*bestepoch) && break
 
-        end
-    end
-end
+            net = gpucopy(net); gc()
+        end # if epoch % args["pepochs"] == 0
+    end # while true
+end # main
 
 main()
