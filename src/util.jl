@@ -81,7 +81,6 @@ zn11punct(w)=ismatch(r"^[,?!:;]$|^-LRB-$|^-RRB-$|^[.]+$|^[`]+$|^[']+$|^（$|^）
 kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
 
 # Copying net between cpu and gpu
-testnet(net)=copy(net,:test)
 
 import Base: copy
 KUnet.GPU && eval(Expr(:using,:CUDArt))
@@ -90,6 +89,19 @@ function copy(net::Net, to::Symbol)
     net = KUnet.strip!(net)
     ((to == :gpu) ? gpucopy(net) :
      (to == :cpu) ? cpucopy(net) :
-     (to == :test) ? cpucopy(net) :
      error("Don't know how to copy net to $to"))
+end
+
+function testnet(net)
+    net = cpucopy(net)
+    KUnet.strip!(net)
+    for l in net
+        for n in names(l)
+            if isdefined(l,n) && isa(l.(n), Param)
+                # Get rid of all the training fields
+                l.(n) = Param(l.(n).data)
+            end
+        end
+    end
+    return net
 end
