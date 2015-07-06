@@ -30,6 +30,22 @@ function restartmachines()
     addprocs(machines)
 end
 
+# This does not distribute gpus equally:
+# @date @everywhere using CUDArt
+# @date @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
+
+function restartcuda()
+    d = Dict()
+    for i in keys(Base.map_pid_wrkr)
+        i == 1 && continue
+        @fetchfrom i require("CUDArt")
+        a = Base.map_pid_wrkr[i].bind_addr
+        n = get!(d, a, 0)
+        @fetchfrom i CUDArt.device(n % CUDArt.devcount())
+        d[a] = n+1
+    end
+end
+
 function restartmachines(host::ASCIIString)
     wid = 0
     for i in keys(Base.map_pid_wrkr)
