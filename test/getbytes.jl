@@ -4,7 +4,7 @@ _getbytes(x::DataType,d) = sizeof(x)
 
 _getbytes(x::NTuple,d)=(length(x) * sizeof(eltype(x)))
 
-_getbytes(x::CudaArray,d)=(haskey(d,x) ? 0 : (d[x]=1; length(x) * sizeof(eltype(x))))
+_getbytes(x::AbstractCudaArray,d)=(haskey(d,x) ? 0 : (d[x]=1; length(x) * sizeof(eltype(x))))
 
 function _getbytes(x::DenseArray,d) 
     haskey(d,x) && return 0; d[x]=1
@@ -32,7 +32,7 @@ function _getbytes(x,d)
             f = x.(fieldName)
             fieldBytes = _getbytes(f,d)
             fieldSize = (isa(f, Union(AbstractArray,CudaArray)) ? (eltype(f),size(f)) : ())
-            @show (typeof(x), fieldName, fieldSize, fieldBytes)
+            # @show (typeof(x), fieldName, fieldSize, fieldBytes)
             total += fieldBytes
         end
     end
