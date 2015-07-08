@@ -10,25 +10,31 @@ function parse_commandline()
         nargs = '+'
         required = true
         "--out"
-        help = "JLD file for output trained network"
-        default = ""
+        help = "JLD file for saving last network"
+        #default = ""
+        "--in"
+        help = "JLD file for loading init network"
+        #default = ""
+        "--best"
+        help = "JLD file for best (dev) network"
+        #default = ""
         "--nogpu"
         help = "Do not use gpu"
         action = :store_true
         "--parser"
         help = "Parsing algorithm to use: g(reedy)parser, b(eam)parser, or o(racle)parser for static training"
-        default = "oparser"
+        default = "bparser"
         "--arctype"
         help = "Move set to use: ArcEager{R1,13}, ArcHybrid{R1,13}"
         default = "ArcEager13"
         "--feats"
         help = "Features to use from KUparser.Flist"
-        default = "tacl13hybrid"
+        default = "zn11cpv"
         "--hidden"
         help = "One or more hidden layer sizes"
         nargs = '+'
         arg_type = Int
-        default = [16384]
+        #default = [16384]
         "--minepochs"
         help = "Minimum number of epochs to train"
         arg_type = Int
@@ -115,10 +121,11 @@ function main()
     args["nogpu"] && blas_set_num_threads(20)
     args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
     (data, ndeps) = loaddata(args["datafiles"])
-    feats = eval(parse("Flist."*args["feats"]))
-    pt = eval(parse(args["arctype"]))
-    yrows = pt(1,ndeps).nmove
-    net = initnet(args, yrows)
+    @show (map(size, data), ndeps)
+    @show feats = eval(parse("Flist."*args["feats"]))
+    @show pt = eval(parse(args["arctype"]))
+    net = (args["in"]==nothing ? initnet(args, pt, ndeps) : (@date loadnet(args["in"])))
+    @show net
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch,epoch)=(0,0,0)
     
@@ -131,7 +138,7 @@ function main()
             c2=min(length(corpus), c1+args["sbatch"]-1)
             @show (:corpus, 1, c1, c2)
             sentences=sub(corpus, c1:c2)
-            if ((epoch==1) || (args["parser"] == "oparser"))
+            if ((args["parser"] == "oparser") || ((epoch==1) && (args["in"]==nothing)))
                 @date p = oparse(pt, sentences, ndeps, args["ncpu"], feats)
             elseif (args["parser"] == "bparser")
                 @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
@@ -144,11 +151,10 @@ function main()
                 append!(parses, pxy[1])
                 train(net, pxy[2], pxy[3]; batch=args["tbatch"])
             end
-            p = nothing
-            @everywhere gc()
         end
         @show e = evalparse(parses, corpus)
         accuracy[1] = e[2]
+        (args["out"] != nothing) && (@date savenet(args["out"], net))
 
         for idata=2:length(data)
             corpus=data[idata]
@@ -165,8 +171,6 @@ function main()
                     error("Unknown parser")
                 end
                 for pp in p; append!(parses, pp); end
-                p = nothing
-                @everywhere gc()
             end
             @show e = evalparse(parses, corpus)
             accuracy[idata] = e[2]
@@ -183,7 +187,7 @@ function main()
 
         if (score > bestscore)
             @show (bestscore,bestepoch)=(score,epoch)
-            !isempty(args["out"]) && save(args["out"], net)
+            (args["best"] != nothing) && (@date savenet(args["best"], net))
         end
 
         # If epochs specified, do exactly epoch.
@@ -222,13 +226,14 @@ function loaddata(files)
     return (data, ndeps)
 end
 
-function initnet(args, yrows)
+function initnet(args, pt, ndeps)
     net = Layer[]
     !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][1]))
     for h in args["hidden"]
         append!(net, [Mmul(h), Bias(), Relu()])
         !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][end]))
     end
+    yrows = pt(1,ndeps).nmove
     append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
     for k in [fieldnames(Param)]
         haskey(args, string(k)) || continue
@@ -351,3 +356,10 @@ main()
 #     return b
 # end
 
+        # # gc() does not work, so we need these:
+        # @date sleep(5)
+        # @date Main.restartmachines()
+        # @date sleep(5)
+        # @date Main.restartcuda()
+        # @date (@everywhere require("KUparser"))
+        # @date (@everywhere gc())
