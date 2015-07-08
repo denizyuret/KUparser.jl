@@ -35,12 +35,13 @@ end
 # @date @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
 
 function restartcuda()
+    @everywhere require("CUDArt")
     d = Dict()
     for i in keys(Base.map_pid_wrkr)
         i == 1 && continue
-        @fetchfrom i require("CUDArt")
         a = Base.map_pid_wrkr[i].bind_addr
         n = get!(d, a, 0)
+        # @show (a,n)
         @fetchfrom i CUDArt.device(n % CUDArt.devcount())
         d[a] = n+1
     end

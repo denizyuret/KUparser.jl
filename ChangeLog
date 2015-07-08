@@ -1,3 +1,204 @@
+2015-07-07  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* test/train.jl: After a long debugging session, rewrote the whole
+	thing.  The x matrix gets too big.  So we parse training corpus in
+	chunks, feeding one chunk at a time to parsers, then feeding the
+	results immediately to train.  Never keep around big chunks.
+	@@kunet
+
+	* Timing: for sentence chunk train:2501:5000
+	$ julia --machinefile foo.machinefile8x4 train.jl --parser bparser --nbeam 64 --arctype ArcEager13 --feats zn11cpv --hidden 4096 4096 --dropout .1 .5 --epochs 20 --seed 42 yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4 
+
+	machine	worker	sbatch	pbatch	bparse	train
+	3	8	2500	25	98	41
+	5	4	2500	25	93	35
+	5	6	2500	25	84	41	# optimal
+	5	8	2500	25	88	42
+	5	10	2500	25	88	46
+	5	12	2500	25	97	51
+	5	16	2500	32	113	55
+	8	2	2500	25	100	34	# seems machine x worker < 25 not good enough
+	8	4	2500	25	84	40	# optimal
+	8	8	2500	25	107	52	# seems machine x worker > 40 slowing us down
+	4	8	2500	25	114	40	# just machine x worker not enough
+
+
+	with 3 machines x 8 workers and 2500 sent chunks (16 train chunks):
+
+	epoch 1:
+	2015-07-07T16:15:53 p = oparse(pt,sentences,ndeps,args["ncpu"],feats)
+	oparse(1:2500) 14 secs
+	train(1:2500) 41 secs
+	2015-07-07T16:30:29 p = bparse(pt,sentences,ndeps,feats,net,args["nbeam"],args["pbatch"],args["ncpu"]; xy=false)
+	bparse(1700) 78 secs
+	2015-07-07T16:31:48 p = bparse(pt,sentences,ndeps,feats,net,args["nbeam"],args["pbatch"],args["ncpu"]; xy=false)
+	bparse(2416) 92 secs
+
+	epoch 2:
+	2015-07-07T16:33:21 p = bparse(pt,sentences,ndeps,feats,net,args["nbeam"],args["pbatch"],args["ncpu"]; xy=true)
+	bparse(2500) 98 secs
+	train(2500) 41 secs
+	2015-07-07T17:10:45 p = bparse(pt,sentences,ndeps,feats,net,args["nbeam"],args["pbatch"],args["ncpu"]; xy=false)
+	bparse(dev1700) 72 secs
+	2015-07-07T17:11:57 p = bparse(pt,sentences,ndeps,feats,net,args["nbeam"],args["pbatch"],args["ncpu"]; xy=false)
+	bparse(tst2416) 89 secs
+
+
+	Compare with 5 machines x 8 workers and 2500 sent chunks:
+	bparse(2500) 83 secs
+	train(2500) 42 secs
+
+	Compare with 5 machines x 16 workers and 2500 sent chunks, pbatch=32 (was 25)
+	bparse(2500): 113 secs
+	train(2500): 55 secs
+
+	Compare with 5 machines x 4 workers and 2500 sent chunks: (back to pbatch=25)
+	bparse(2500): 93 secs
+	train(2500): 35 secs
+
+2015-07-06  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/resetworkers.jl: gc() still does not work in v0.3.  With our
+	without DArrays, I could not find a way to gc() an array returned
+	from the worker consistently.  We'll have to use
+	restartmachines().  There may or may not be any reason to use
+	DArrays for anything other than the input.
+
+	* TODO:
+	+ prep data with predicted/gold postags and yatbaz embedding:
+	yatbazp.*: cofirmed using compare-jld4.jl
+	+ fix bparser xy problem.
+	+ fix worker memory reset problem.
+	- figure out optimum nbatch, workers/machine.
+	- run bparser experiment.
+	- experiment with early stop.
+	- resort to feature selection.
+
+2015-07-05  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO: old results invalid because i used predicted postags in
+	acl11.trn.jld but gold ones in acl11.dev.jld.  also be careful
+	about early stop.
+
+	* testbparser3.jl: parallelism.
+	cannot get speedup using one machine and multiple gpu/cpu.
+
+	100 sentence test:
+	1 machine with xy: 45 secs
+	5 machines x 2 workers x nbatch=10 with xy: 17 secs / 22 secs with restart
+
+	250 sentence test:
+	single cpu: 121 secs
+	5 machines: 39 secs
+	5 machines x 2 workers each: 35 secs
+
+	500 sentence test:
+	5 machines x 2 workers each: 36 secs
+
+	1000 sentence test:
+	5 machines x 1 worker each: 111 secs
+	5 machines x 2 workers each: 60 secs
+	5 machines x 4 workers each: 50 secs
+
+	1700 sentence test (whole dev):
+	5 machines x 2 workers each: 92 secs
+	5 machines x 4 workers each: 72 secs
+	5 machines x 8 workers each: 72 secs
+
+	These were for nbatch=5.
+	5 machines x 4 workers x nbatch=10: 70 secs
+	5 machines x 4 workers x nbatch=20: 69 secs
+	5 machines x 4 workers x nbatch=85: 69 secs
+
+	However this was with default batch=128 for predict.  Try again
+	with unlimited predict batch size.
+
+	5 machines x 4 workers x nbatch=85: 65 secs
+
+	gc() may be slowing down, commenting out gc() in train.  That's
+	stupid, we are not doing train!  65 secs is it.
+
+	5 machines x 4 workers x nbatch=2: 72 secs
+
+	There is no point in using a large nbatch.
+
+	5 machines x 6 workers x nbatch=10: 65 secs
+	5 machines x 8 workers x nbatch=10: 68 secs
+
+	5000 sentence experiments:
+
+	5 machines x 8 workers x nbatch=5: 136 secs
+	5 machines x 8 workers x nbatch=25: 126 secs
+	5 machines x 10 workers x nbatch=25: 121 secs
+	5 machines x 12 workers x nbatch=25: 122 secs
+	5 machines x 16 workers x nbatch=5: 133 secs
+
+	10000 sentence experiments:
+	5 machines x 16 workers x nbatch=5: 202 secs
+	5 machines x 16 workers x nbatch=25: 187 secs
+
+	10000 sentences with xy:
+	(30 workers, 334 sentences per worker)
+	15 machines x 2 workers x nbatch=5: 224 secs
+	15 machines x 2 workers x nbatch=25: 216 secs
+	15 machines x 2 workers x nbatch=335: 217 secs
+	(60 workers, 167 sentences per worker)
+	15 machines x 4 workers x nbatch=5: 193 secs
+	15 machines x 4 workers x nbatch=25: 189 secs
+	15 machines x 4 workers x nbatch=56: 179.6 secs
+	(120 workers, 84 sentences per worker)
+	15 machines x 8 workers x nbatch=5: 207 secs
+	15 machines x 8 workers x nbatch=21: 212 secs
+	15 machines x 8 workers x nbatch=44: 212 secs
+
+	full training set experiments:
+	5 machines x 16 workers x nbatch=25: 576 secs
+	15 machines x 6 workers x nbatch=25: 483 secs
+	15 machines x 6 workers x nbatch=125: oom
+	15 machines x 8 workers x nbatch=25: 480 secs (10 secs to hcat x, 333 sent/worker)
+	15 machines x 16 workers x nbatch=25: oom
+
+	WARNING: with xy, the time is dominated by transferring x! (~200 secs)
+
+	* src/bparser.jl: DONE: profile bparser.  Using net
+	"foo11nnet3.jld" trained single epoch with "zn11cpv.jld 0.01 .2 .5
+	4096 4096".  accuracy: 0.9606554389983601,0.9606121471216923.
+
+	bparser methods:
+	bparse(pt, c, ndeps, feats, net, nbeam, [nbatch=1]) # single cpu
+	bparse(pt, c, ndeps, feats, net, nbeam, nbatch, ncpu) # multi cpu
+	bparse(pa, c, ndeps, feats, net, nbeam, nbatch, [x, y, nx]) # workhorse
+
+	testbparser3.jl
+	bparse(pt, corpus[1:10], ndeps, ft, net, nbeam;	xy=true) # 6509
+	features(b.parser[i], b.sentence, feats, f, (nf+=1)) 	# L106: 2562
+	cost = movecosts(b.parser[i], b.sentence.head, ...)  	# L107: 575
+	predict(net, sub(f,:,1:nf), sub(score,:,1:nf))       	# L122: 2755
+	b.cscore[nc] = b.pscore[i] + score[j,nf]		# L135:	179
+	sortpermx(sub(b.csorted, 1:nc), sub(b.cscore, 1:nc); rev=true)	# L139: 146
+
+	Nothing obvious from profiling.
+
+	Effect of batch size: almost none at nbeam=64.
+	128 sentences take 55-56 secs from nbatch=128 to nbatch=2, 61 secs
+	without nbatch.  So small batch sizes saving memory is ok.  Memory
+	used is 560MB.
+
+	Effect of multi-cpu: does not speed up as expected on a single
+	machine.
+
+	Try multi-machine: fails with cublas.  starting with CUDArt,
+	CUBLAS, CUDNN, KUnet, KUparser, test multi-machine before
+	bparser.  It turns out cublas is failing when using more than one
+	gpu per machine.
+
+	TODO: do we drop during testing?
+	
+	TODO: multi-cpu uses shared-array, which will not work on multiple
+	machines!
+
+	TODO: Check early stopping.
+
 2015-06-26  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* plan:

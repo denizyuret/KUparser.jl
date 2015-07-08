@@ -11,78 +11,32 @@
 # xy::Bool: (keyword) return (p,x,y) tuple for training, by default only parsers returned.
 
 
+# Multi cpu version:
+function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
+                           nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
+    d = distribute(c)
+    net = testnet(net)
+    pmap(procs(d)) do x
+        bparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam, nbatch; xy=xy)
+    end
+end
+
 # Single cpu version:
 function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
                            nbeam::Integer, nbatch::Integer=1; xy::Bool=false)
     pa = map(s->pt(wcnt(s), ndeps), c)
-    if !xy
-        bparse(pa, c, ndeps, feats, net, nbeam, nbatch)
-    else
+    if xy
         xtype = wtype(c[1])
         x = Array(xtype, xsize(pa[1], c, feats))
         y = zeros(xtype, ysize(pa[1], c))
         bparse(pa, c, ndeps, feats, net, nbeam, nbatch, x, y)
-    end
-    (xy ? (pa, x, y) : pa)
-end
-
-# Multi cpu version:
-function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
-                           nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
-    @date Main.resetworkers(ncpu)
-    sa = distribute(c)                                  # distributed sentence array
-    pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
-    net = testnet(net)                                  # host copy of net for sharing
-    if !xy
-        @sync for p in procs(sa)
-            @spawnat p bparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbeam, nbatch)
-        end
+        return (pa,x,y)
     else
-        xtype = wtype(c[1])
-        x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
-        y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
-        fill!(y, zero(xtype))
-        nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
-        p1 = pt(1,ndeps)
-        for i=1:length(c)-1
-            nx[i+1] = nx[i] + nmoves(p1, c[i])
-        end
-        @sync for p in procs(sa)
-            @spawnat p bparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbeam, nbatch, x, y, nx[localindexes(sa)[1][1]])
-        end
-    end
-    pa = convert(Vector{pt}, pa)
-    @date Main.rmworkers()
-    (xy ? (pa, sdata(x), sdata(y)) : pa)
-end
-
-
-# Data structure for beam search:
-type Beam cmove; cost; cparser; cscore; csorted; nbeam; parser; parser2; pscore; pscore2; sentence; 
-    function Beam(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer)
-        # @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer for beam parser"
-        @assert isa(net[end], LogpLoss) "Need LogpLoss final layer for beam parser"
-        b = new()
-        nword = wcnt(s)
-        ftype = wtype(s)
-        itype = typeof(nbeam)
-        ptype = typeof(p)
-        ncand = nbeam * p.nmove
-        b.cmove = Array(Move, ncand)
-        b.cost = Array(Position, p.nmove, nbeam)
-        b.cparser = Array(itype, ncand)
-        b.cscore = Array(ftype, ncand)
-        b.csorted = Array(itype, ncand)
-        b.nbeam = 1
-        b.parser  = [ptype(nword,ndeps) for i=1:nbeam]
-        b.parser2 = [ptype(nword,ndeps) for i=1:nbeam]
-        b.pscore  = Array(ftype, nbeam)
-        b.pscore2 = Array(ftype, nbeam)
-        b.pscore[1] = zero(ftype)
-        b.sentence = s
-        return b
+        bparse(pa, c, ndeps, feats, net, nbeam, nbatch)
+        return pa
     end
 end
+
 
 # Here is the workhorse:
 function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer, nbatch::Integer,
@@ -119,7 +73,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                 end
             end # for b in batch (1)
             nf == 0 && break                                                    # no more valid moves for any sentence
-            predict(net, sub(f,:,1:nf), sub(score,:,1:nf))                      # scores in score[1:nf]
+            predict(net, sub(f,:,1:nf), sub(score,:,1:nf); batch=0)             # scores in score[1:nf]
             nf1 = nf; nf = 0                                                    # nf will count 1..nf1 during second pass
             for b in batch                                                      # collect candidates in second pass
                 anyvalidmoves(b.parser[1]) || continue
@@ -154,4 +108,84 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
             copy!(p[s], batch[s-s1+1].parser[1])                                # copy the best parses to output
         end
     end # for s1=1:nbatch:length(corpus)
+    # @date @show (:bparse1, myid(), gpumem())
 end # function bparse
+
+# Data structure for beam search:
+type Beam cmove; cost; cparser; cscore; csorted; nbeam; parser; parser2; pscore; pscore2; sentence; 
+    function Beam(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer)
+        # @assert (isdefined(net[end],:f) && net[end].f == KUnet.logp) "Need logp final layer for beam parser"
+        @assert isa(net[end], LogpLoss) "Need LogpLoss final layer for beam parser"
+        b = new()
+        nword = wcnt(s)
+        ftype = wtype(s)
+        itype = typeof(nbeam)
+        ptype = typeof(p)
+        ncand = nbeam * p.nmove
+        b.cmove = Array(Move, ncand)
+        b.cost = Array(Position, p.nmove, nbeam)
+        b.cparser = Array(itype, ncand)
+        b.cscore = Array(ftype, ncand)
+        b.csorted = Array(itype, ncand)
+        b.nbeam = 1
+        b.parser  = [ptype(nword,ndeps) for i=1:nbeam]
+        b.parser2 = [ptype(nword,ndeps) for i=1:nbeam]
+        b.pscore  = Array(ftype, nbeam)
+        b.pscore2 = Array(ftype, nbeam)
+        b.pscore[1] = zero(ftype)
+        b.sentence = s
+        return b
+    end
+end
+
+# function bparse_old{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
+#                                nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
+#     # @date Main.resetworkers(ncpu)
+#     @everywhere gc()
+#     @show gpumem()
+#     @date sa = distribute(c)                                  # distributed sentence array
+#     @date pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
+#     @date net = testnet(net)                                  # host copy of net for sharing
+#     if !xy
+#         @date @sync for p in procs(sa)
+#             @spawnat p bparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbeam, nbatch)
+#         end
+#     else
+#         xtype = wtype(c[1])
+#         x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
+#         y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
+#         fill!(y, zero(xtype))
+#         nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
+#         p1 = pt(1,ndeps)
+#         for i=1:length(c)-1
+#             nx[i+1] = nx[i] + nmoves(p1, c[i])
+#         end
+#         @sync for p in procs(sa)
+#             @spawnat p bparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbeam, nbatch, x, y, nx[localindexes(sa)[1][1]])
+#         end
+#     end
+#     pa = convert(Vector{pt}, pa)
+#     # @date Main.rmworkers()
+#     (xy ? (pa, sdata(x), sdata(y)) : pa)
+# end
+
+
+
+
+    #DBG 
+    # wrkr = map(x->(x[1],(isa(x[2],Base.Worker)?x[2].config[:machine]:"localhost")), Base.map_pid_wrkr)
+    # @show wrkr
+    # l = xy ? map(x->(map(size,x)),pxy) : map(size,pxy)
+    # @show (:pxy, l)
+    # @show map(summary, pxy)
+    # return pxy
+
+    # if !xy
+    #     @date p = mycat(pxy)
+    #     return p
+    # else
+    #     @date p = mycat(map(z->z[1], pxy))
+    #     @date x = mycat(map(z->z[2], pxy))
+    #     @date y = mycat(map(z->z[3], pxy))
+    #     return (p, x, y)
+    # end

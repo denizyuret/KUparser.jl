@@ -25,32 +25,41 @@ end
 
 function gparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
                            nbatch::Integer, ncpu::Integer; xy::Bool=false)
-    @date Main.resetworkers(ncpu)
-    sa = distribute(c)                                  # distributed sentence array
-    pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
-    net = testnet(net)                                  # host copy of net for sharing
-    if !xy
-        @sync for p in procs(sa)
-            @spawnat p gparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbatch)
-        end
-    else
-        xtype = wtype(c[1])
-        x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
-        y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
-        fill!(y, zero(xtype))
-        nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
-        p1 = pt(1,ndeps)
-        for i=1:length(c)-1
-            nx[i+1] = nx[i] + nmoves(p1, c[i])
-        end
-        @sync for p in procs(sa)
-            @spawnat p gparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbatch, x, y, nx[localindexes(sa)[1][1]])
-        end
+    d = distribute(c)
+    net = testnet(net)
+    pmap(procs(d)) do x
+        gparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbatch; xy=xy)
     end
-    pa = convert(Vector{pt}, pa)
-    @date Main.rmworkers()
-    (xy ? (pa, sdata(x), sdata(y)) : pa)
 end
+
+# function gparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
+#                            nbatch::Integer, ncpu::Integer; xy::Bool=false)
+#     @date Main.resetworkers(ncpu)
+#     sa = distribute(c)                                  # distributed sentence array
+#     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
+#     net = testnet(net)                                  # host copy of net for sharing
+#     if !xy
+#         @sync for p in procs(sa)
+#             @spawnat p gparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbatch)
+#         end
+#     else
+#         xtype = wtype(c[1])
+#         x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
+#         y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
+#         fill!(y, zero(xtype))
+#         nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
+#         p1 = pt(1,ndeps)
+#         for i=1:length(c)-1
+#             nx[i+1] = nx[i] + nmoves(p1, c[i])
+#         end
+#         @sync for p in procs(sa)
+#             @spawnat p gparse(localpart(pa), localpart(sa), ndeps, feats, copy(net,:gpu), nbatch, x, y, nx[localindexes(sa)[1][1]])
+#         end
+#     end
+#     pa = convert(Vector{pt}, pa)
+#     @date Main.rmworkers()
+#     (xy ? (pa, sdata(x), sdata(y)) : pa)
+# end
 
 
 function gparse{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Integer,
