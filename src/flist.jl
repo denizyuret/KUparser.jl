@@ -1,6 +1,10 @@
 module Flist                    # feature matrices
 using KUparser: SFeature, DFeature # sparse and dense features
 
+gn13cpv = DFeature["s0v","s1v","n0v","n1v",
+	           "s0c","s1c","n0c","n1c","s1rc","s1lc","s0lc","s0rc","n0lc",
+	           "s0p","s1p","n0p","n1p","s1rp","s1lp","s0lp","s0rp","n0lp"]
+
 # ZN11 dense variants.  The original has:
 # (w,p) for (s,n,n1,n2,sh,sh2,sl,sr,nl,sl2,sr2,nl2): 24 features, 1200 dims for v,c; 540 dims for p
 # L for (s,sh,sl,sr,nl,sl2,sr2,nl2): 8 features, 96 dims
