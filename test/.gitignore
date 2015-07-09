@@ -6,3 +6,4 @@ data
 *.wvec
 *.jld?
 *.dict
+*.net
