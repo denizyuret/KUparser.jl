@@ -131,7 +131,8 @@ function main()
            !isfile(args["in"]) ? (warn("Cannot find net file, creating blank net"); args["in"]=nothing; initnet(args, pt, ndeps)) :
            (@date loadnet(args["in"])))
     display(net)
-    ispunct = (args["ispunct"]==nothing ? nothing : eval(args["ispunct"]))
+    ispunct = (args["ispunct"]==nothing ? nothing : eval(parse("KUparser."*args["ispunct"])))
+    @show ispunct
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch,epoch)=(0,0,0)
     
