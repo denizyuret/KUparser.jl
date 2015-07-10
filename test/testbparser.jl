@@ -20,8 +20,6 @@ net = [Mmul(h0), Bias(), Relu(),
 # @date train(net, x, y; loss=logploss)
 @date train(net, x, y)
 
-corpus=corpus[1:10]
-
 info("Use gparser as reference for beam=1")
 @date gxy=(gp,gx,gy)=gparse(pt, corpus, ndeps, ft, net; xy=true)
 @show map(size, gxy)
@@ -42,19 +40,21 @@ info("nbeam=1 Multiple sentences")
 @date p3=bparse(pt, corpus, ndeps, ft, net, nbeam)
 @test @show isequal(p3,gp)
 @date pxy4=bparse(pt, corpus, ndeps, ft, net, nbeam; xy=true)
-@test @show isequal(pxy4,gxy)
+@show map(size, pxy4)
+@show map(size, gxy)
+@test @show isequal(pxy4[1],gxy[1])
 
 info("nbeam=1 Batch processing")
 @date p5=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch)
 @test @show isequal(p5,gp)
 @date pxy6=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch; xy=true)
-@test @show pxyequal(pxy6, gxy)
+@test @show pxyequal(pxy6, pxy4)
 
 info("nbeam=1 Multi-cpu processing")
 @date p7=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu)
 @test @show isequal(mycat(p7),gp)
 @date pxy8=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu; xy=true)
-@test @show pxyequal(pxycat(pxy8), gxy)
+@test @show pxyequal(pxycat(pxy8), pxy4)
 
 @show nbeam = 10
 
