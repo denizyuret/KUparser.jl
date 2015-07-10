@@ -1,1 +1,0 @@
-/home/nlg-05/dy_052/kunet/dev/test/initnet.jl
