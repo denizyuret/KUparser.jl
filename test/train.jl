@@ -21,6 +21,9 @@ function parse_commandline()
         "--nogpu"
         help = "Do not use gpu"
         action = :store_true
+        "--ispunct"
+        help = "Do not score punct as determined by this function"
+        #default = "zn11punct"
         "--parser"
         help = "Parsing algorithm to use: g(reedy)parser, b(eam)parser, or o(racle)parser for static training"
         default = "bparser"
@@ -124,8 +127,11 @@ function main()
     @show (map(size, data), ndeps)
     @show feats = eval(parse("Flist."*args["feats"]))
     @show pt = eval(parse(args["arctype"]))
-    net = (args["in"]==nothing ? initnet(args, pt, ndeps) : (@date loadnet(args["in"])))
-    @show net
+    net = (args["in"]==nothing ? initnet(args, pt, ndeps) : 
+           !isfile(args["in"]) ? (warn("Cannot find net file, creating blank net"); args["in"]=nothing; initnet(args, pt, ndeps)) :
+           (@date loadnet(args["in"])))
+    display(net)
+    ispunct = (args["ispunct"]==nothing ? nothing : eval(args["ispunct"]))
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch,epoch)=(0,0,0)
     
@@ -152,8 +158,7 @@ function main()
                 train(net, pxy[2], pxy[3]; batch=args["tbatch"])
             end
         end
-        @show e = evalparse(parses, corpus)
-        accuracy[1] = e[2]
+        accuracy[1] = getscore(parses, corpus, ispunct)
         (args["out"] != nothing) && (@date savenet(args["out"], net))
 
         for idata=2:length(data)
@@ -172,8 +177,7 @@ function main()
                 end
                 for pp in p; append!(parses, pp); end
             end
-            @show e = evalparse(parses, corpus)
-            accuracy[idata] = e[2]
+            accuracy[idata] = getscore(parses, corpus, ispunct)
         end            
 
         println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
@@ -181,12 +185,12 @@ function main()
         # We look at accuracy[2] (dev score) by default,
         # accuracy[1] (trn score) if there is no dev.
 
-        score = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
+        myscore = (length(accuracy) > 1 ? accuracy[2] : accuracy[1])
 
         # Update best score and save best net
 
-        if (score > bestscore)
-            @show (bestscore,bestepoch)=(score,epoch)
+        if (myscore > bestscore)
+            @show (bestscore,bestepoch)=(myscore,epoch)
             (args["best"] != nothing) && (@date savenet(args["best"], net))
         end
 
@@ -205,6 +209,16 @@ function main()
 
     end # while true
 end # main
+
+function getscore(parses, corpus, ispunct)
+    if ispunct == nothing
+        @show e = evalparse(parses, corpus)
+        return e[1]
+    else
+        @show e = evalparse(parses, corpus; ispunct=ispunct)
+        return e[2]
+    end
+end
 
 function loaddata(files)
     data = Corpus[]
