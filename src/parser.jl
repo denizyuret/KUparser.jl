@@ -16,6 +16,7 @@
 
 @compat typealias Position UInt8
 @compat typealias DepRel UInt8
+@compat typealias Cost UInt8
 typealias Move Integer
 typealias Pvec AbstractVector{Position}
 typealias Dvec AbstractVector{DepRel}
