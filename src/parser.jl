@@ -425,3 +425,5 @@ function reset!(p::Parser)
 end
 
 reset!{T<:Parser}(pa::Vector{T})=(for p in pa; reset!(p); end)
+
+Base.show(io::IO, p::Parser)=print(io, map(int,p.stack[1:p.sptr]), Int[p.wptr], map(int,p.head))
