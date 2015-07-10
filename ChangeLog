@@ -1,4 +1,198 @@
+2015-07-09  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO: check on *5.out for variance and effect of shuffling.
+
+	* TODO:
+	x reset adagrad to see if learning resumes?
+	= try shuffling and make it the default if it helps (train9.jl, *5.out)
+
+2015-07-08  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	- Do 5x experiments with eager static and dynamic.
+	- reread a tale of two parsers and try to understand structured vs transition.  is gn13 structured?  is structured the same as beam, i.e. not greedy?
+	- feature selection?
+
+	* zn11beam: in buffer *zn11beam*
+	07081529-zn11beam-epochs-1-12.log: first 12 epochs (epoch 3 crashed, is empty)
+	yatbazp.nnet.jld
+	[dy_052@hpc3021 test]$ for i in `seq 1 20`; do echo "EPOCH $i"; julia --machinefile foo.machinefile5x6 train.jl --epochs 1 --seed $i --in yatbazp.nnet.jld --out yatbazp.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4 ; done
+	psub -N zn11bparser2 `pwd`/train20.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --in yatbazp.nnet.jld --out yatbazp.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12567903.hpc-pbs.hpcc.usc.edu
+	hpc3007
+	ssh hpc3007 tail /var/spool/torque/spool/*.OU
+	THIS IS PROBABLY TOO SLOW KILLING IT and restarting 5x6...
+	log/07081613-zn11bparser2.out
+	[dy_052@hpc-login3 test]$ psub -N zn11bparser3 `pwd`/train20m.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --in yatbazp.nnet.jld --out yatbazp.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12567954.hpc-pbs.hpcc.usc.edu
+	running on head=hpc3007, workers=3002,3008,3009,3010,3011
+	ssh hpc3007 grep DATA /var/spool/torque/spool/*.OU
+
+	Result: 07081529-zn11beam-epochs-1-12.log + 07090417-zn11bparser3.out
+	- trn drops after epoch 18 .9630
+	- dev drops after epoch 12 .9305
+	- tst drops after epoch 13 .9292
+	- @@Replicate to see variance:
+	psub -N zn11beam4 `pwd`/train20m.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam4.net --out zn11beam4.net yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	- Should have been:
+	psub -N zn11beam4 `pwd`/train20m.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam4.net --out zn11beam4.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+
+	* zn11dynamic:
+	foo.hpc3004.log
+	hpc3004: zn11dynamic: careful, pick the score with punctuation!
+	[dy_052@hpc3004 test]$ julia -p 4 train.jl --parser gparser --arctype ArcEager13 --feats zn11cpv --hidden 4096 4096 --dropout .1 .5 --epochs 1 --seed 42 --out gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	[dy_052@hpc3004 test]$ for i in `seq 2 20`; do echo "EPOCH $i"; julia -p 4 train.jl --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --seed $i --out gparser.nnet.jld --in gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4; done
+	07081635-zn11dynamic-epochs-1-20.log
+	gparser.nnet.jld
+	[dy_052@hpc-login3 test]$ psub -N zn11dynamic2 `pwd`/train20.sh  --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --in gparser.nnet.jld --out gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12568315.hpc-pbs.hpcc.usc.edu
+	BUGGY: we should be using the conll07 dataset!
+	[dy_052@hpc-login3 test]$ psub -N zn11dynamic3 `pwd`/train40.sh  --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --in zn11dynamic.net --out zn11dynamic.net conll07.trn.jld4 conll07.tst.jld4 
+	12569034.hpc-pbs.hpcc.usc.edu
+	ssh hpc3004 grep evalparse /var/spool/torque/spool/*.OU
+
+	Result:
+	- trn still going up at epoch 40 .9180
+	- tst zig-zags after epoch 7 between .884 and .894 with average .888
+
+	@@Run2 to see variation
+	psub -N zn11dynamic4 `pwd`/train20.sh  --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11dynamic4.net --out zn11dynamic4.net conll07.trn.jld4 conll07.tst.jld4 
+	12570850.hpc-pbs.hpcc.usc.edu
+	ssh hpc3001 grep evalparse /var/spool/torque/spool/*.OU
+	psub -N zn11dynamic4 `pwd`/train20r.sh  --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11dynamic4.net --out zn11dynamic4.net conll07.trn.jld4 conll07.tst.jld4
+	ssh hpc3020 grep DATA $OU
+	8934 and climbing.
+
+	@@zn11dynamic5 is the shuffling version.
+
+	* zn11static:
+	[dy_052@hpc3005 test]$ julia -p 4 train.jl --parser oparser --arctype ArcEager13 --feats zn11cpv --hidden 4096 4096 --dropout .1 .5 --epochs 1 --seed 42 --out oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	[dy_052@hpc3005 test]$ for i in `seq 2 20`; do echo "EPOCH $i"; julia -p 4 train.jl --parser oparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --seed $i --in oparser.nnet.jld --out oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4; done
+	oparser.nnet.jld
+	07081557-zn11static-epochs-1-20.log
+	[dy_052@hpc-login3 test]$ psub -N zn11static2 `pwd`/train20.sh --parser oparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --in oparser.nnet.jld --out oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12567949.hpc-pbs.hpcc.usc.edu
+	ssh hpc3005 tail /var/spool/torque/spool/*.OU
+	BUGGY: use the conll07 dataset!
+	[dy_052@hpc-login3 test]$ psub -N zn11static3 `pwd`/train40.sh  --parser oparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --in zn11static.net --out zn11static.net conll07.trn.jld4 conll07.tst.jld4 
+	12569040.hpc-pbs.hpcc.usc.edu
+	ssh hpc3005 grep evalparse /var/spool/torque/spool/*.OU
+
+	Result:
+	- tst peaks at .8668 epoch 13, average after epoch 10: .8654.
+	- Replicating for variation: zn11static4: converged to .8659.  This is identical, no variation?
+	- @@wrote train20r.sh that sets a random seed: rerunning zn11static4.
+	psub -N zn11static4 `pwd`/train20r.sh  --parser oparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11static4.net --out zn11static4.net conll07.trn.jld4 conll07.tst.jld4 
+	ssh hpc3021 grep DATA $OU
+	.8755: seed helped, shuffling?
+	@@zn11static5 is the shuffling version.
+
+	* gn13dynamic:
+	[dy_052@hpc3006 test]$ julia -p 4 train.jl --parser gparser --arctype ArcHybrid13 --feats gn13cpv --hidden 4096 4096 --dropout .1 .5 --epochs 1 --seed 42 --out gn13gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	[dy_052@hpc3006 test]$ for i in `seq 2 20`; do echo "EPOCH $i"; julia -p 4 train.jl --parser gparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --seed $i --out gn13gparser.nnet.jld  --in gn13gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4; done
+	07081642-gn13dynamic-epochs-1-20.log
+	[dy_052@hpc-login3 test]$ psub -N gn13dynamic2 `pwd`/train20.sh --parser gparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --out gn13gparser.nnet.jld  --in gn13gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12568324.hpc-pbs.hpcc.usc.edu
+	BUGGY: restart with conll07 data
+	[dy_052@hpc-login3 test]$ psub -N gn13dynamic3 `pwd`/train40.sh --parser gparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --out gn13dynamic.net --in gn13dynamic.net conll07.trn.jld4 conll07.tst.jld4 
+	12569043.hpc-pbs.hpcc.usc.edu
+	ssh hpc3006 grep evalparse /var/spool/torque/spool/*.OU
+
+	Results:
+	- peaks at epoch 9 at .8760 (seen only once).  avg(3:40)=.8690
+	- previous best results with hybrid13 (no pos) at .8827 max, .8766 avg
+	- changing features gets us .88, .89.
+	- @@Replicating to see variance at gn13dynamic4.
+	psub -N gn13dynamic4 `pwd`/train20r.sh --parser gparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --out gn13dynamic4.net --in gn13dynamic4.net conll07.trn.jld4 conll07.tst.jld4
+	ssh hpc3004 grep DATA $OU
+	Seeing .8951, random seed definitely helped.  Maybe should try shuffling?
+	@@gn13dynamic5 is the shuffling version.
+
+	* gn13static: hpc3017: psub:
+	main queue: psub -q default -N gn13oparser `pwd`/train20.sh --parser oparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --out gn13oparser.nnet.jld  --in gn13oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12566917.hpc-pbs.hpcc.usc.edu
+	isi queue: psub -N gn13oparser2 `pwd`/train20.sh --parser oparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --out gn13oparser.nnet.jld  --in gn13oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	12566925.hpc-pbs.hpcc.usc.edu
+	ssh hpc3017 grep evalparse /var/spool/torque/spool/*.OU
+	BUGGY: restart with conll07 data
+	[dy_052@hpc-login3 test]$ psub -N gn13static3 `pwd`/train40.sh --parser oparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --out gn13static.net --in gn13static.net conll07.trn.jld4 conll07.tst.jld4 
+	12569045.hpc-pbs.hpcc.usc.edu
+	ssh hpc3012 grep evalparse /var/spool/torque/spool/*.OU
+
+	Results:
+	- Peaks at .8829 at epoch 24. avg(11:40)=.8820
+	- Weirdly higher than dynamic?
+	- Previous best (no pos) was at 8823 max, 8728 avg vs dynamic at 8827 max, 8766 avg.
+	- So no surprize here.
+	- @@Replicating to see variance at gn13static4.
+	psub -N gn13static4 `pwd`/train20r.sh --parser oparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --out gn13static4.net --in gn13static4.net conll07.trn.jld4 conll07.tst.jld4
+	ssh hpc3001 grep DATA $OU
+	Seeing .8910 => seeding each epoch helped?
+	@@gn13static5 is the shuffling version.
+
+	* Data: sort through the confusion with the data:
+	yatbaz: gold postags
+	yatbazp: predicted postags
+	acl11*, zn11*: anything before july 6: train has predicted, dev/test have gold postags.
+	at this point it makes sense to use the old acl11 results up to the parsing experiments.
+
+	* zn11nnet7: Reoptimize nnet for conll07.
+	Created conll07-zn11cpv.jld
+	[dy_052@hpc-login3 test]$ psub julia zn11nnet7.jl conll07-zn11cpv.jld .01 .1 .5 4096 4096
+	12570094.hpc-pbs.hpcc.usc.edu
+	for i in `myqueue | perl -lne 'print $1 if /zn11nnet7.*(hpc\d+)/'`; do ssh $i grep Name /var/spool/torque/spool/*.OU; ssh $i grep epoch /var/spool/torque/spool/*.OU | sort -gr -t, -k6 | head -1; done
+	Result: the original setting still the best.
+
+	maxtst	lr	d1	d2	h
+	.9603	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_4096_4096
+	.9602	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_3_4096_4096
+	.9598	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_8192_8192
+	.9597	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_2048_2048
+	.9590	julia_zn11nnet7_jl_conll07_zn11cpv_jld_02_1_5_4096_4096
+	.95875	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_2_5_4096_4096
+	.95875	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_11585
+	.9584	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_0_5_4096_4096
+	.9584	julia_zn11nnet7_jl_conll07_zn11cpv_jld_005_1_5_4096_4096
+	.9582	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_23170
+	.9581	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_16384
+	.9578	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_5_32768
+	.9568	julia_zn11nnet7_jl_conll07_zn11cpv_jld_01_1_7_4096_4096
+
+	* zn11nnet: checking nnet settings with yatbazp-zn11cpv.jld
+	for i in `myqueue | perl -lne 'print $1 if /zn11nnet.*(hpc\d+)/'`; do ssh $i grep Name /var/spool/torque/spool/*.OU; ssh $i grep epoch /var/spool/torque/spool/*.OU | sort -gr -t, -k6 | head -1; done
+	Result: lr=.01 dropout=.1,.5 hidden=4096,4096 adagrad=1e-8 still good.
+
+	maxdev	lr	d1	d2	h
+	.9708	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_4096_4096
+	.97045	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_2_5_4096_4096
+	.9704	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_0_5_4096_4096
+	.97035	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_2048_2048
+	.9703	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_005_1_5_4096_4096
+	.9700	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_02_1_5_4096_4096
+	.9699	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_8192_8192
+	.9697	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_11585
+	.9696	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_3_4096_4096
+	.9694	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_23170
+	.9694	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_16384
+	.96905	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_7_4096_4096
+	.96905	julia_zn11nnet_jl_yatbazp_zn11cpv_jld_01_1_5_32768
+
 2015-07-07  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	+ prep data with predicted/gold postags and yatbaz embedding:
+	yatbazp.*: cofirmed using compare-jld4.jl
+	+ fix bparser xy problem.
+	+ fix worker memory reset problem.
+	+ figure out optimum nbatch, workers/machine.
+	+ run bparser experiment.
+	x resort to feature selection.
+	- experiment with early stop.
+	- add a punct option in train.jl to determine what score to use.
+	+ old results suspect because i used predicted postags in
+	  acl11.trn.jld but gold ones in acl11.dev.jld.
+	  creating yatbazp-zn11cpv.jld
+	  psub julia zn11nnet.jl yatbazp-zn11cpv.jld .01 .1 .5 4096 4096
 
 	* test/train.jl: After a long debugging session, rewrote the whole
 	thing.  The x matrix gets too big.  So we parse training corpus in
@@ -64,21 +258,7 @@
 	restartmachines().  There may or may not be any reason to use
 	DArrays for anything other than the input.
 
-	* TODO:
-	+ prep data with predicted/gold postags and yatbaz embedding:
-	yatbazp.*: cofirmed using compare-jld4.jl
-	+ fix bparser xy problem.
-	+ fix worker memory reset problem.
-	- figure out optimum nbatch, workers/machine.
-	- run bparser experiment.
-	- experiment with early stop.
-	- resort to feature selection.
-
 2015-07-05  Deniz Yuret  <dyuret@ku.edu.tr>
-
-	* TODO: old results invalid because i used predicted postags in
-	acl11.trn.jld but gold ones in acl11.dev.jld.  also be careful
-	about early stop.
 
 	* testbparser3.jl: parallelism.
 	cannot get speedup using one machine and multiple gpu/cpu.
@@ -192,12 +372,10 @@
 	bparser.  It turns out cublas is failing when using more than one
 	gpu per machine.
 
-	TODO: do we drop during testing?
-	
-	TODO: multi-cpu uses shared-array, which will not work on multiple
-	machines!
+	DONE: do we drop during testing? predict flag takes care.
 
-	TODO: Check early stopping.
+	DONE: multi-cpu uses shared-array, which will not work on multiple
+	machines! got rid of shared arrays.
 
 2015-06-26  Deniz Yuret  <dyuret@ku.edu.tr>
 
