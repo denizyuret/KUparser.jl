@@ -1,4 +1,5 @@
 using HDF5,JLD,KUparser,KUnet,Base.Test
+require("mycat.jl")
 
 info("Loading data")
 @date @load "conll07.tst.jld4"
@@ -18,6 +19,8 @@ net = [Mmul(h0), Bias(), Relu(),
 @date (p,x,y)=oparse(pt, corpus, ndeps, ft)
 # @date train(net, x, y; loss=logploss)
 @date train(net, x, y)
+
+corpus=corpus[1:10]
 
 info("Use gparser as reference for beam=1")
 @date gxy=(gp,gx,gy)=gparse(pt, corpus, ndeps, ft, net; xy=true)
@@ -49,9 +52,9 @@ info("nbeam=1 Batch processing")
 
 info("nbeam=1 Multi-cpu processing")
 @date p7=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu)
-@test @show isequal(p7,gp)
+@test @show isequal(mycat(p7),gp)
 @date pxy8=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu; xy=true)
-@test @show pxyequal(pxy8, gxy)
+@test @show pxyequal(pxycat(pxy8), gxy)
 
 @show nbeam = 10
 
@@ -82,6 +85,6 @@ info("nbeam=10 Batch processing")
 
 info("nbeam=10 Multi-cpu processing")
 @date q7=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu)
-@test @show isequal(q7,qxy6[1])
+@test @show isequal(mycat(q7),qxy6[1])
 @date qxy8=bparse(pt, corpus, ndeps, ft, net, nbeam, nbatch, ncpu; xy=true)
-@test @show pxyequal(qxy8, qxy6)
+@test @show pxyequal(pxycat(qxy8), qxy6)
