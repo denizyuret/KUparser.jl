@@ -1,17 +1,42 @@
+2015-07-12  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* archive:
+	Moving gn13dynamic3.out to log/07082253-gn13dynamic3.out
+	Moving gn13dynamic4.out to log/07091602-gn13dynamic4.out
+	Moving gn13dynamic5.out to log/07091747-gn13dynamic5.out
+	Moving gn13static3.out to log/07082106-gn13static3.out
+	Moving gn13static4.out to log/07091513-gn13static4.out
+	Moving gn13static5.out to log/07091655-gn13static5.out
+	Moving sleep_1d.out to log/07102259-sleep_1d.out
+	Moving sleep_1h.out to log/07071304-sleep_1h.out
+	Moving zn11beam4.out to log/07100058-zn11beam4.out
+	Moving zn11beam5.out to log/07101849-zn11beam5.out
+	Moving zn11beam6.out to log/07121432-zn11beam6.out
+	Moving zn11dynamic3.out to log/07090005-zn11dynamic3.out
+	Moving zn11dynamic4.out to log/07091637-zn11dynamic4.out
+	Moving zn11dynamic5.out to log/07091827-zn11dynamic5.out
+	Moving zn11static3.out to log/07082156-zn11static3.out
+	Moving zn11static4.out to log/07091536-zn11static4.out
+	Moving zn11static5.out to log/07091757-zn11static5.out
+
+
 2015-07-09  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* TODO: check on *5.out for variance and effect of shuffling.
+	* DONE: check on *5.out for variance and effect of shuffling.
 
-	* TODO:
+	* DONE:
 	x reset adagrad to see if learning resumes?
-	= try shuffling and make it the default if it helps (train9.jl, *5.out)
+	+ try shuffling and make it the default if it helps (train9.jl, *5.out)
 
 2015-07-08  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
-	- Do 5x experiments with eager static and dynamic.
-	- reread a tale of two parsers and try to understand structured vs transition.  is gn13 structured?  is structured the same as beam, i.e. not greedy?
+	x Do 5x experiments with eager static and dynamic.
+	+ reread a tale of two parsers and try to understand structured vs transition.  is gn13 structured?  is structured the same as beam, i.e. not greedy?
 	- feature selection?
+	- figure out the thrust tanh mistery in ~/cuda.
+	- setup minecraft.
+	- compare training curves (move/parse) for oparse, gparse, bparse.
 
 	* zn11beam: in buffer *zn11beam*
 	07081529-zn11beam-epochs-1-12.log: first 12 epochs (epoch 3 crashed, is empty)
@@ -32,10 +57,19 @@
 	- trn drops after epoch 18 .9630
 	- dev drops after epoch 12 .9305
 	- tst drops after epoch 13 .9292
-	- @@Replicate to see variance:
+	- Replicate to see variance:
 	psub -N zn11beam4 `pwd`/train20m.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam4.net --out zn11beam4.net yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
 	- Should have been:
 	psub -N zn11beam4 `pwd`/train20m.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam4.net --out zn11beam4.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	TODO: analyze results (also shuffling)
+
+	- @@zn11beam5: after bugfix
+	psub -N zn11beam5 `pwd`/train20m.sh --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam5.net --out zn11beam5.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+
+	- @@zn11beam6: *julia* with earlystop
+	nohup ./train20dbg.sh --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam6.net --out zn11beam6.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4 > zn11beam6.out 2> zn11beam6.err 
+
+	- Does not seem to improve.  New hypothesis?
 
 	* zn11dynamic:
 	foo.hpc3004.log
@@ -55,7 +89,7 @@
 	- trn still going up at epoch 40 .9180
 	- tst zig-zags after epoch 7 between .884 and .894 with average .888
 
-	@@Run2 to see variation
+	- Run2 to see variation
 	psub -N zn11dynamic4 `pwd`/train20.sh  --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11dynamic4.net --out zn11dynamic4.net conll07.trn.jld4 conll07.tst.jld4 
 	12570850.hpc-pbs.hpcc.usc.edu
 	ssh hpc3001 grep evalparse /var/spool/torque/spool/*.OU
@@ -63,7 +97,10 @@
 	ssh hpc3020 grep DATA $OU
 	8934 and climbing.
 
-	@@zn11dynamic5 is the shuffling version.
+	- zn11dynamic5 is the shuffling version. comparison not significant:
+		15	20	best
+	noshuf4	8919	8919	8977@17
+	shuf5	8923	8927	8947@9
 
 	* zn11static:
 	[dy_052@hpc3005 test]$ julia -p 4 train.jl --parser oparser --arctype ArcEager13 --feats zn11cpv --hidden 4096 4096 --dropout .1 .5 --epochs 1 --seed 42 --out oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
@@ -81,11 +118,14 @@
 	Result:
 	- tst peaks at .8668 epoch 13, average after epoch 10: .8654.
 	- Replicating for variation: zn11static4: converged to .8659.  This is identical, no variation?
-	- @@wrote train20r.sh that sets a random seed: rerunning zn11static4.
+	- wrote train20r.sh that sets a random seed: rerunning zn11static4.
 	psub -N zn11static4 `pwd`/train20r.sh  --parser oparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11static4.net --out zn11static4.net conll07.trn.jld4 conll07.tst.jld4 
 	ssh hpc3021 grep DATA $OU
 	.8755: seed helped, shuffling?
-	@@zn11static5 is the shuffling version.
+	- zn11static5 is the shuffling version.  comparison not significant:
+		15	20	best
+	noshuf4	8793	8775	8793
+	shuf5	8767	8813	8813
 
 	* gn13dynamic:
 	[dy_052@hpc3006 test]$ julia -p 4 train.jl --parser gparser --arctype ArcHybrid13 --feats gn13cpv --hidden 4096 4096 --dropout .1 .5 --epochs 1 --seed 42 --out gn13gparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
@@ -106,7 +146,10 @@
 	psub -N gn13dynamic4 `pwd`/train20r.sh --parser gparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --out gn13dynamic4.net --in gn13dynamic4.net conll07.trn.jld4 conll07.tst.jld4
 	ssh hpc3004 grep DATA $OU
 	Seeing .8951, random seed definitely helped.  Maybe should try shuffling?
-	@@gn13dynamic5 is the shuffling version.
+	- gn13dynamic5 is the shuffling version.
+		15	20	best
+	noshuf4	8995	8977	9017@16
+	shuf5	8957	8963	8973@16
 
 	* gn13static: hpc3017: psub:
 	main queue: psub -q default -N gn13oparser `pwd`/train20.sh --parser oparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --out gn13oparser.nnet.jld  --in gn13oparser.nnet.jld yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
@@ -124,11 +167,15 @@
 	- Weirdly higher than dynamic?
 	- Previous best (no pos) was at 8823 max, 8728 avg vs dynamic at 8827 max, 8766 avg.
 	- So no surprize here.
-	- @@Replicating to see variance at gn13static4.
+	- Replicating to see variance at gn13static4.
 	psub -N gn13static4 `pwd`/train20r.sh --parser oparser --arctype ArcHybrid13 --feats gn13cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --out gn13static4.net --in gn13static4.net conll07.trn.jld4 conll07.tst.jld4
 	ssh hpc3001 grep DATA $OU
 	Seeing .8910 => seeding each epoch helped?
-	@@gn13static5 is the shuffling version.
+	- gn13static5 is the shuffling version.
+		15	20	best
+	noshuf4	8891	8883	8913@17
+	shuf5	8867	8919	8955@16
+
 
 	* Data: sort through the confusion with the data:
 	yatbaz: gold postags
