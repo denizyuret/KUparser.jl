@@ -109,6 +109,9 @@ function parse_commandline()
         help = "Random number seed (-1 leaves the default seed)"
         arg_type = Int
         default = -1
+        "--shuffle"
+        help = "Whether to shuffle the data every epoch"
+        action = :store_true
     end
     args = parse_args(s)
     for (arg,val) in args
@@ -156,7 +159,7 @@ function main()
             end
             @date for pxy in p
                 append!(parses, pxy[1])
-                train(net, pxy[2], pxy[3]; batch=args["tbatch"])
+                train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
             end
         end
         accuracy[1] = getscore(parses, corpus, ispunct)
