@@ -66,6 +66,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
     f = Array(ftype, frows, fcols)
     nmove = p[1].nmove
     score = Array(ftype, nmove, fcols)
+    dbg = Dict();
 
     for s1=1:nbatch:length(corpus)                                              # processing corpus[s1:s2]
         s2=min(length(corpus), s1+nbatch-1)                                     
@@ -82,9 +83,16 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                     movecosts(bs.parser, st.head, st.deprel, bs.mcost)          # bs.mcost[j] is the cost of move j
                     for j=1:nmove
                         ccost = bs.mcost[j] + bs.cost                           # cumulative cost of move j
+                        if ccost < cmin
+                            dbg[:yp] = i
+                            dbg[:ym] = j
+                            dbg[:yc] = bs.mcost[j]
+                            dbg[:ycc] = ccost
+                        end
                         ccost < cmin && ((cmin,jmin,fmin)=(ccost,j,nf))         # record mincost state and move
                     end
                 end # for i=1:b.nbeam
+
                 @assert (cmin < Pinf)
                 if !isempty(x)                                                  # if asked for x, copy mincost column from f
                     nx += 1                                                     # implement early stop here?
@@ -109,6 +117,11 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                         b.cand[nc].parent = bs                                  # parent state
                         b.cand[nc].move = j                                     # candidate move
                         b.cand[nc].score = bs.score + score[j,nf]               # cumulative score for state + move
+
+                        if i==dbg[:yp] && j==dbg[:ym]
+                            dbg[:ys] = b.cand[nc].score - bs.score
+                            dbg[:yss] = b.cand[nc].score
+                        end
                     end
                 end # for i=1:b.nbeam
                 @assert (nc > 0) "No candidates found"
@@ -121,14 +134,31 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                     move!(b.beam2[i].parser, bc.move)
                     b.beam2[i].score = bc.score
                     b.beam2[i].cost = bs.cost + bs.mcost[bc.move]
+
+                    if i==1
+                        dbg[:zp] = findfirst(b.beam, bs)
+                        dbg[:zm] = bc.move
+                        dbg[:zc] = bs.mcost[bc.move]
+                        dbg[:zcc] = bs.cost + bs.mcost[bc.move]
+                        dbg[:zs] = bc.score - bs.score
+                        dbg[:zss] = bc.score
+                    end
+
                 end # for i=1:b.nbeam
+                dbgprint(dbg, b)
+
                 b.beam,b.beam2 = b.beam2,b.beam
+
             end # for b in batch (2)
             @assert (nf == nf1) "$nf != $nf1"
         end # while true
         for s=s1:s2
             copy!(p[s], batch[s-s1+1].beam[1].parser)                           # copy the best parses to output
 
+            ss = corpus[s]
+            for i=1:wcnt(ss); print("$(ss.form[i])($i) "); end; println("")
+            println(map(int, ss.head))
+            println(map(int, batch[s-s1+1].beam[1].parser.head))
             # b = batch[s-s1+1]
             # for i=1:b.nbeam
             #     bs = b.beam[i]
@@ -137,6 +167,36 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
         end
     end # for s1=1:nbatch:length(corpus)
 end # function bparse
+
+function dbgprint(dbg, b)
+    @printf("yp=%02d ", dbg[:yp])
+    @printf("ym=%02d ", dbg[:ym])
+    @printf("yc=%d ", dbg[:yc])
+    @printf("ycc=%d ", dbg[:ycc])
+    @printf("ys=%.2e ", dbg[:ys])
+    @printf("yss=%.2e ", dbg[:yss])
+    s = b.sent
+    p = b.beam[dbg[:yp]].parser
+    w0 = (p.wptr <= wcnt(s) ? s.form[p.wptr] : :none)
+    s0 = (p.sptr >= 1 ? s.form[p.stack[p.sptr]] : :none)
+    mv = (dbg[:ym]==1 ? "X" :
+          dbg[:ym]==p.nmove ? "S" :
+          dbg[:ym]%2==0 ? "L" : "R")
+    println("[$s0|$w0]:$mv")
+    @printf("zp=%02d ", dbg[:zp])
+    @printf("zm=%02d ", dbg[:zm])
+    @printf("zc=%d ", dbg[:zc])
+    @printf("zcc=%d ", dbg[:zcc])
+    @printf("zs=%.2e ", dbg[:zs])
+    @printf("zss=%.2e ", dbg[:zss])
+    p = b.beam[dbg[:zp]].parser
+    w0 = (p.wptr <= wcnt(s) ? s.form[p.wptr] : :none)
+    s0 = (p.sptr >= 1 ? s.form[p.stack[p.sptr]] : :none)
+    mv = (dbg[:zm]==1 ? "X" :
+          dbg[:zm]==p.nmove ? "S" :
+          dbg[:zm]%2==0 ? "L" : "R")
+    println("[$s0|$w0]:$mv\n")
+end
 
 # Need this so sort works:
 Base.isless(a::BeamCandidate,b::BeamCandidate)=(a.score < b.score)
