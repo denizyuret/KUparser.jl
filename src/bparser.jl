@@ -55,7 +55,7 @@ type BeamCandidate
     BeamCandidate()=new()
 end
 
-BeamDebug = false
+# BeamDebug = false
 
 # Here is the workhorse:
 function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer, nbatch::Integer,
@@ -68,7 +68,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
     f = Array(ftype, frows, fcols)
     nmove = p[1].nmove
     score = Array(ftype, nmove, fcols)
-    BeamDebug && (dbg = Dict())
+    # BeamDebug && (dbg = Dict())
 
     for s1=1:nbatch:length(corpus)                                              # processing corpus[s1:s2]
         s2=min(length(corpus), s1+nbatch-1)                                     
@@ -103,13 +103,14 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                     end
                 end
                 @assert (nc > 0) "No candidates found"
-                sort!(sub(b.cand,1:nc); rev=true)                               # sort candidates by score
-                (mincost, yc) = (Pinf, nothing)
+
                 #@show (nc, nbeam, b.nbeam)
                 #display(b.beam[1:b.nbeam])
+
+                sort!(sub(b.cand,1:nc); rev=true)                               # sort candidates by score
+                (mincost, c0) = (Pinf, nothing)                                 # track the mincost candidate c0
                 b.nbeam = min(nc,nbeam)                                         # b.nbeam is now the new beam size
-                for i=1:b.nbeam                                                 # fill beam2 with new states then swap with beam
-                    @show ctuple(b,i)
+                for i=1:b.nbeam                                                 # fill b.beam2[1:b.nbeam] from b.cand[1:b.nbeam]
                     bc = b.cand[i]
                     b1 = bc.state
                     b2 = b.beam2[i]
@@ -117,14 +118,25 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                     move!(b2.parser, bc.move)
                     b2.score = bc.score
                     b2.cost = b1.cost + b1.mcost[bc.move]
-                    (b2.cost < mincost) && ((mincost,yc) = (b2.cost,bc))
+                    (b2.cost < mincost) && ((mincost,c0) = (b2.cost,bc))
                 end
+
+                # c1 = ctuple(b,1)
+                # c2 = ctuple(b, findfirst(b.cand,c0))
+                # y0 = findfirst(bc->(bc.state.cost + bc.state.mcost[bc.move]==0), b.cand[1:nc])
+                # c3 = (y0==0 ? y0 : ctuple(b, y0))
+                # c4 = ctuple(b, b.nbeam)
+                # println("")
+                # @show c1
+                # @show c2
+                # @show c3
+                # @show c4
 
                 if (!isempty(x) &&                                              # if we need training data
                     (mincost == 0) &&                                           # early stop if no good candidates
-                    (yc != (zc = b.cand[1])))                                   # if predicted wrong
-                    addxy(x, (nx+=1), f, yc.state.fidx, y, yc.move, -one(eltype(y)))
-                    addxy(x, (nx+=1), f, zc.state.fidx, y, zc.move, one(eltype(y)))
+                    (c0 != (c1 = b.cand[1])))                                   # if predicted wrong
+                    addxy(x, (nx+=1), f, c0.state.fidx, y, c0.move, -one(eltype(y)))
+                    addxy(x, (nx+=1), f, c1.state.fidx, y, c1.move, one(eltype(y)))
                 end
 
                 b.beam,b.beam2 = b.beam2,b.beam
@@ -134,17 +146,17 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
         for s=s1:s2
             copy!(p[s], batch[s-s1+1].beam[1].parser)                           # copy the best parses to output
 
-            if BeamDebug
-                ss = corpus[s]
-                for i=1:wcnt(ss); print("$(ss.form[i])($i) "); end; println("")
-                println(map(int, ss.head))
-                println(map(int, batch[s-s1+1].beam[1].parser.head))
-                b = batch[s-s1+1]
-                for i=1:b.nbeam
-                    bs = b.beam[i]
-                    @assert (truecost(bs.parser, b.sent) == int(bs.cost))
-                end
-            end
+            # if BeamDebug
+            #     ss = corpus[s]
+            #     for i=1:wcnt(ss); print("$(ss.form[i])($i) "); end; println("")
+            #     println(map(int, ss.head))
+            #     println(map(int, batch[s-s1+1].beam[1].parser.head))
+            #     b = batch[s-s1+1]
+            #     for i=1:b.nbeam
+            #         bs = b.beam[i]
+            #         @assert (truecost(bs.parser, b.sent) == int(bs.cost))
+            #     end
+            # end
         end
     end # for s1=1:nbatch:length(corpus)
     return nx
