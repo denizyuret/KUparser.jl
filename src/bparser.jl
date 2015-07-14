@@ -17,8 +17,10 @@
 
 # A batch consists of multiple sentences and their beams.
 # A beam consists of an array of BeamState's and an array of BeamCandidate's.
+# The BeamStates and the BeamCandidates in a beam are sorted by cumulative score.
+# We also track the mcs, index of the mincoststate for training and early stop.
 
-type Beam beam; beam2; cand; sent; nbeam
+type Beam beam; beam2; cand; sent; nbeam; mcs
     function Beam(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer)
         b = new()
         nword = wcnt(s)
@@ -27,6 +29,7 @@ type Beam beam; beam2; cand; sent; nbeam
         ncand = nbeam * p.nmove
 
         b.nbeam = 1                                     # number of parsers: b.nbeam is actual, nbeam is max
+        b.mcs = 1                                       # index of the mincoststate
         b.sent = s                                      # sentence of the beam
         b.beam  = [BeamState(ptype, nword, ndeps, nmove) for i=1:nbeam]
         b.beam2 = [BeamState(ptype, nword, ndeps, nmove) for i=1:nbeam]         # for swap
@@ -60,7 +63,8 @@ end
 # Here is the workhorse:
 function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbeam::Integer, nbatch::Integer,
                            x::AbstractArray=[], y::AbstractArray=[], nx::Integer=0)
-    @assert isa(net[end], LogpLoss) "Need LogpLoss final layer for beam parser"
+    # Do not locally normalize!
+    # @assert isa(net[end], LogpLoss) "Need LogpLoss final layer for beam parser"
     (nbatch == 0 || nbatch > length(corpus)) && (nbatch = length(corpus))
     ftype = wtype(corpus[1])
     frows = flen(p[1], corpus[1], feats)
@@ -78,7 +82,8 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
             # Compute move scores in bulk to take advantage of the GPU
             nf = 0                                                              # f[1:nf]: feature vectors for the whole batch s1:s2
             for b in batch                                                      # b is the beam (multiple parser states) for one sentence in s1:s2
-                anyvalidmoves(b.beam[1].parser) || continue                     # assuming all parsers for a sentence finish at the same time
+                !isempty(x) && (b.beam[b.mcs].cost != 0) && continue            # early stop if training and zero cost state falls out of beam
+                anyvalidmoves(b.beam[1].parser) || continue                     # parsing finished, assuming all parsers for a sentence finish at the same time
                 for i=1:b.nbeam                                                 # b.beam[1:b.nbeam] are valid parser states
                     bs = b.beam[i]
                     bs.fidx = (nf+=1)
@@ -89,6 +94,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
             predict(net, sub(f,:,1:nf), sub(score,:,1:nf); batch=0)             # scores in score[1:nf]
 
             for b in batch                                                      
+                !isempty(x) && (b.beam[b.mcs].cost != 0) && continue
                 anyvalidmoves(b.beam[1].parser) || continue
                 nc = 0                                                          # nc is number of candidates for sentence beam b
                 for i=1:b.nbeam                                                 # collect candidates in second pass
@@ -108,7 +114,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                 #display(b.beam[1:b.nbeam])
 
                 sort!(sub(b.cand,1:nc); rev=true)                               # sort candidates by score
-                (mincost, c0) = (Pinf, nothing)                                 # track the mincost candidate c0
+                b.mcs = 1                                                       # reset mincoststate
                 b.nbeam = min(nc,nbeam)                                         # b.nbeam is now the new beam size
                 for i=1:b.nbeam                                                 # fill b.beam2[1:b.nbeam] from b.cand[1:b.nbeam]
                     bc = b.cand[i]
@@ -118,7 +124,7 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                     move!(b2.parser, bc.move)
                     b2.score = bc.score
                     b2.cost = b1.cost + b1.mcost[bc.move]
-                    (b2.cost < mincost) && ((mincost,c0) = (b2.cost,bc))
+                    (b2.cost < b.beam2[b.mcs].cost) && (b.mcs = i)
                 end
 
                 # c1 = ctuple(b,1)
@@ -132,9 +138,11 @@ function bparse{T<:Parser}(p::Vector{T}, corpus::Corpus, ndeps::Integer, feats::
                 # @show c3
                 # @show c4
 
-                if (!isempty(x) &&                                              # if we need training data
-                    (mincost == 0) &&                                           # early stop if no good candidates
-                    (c0 != (c1 = b.cand[1])))                                   # if predicted wrong
+                if (!isempty(x) &&
+                    (b.mcs != 1) &&
+                    (b.beam2[b.mcs].cost == 0))
+                    c0 = b.cand[b.mcs]
+                    c1 = b.cand[1]
                     addxy(x, (nx+=1), f, c0.state.fidx, y, c0.move, -one(eltype(y)))
                     addxy(x, (nx+=1), f, c1.state.fidx, y, c1.move, one(eltype(y)))
                 end
