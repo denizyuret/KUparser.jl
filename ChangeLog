@@ -100,13 +100,16 @@
 	psub -N zn11beam4 `pwd`/train20m.sh  --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam4.net --out zn11beam4.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
 	TODO: analyze results (also shuffling)
 
-	- @@zn11beam5: after bugfix
+	- zn11beam5: after bugfix
 	psub -N zn11beam5 `pwd`/train20m.sh --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam5.net --out zn11beam5.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
 
-	- @@zn11beam6: *julia* with earlystop
-	nohup ./train20dbg.sh --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam6.net --out zn11beam6.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4 > zn11beam6.out 2> zn11beam6.err 
+	- zn11beam6: *julia* with earlystop
+	nohup ./train20dbg.sh --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam6.net --out zn11beam6.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4 > zn11beam6.out 2> zn11beam6.err
 
 	- Does not seem to improve.  New hypothesis?
+
+	- @@zn11beam7: with structured learning
+	psub -N zn11beam7 `pwd`/train20m.sh --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 1 --hidden 4096 4096 --dropout .1 .5 --in zn11beam7.net --out zn11beam7.net --ispunct zn11punct yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
 
 	* zn11dynamic:
 	foo.hpc3004.log

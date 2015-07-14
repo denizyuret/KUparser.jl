@@ -148,7 +148,7 @@ function main()
             c2=min(length(corpus), c1+args["sbatch"]-1)
             @show (:corpus, 1, c1, c2)
             sentences=sub(corpus, c1:c2)
-            if ((args["parser"] == "oparser") || ((epoch==1) && (args["in"]==nothing)))
+            if (args["parser"] == "oparser")     # || ((epoch==1) && (args["in"]==nothing)))
                 @date p = oparse(pt, sentences, ndeps, args["ncpu"], feats)
             elseif (args["parser"] == "bparser")
                 @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
@@ -252,7 +252,9 @@ function initnet(args, pt, ndeps)
         !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][end]))
     end
     yrows = pt(1,ndeps).nmove
-    append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
+    # We are removing normalization
+    #append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
+    append!(net, [Mmul(yrows), Bias()])
     for k in [fieldnames(Param)]
         haskey(args, string(k)) || continue
         v = args[string(k)]

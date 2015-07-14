@@ -11,4 +11,5 @@ function Base.show(io::IO, s::Sentence)
     print(io, (wcnt(s) <= 6 ?
                join(s.form, " ") :
                join([s.form[1:3], "...", s.form[end-2:end]], " ")))
+    print(io, map(int, s.head))
 end
