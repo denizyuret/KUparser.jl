@@ -190,34 +190,41 @@ end
 # Need this so sort works:
 Base.isless(a::BeamCandidate,b::BeamCandidate)=(a.score < b.score)
 
-
-# Single cpu version:
 function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
-                           nbeam::Integer, nbatch::Integer=1; xy::Bool=false)
-    pa = map(s->pt(wcnt(s), ndeps), c)
-    if xy
-        xtype = wtype(c[1])
-        xdims = xsize(pa[1], c, feats)
-        ydims = ysize(pa[1], c)
-        x = Array(xtype, xdims[1], 2*xdims[2]) # we can have two training instances for each move
-        y = zeros(xtype, ydims[1], 2*ydims[2])
-        nx = bparse(pa, c, ndeps, feats, net, nbeam, nbatch, x, y)
-        return (pa, sub(x,:,1:nx), sub(y,:,1:nx))
-    else
-        bparse(pa, c, ndeps, feats, net, nbeam, nbatch)
-        return pa
+                           nbeam::Integer, nbatch::Integer=1, ncpu::Integer=1; xy::Bool=false)
+    if ncpu > 1
+        @assert ncpu==nworkers() "ncpu must be 1 or nworkers()"
+        d = distribute(c)
+        net = testnet(net)
+        pmap(procs(d)) do x
+            bparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam, nbatch, 1; xy=xy)
+        end
+    else 
+        pa = map(s->pt(wcnt(s), ndeps), c)
+        if xy
+            xtype = wtype(c[1])
+            xdims = xsize(pa[1], c, feats)
+            ydims = ysize(pa[1], c)
+            x = Array(xtype, xdims[1], 2*xdims[2]) # we can have two training instances for each move
+            y = zeros(xtype, ydims[1], 2*ydims[2]) # TODO: implement a more memory efficient alloc
+            nx = bparse(pa, c, ndeps, feats, net, nbeam, nbatch, x, y)
+            return (pa, sub(x,:,1:nx), sub(y,:,1:nx))
+        else
+            bparse(pa, c, ndeps, feats, net, nbeam, nbatch)
+            return pa
+        end
     end
 end
 
 # Multi cpu version:
-function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
-                           nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
-    d = distribute(c)
-    net = testnet(net)
-    pmap(procs(d)) do x
-        bparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam, nbatch; xy=xy)
-    end
-end
+# function bparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
+#                            nbeam::Integer, nbatch::Integer, ncpu::Integer; xy::Bool=false)
+#     d = distribute(c)
+#     net = testnet(net)
+#     pmap(procs(d)) do x
+#         bparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam, nbatch; xy=xy)
+#     end
+# end
 
 
 
