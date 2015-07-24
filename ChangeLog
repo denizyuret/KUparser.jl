@@ -1,4 +1,75 @@
+2015-07-15  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	- read other papers doing structured nnet learning.
+	-- figure out why our first attempt did not work?
+	-- what is the relation to contrastive estimation, contrastive divergence, noise contrastive estimation, negative sampling?
+	--- http://www.cs.cmu.edu/~nasmith/papers/smith+eisner.acl05.pdf
+	--- http://demo.clab.cs.cmu.edu/cdyer/nce_notes.pdf
+	- replicate zn11:
+	-- need structured perceptron working on sparse vectors.
+	- implement collins2015: pnet: nnet+perceptron as in weiss15.
+	-- pnet is not a regular net, need to introduce model.
+	-- need to modify kuparser to work with pnet:
+	--- call model predict, provide pnet training set
+	--- need correct answers for averaging: package xy efficiently, rethink perceptorn train
+	- try pnet with optimized nets from earlier experiments	(o,g,bparse)
+	-- need to run gparse/oparse experiments.
+	- feature optimization?  using o,g,bparse?
+	- perceptron signal to nnet training did not work?
+	-- try on smaller problems, collins2002.
+	-- try after good initialization
+	-- careful about adagrad,
+	-- careful no averaging! implement ASGD.
+	- better oracle accuracy using avg or momentum possible?
+	-- implement ASGD in update.jl.  how?
+
+
+2015-07-14  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* collins2015:
+	- based on chen&manning2014
+	- do they use or learn embeddings?
+	- collins attaches a perceptron on top of a oracle trained nnet
+	- nobody fixes the feature set so feature optimization is ok
+	- there are other references for structured nnet learning
+	- adding perceptron adds ~0.6%
+	- they also use additional data for another +1%
+	- they completely freeze the nnet before training the perceptron
+	- they use momentum and l2reg, train on gold parse trees only
+	- they also use parameter averaging for nnet training?  ASGD (Bottou 2010)
+	- they decrease lr every gamma rounds of updates.
+	- should we try structured kernel perceptron?
+	- they did not try fine-tuning during perceptron training.
+	- we should try starting with a pretrained net before switching to
+	perceptron updates.  if not try the separate perceptron idea.  and
+	try ASGD.
+
+	* test/train.jl: Trying perceptron loss with nnet training:
+	Batch training doesn't get off the ground with
+	early stop.  We need to start learning in small batches so we can
+	parse further into the training sentences.
+
+	Even if we implement structured learning, mmul does not do
+	averaging.  Either need to add averaging mmul? or write a
+	separate structured perceptron.
+
+	Bparse does not work with sparse features in xy mode.
+
+	Perceptron does not work with negative example training.
+
 2015-07-12  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	search or space or objective?
+	compare move accuracy with gparser oparser
+	try nesterov if search problem
+	check weights and try maxnorm if regularization problem.
+	move accuracy = parse accuracy?
+	can replicate zn11?  using sparse perceptron?
+	figure out thrust speed: done
+	release kunet kuparser
+	create paper repo
 
 	* src/bparser.jl: (beamdebug version) prints out the beam state at
 	every move.  Except for very long sentences, correct parse is
