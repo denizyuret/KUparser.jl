@@ -23,22 +23,24 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer)
     oparse(pa, c, ndeps)
 end
 
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer)
+    ncpu==1 && (return oparse(pt,c,ndeps))
+    d = distribute(c)
+    pmap(procs(d)) do x
+        oparse(pt, localpart(d), ndeps)
+    end
+end
+
 function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec)
     pa = map(s->pt(wcnt(s), ndeps), c)
     oparse(pa, c, ndeps, feats)
 end
 
 function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats::DFvec)
+    ncpu==1 && (return oparse(pt,c,ndeps,feats))
     d = distribute(c)
     pmap(procs(d)) do x
         oparse(pt, localpart(d), ndeps, feats)
-    end
-end
-
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer)
-    d = distribute(c)
-    pmap(procs(d)) do x
-        oparse(pt, localpart(d), ndeps)
     end
 end
 
