@@ -50,20 +50,25 @@ function parse_commandline()
         help = "Exact number of epochs to train"
         arg_type = Int
         #default = 100
+        # Just start Julia with desired workers instead
         "--ncpu"
         help = "Number of workers for multithreaded parsing"
         arg_type = Int
-        default = 16
-        "--sbatch"
-        help = "Batch size for parsing"
+        #default = 16
+        "--strain"
+        help = "Number of sentences to parse for a training batch"
+        arg_type = Int
+        default = 2500
+        "--stest"
+        help = "Number of sentences to parse for a testing batch"
         arg_type = Int
         default = 2500
         "--pbatch"
-        help = "Minibatch size for parsing"
+        help = "Minibatch argument for parse"
         arg_type = Int
         default = 25
         "--tbatch"
-        help = "Minibatch size for training"
+        help = "Minibatch argument for train"
         arg_type = Int
         default = 128
         "--nbeam"
@@ -123,6 +128,7 @@ end
 
 function main()
     args = parse_commandline()
+    args["ncpu"] != nothing && warn("--ncpu deprecated, will be ignored, all nworkers=$(nworkers()) will be used")
     KUnet.gpu(!args["nogpu"])
     args["nogpu"] && blas_set_num_threads(20)
     args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
@@ -142,46 +148,53 @@ function main()
     while true
         @date println("\nepoch => $(epoch += 1)")
 
-        corpus=data[1]          # use data[1] as the training corpus
+        icorpus=1
+        corpus=data[icorpus]          # use data[1] as the training corpus
         parses=Any[]
-        for c1=1:args["sbatch"]:length(corpus)
-            c2=min(length(corpus), c1+args["sbatch"]-1)
-            @show (:corpus, 1, c1, c2)
+        for c1=1:args["strain"]:length(corpus)
+            c2=min(length(corpus), c1+args["strain"]-1)
+            @show (epoch, icorpus, c1, c2)
             sentences=sub(corpus, c1:c2)
-            if (args["parser"] == "oparser")     # || ((epoch==1) && (args["in"]==nothing)))
-                @date p = oparse(pt, sentences, ndeps, args["ncpu"], feats)
+            if (args["parser"] == "oparser") # || ((epoch==1) && (args["in"]==nothing)))
+                @date p = oparse(pt, sentences, ndeps, nworkers(), feats)
             elseif (args["parser"] == "bparser")
-                @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=true)
+                @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], nworkers(); xy=true)
             elseif (args["parser"] == "gparser")
-                @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], args["ncpu"]; xy=true)
+                @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], nworkers(); xy=true)
             else
                 error("Unknown parser")
             end
+            @everywhere gc()
+            # this does not work otherwise if nworkers()==1
+            nworkers()==1 && (p = Any[p])
             @date for pxy in p
                 append!(parses, pxy[1])
                 train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
             end
         end
-        accuracy[1] = getscore(parses, corpus, ispunct)
+        accuracy[icorpus] = getscore(parses, corpus, ispunct)
         (args["out"] != nothing) && (@date savenet(args["out"], net))
 
-        for idata=2:length(data)
-            corpus=data[idata]
+        for icorpus=2:length(data)
+            corpus=data[icorpus]
             parses=Any[]
-            for c1=1:args["sbatch"]:length(corpus)
-                c2=min(length(corpus), c1+args["sbatch"]-1)
-                @show (:corpus, idata, c1, c2)
+            for c1=1:args["stest"]:length(corpus)
+                c2=min(length(corpus), c1+args["stest"]-1)
+                @show (:corpus, icorpus, c1, c2)
                 sentences=sub(corpus, c1:c2)
                 if in(args["parser"], ("oparser", "gparser"))
-                    @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], args["ncpu"]; xy=false)
+                    @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], nworkers(); xy=false)
                 elseif (args["parser"] == "bparser")
-                    @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], args["ncpu"]; xy=false)
+                    @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], nworkers(); xy=false)
                 else
                     error("Unknown parser")
                 end
+                @everywhere gc()
+                # this does not work otherwise if nworkers()==1
+                nworkers()==1 && (p = Any[p])
                 for pp in p; append!(parses, pp); end
             end
-            accuracy[idata] = getscore(parses, corpus, ispunct)
+            accuracy[icorpus] = getscore(parses, corpus, ispunct)
         end            
 
         println("DATA:\t$epoch\t"*join(accuracy, '\t')); flush(STDOUT)
