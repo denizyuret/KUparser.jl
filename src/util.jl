@@ -98,9 +98,9 @@ function testnet(net)
     KUnet.strip!(net)
     for l in net
         for n in names(l)
-            if isdefined(l,n) && isa(l.(n), Param)
+            if isdefined(l,n) && isa(l.(n), KUparam)
                 # Get rid of all the training fields
-                l.(n) = Param(l.(n).data)
+                l.(n) = KUparam(l.(n).arr)
             end
         end
     end

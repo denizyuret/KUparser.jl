@@ -131,7 +131,7 @@ function main()
     args["ncpu"] != nothing && warn("--ncpu deprecated, will be ignored, all nworkers=$(nworkers()) will be used")
     KUnet.gpu(!args["nogpu"])
     args["nogpu"] && blas_set_num_threads(20)
-    args["seed"] >= 0 && (srand(args["seed"]); KUnet.gpuseed(args["seed"]))
+    args["seed"] >= 0 && setseed(args["seed"])
     (data, ndeps) = loaddata(args["datafiles"])
     @show (map(size, data), ndeps)
     @show feats = eval(parse("Flist."*args["feats"]))
@@ -166,8 +166,14 @@ function main()
             end
             @everywhere gc()
             # this does not work otherwise if nworkers()==1
+            @show typeof(p)
             nworkers()==1 && (p = Any[p])
+            @show typeof(p)
+            @show map(typeof,p)
             @date for pxy in p
+                @show typeof(parses)
+                @show typeof(pxy)
+                @show map(typeof, pxy)
                 append!(parses, pxy[1])
                 train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
             end
@@ -268,7 +274,7 @@ function initnet(args, pt, ndeps)
     # We are removing normalization
     #append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
     append!(net, [Mmul(yrows), Bias()])
-    for k in [fieldnames(Param)]
+    for k in [fieldnames(KUparam)]
         haskey(args, string(k)) || continue
         v = args[string(k)]
         if isempty(v)
