@@ -1,7 +1,7 @@
 # Sparse compound features are specified using a vector of feature
 # names, e.g. ["s0w", "s0p"]
 
-typealias SFeature{T<:String} Vector{T}
+typealias SFeature Vector{ASCIIString}
 
 # Each string specifies a particular feature and has the form:
 #   [sn]\d?([hlr]\d?)*[wpdLabAB]
@@ -27,7 +27,7 @@ typealias SFeature{T<:String} Vector{T}
 # Sparse compound feature vectors are specified using a vector of
 # SFeature's (possibly headed by a hash?)
 
-typealias SFvec{T<:String} Vector{SFeature{T}}
+typealias SFvec Vector{SFeature}
 
 # It does not cost anything to increase the height of a
 # SparseMatrixCSC, so we'll just use a large fixed height
@@ -86,7 +86,7 @@ end
 # can return strings etc.  Returns 'nothing' if target word does not
 # exist or the feature is not available.
 
-function features1(p::Parser, s::Sentence, f::String)
+function features1(p::Parser, s::Sentence, f::ASCIIString)
     @assert in(f[1], "sn") "feature string should start with [sn]"
     (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2) # target index and start of feature spec
     (a,d) = (0,0)           # target word position and right distance
