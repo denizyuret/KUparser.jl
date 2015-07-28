@@ -1,3 +1,98 @@
+2015-07-27  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* profile: features.pl not having ldep/rdep adds 10% to time.  on
+	the other hand it will speed up alloc and copy of parsers and
+	memory savings.  need experiment to decide.  alternative double
+	array with push.  other than that converting features to
+	ASCIIString instead of String, writing to preallocated feature
+	matrix, not doing gc() every call to predict more than doubled the
+	speed.  bparser working correctly except (1) return xy (2)
+	multi-cpu version.
+
+	* yatbazp-static.out: TODO: static/dynamic experiments with
+	yatbazp failed.  Parser never finished first epoch.
+
+2015-07-26  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* bparser.jl: figured out the math: update with 1-p for oracle
+	moves, -p for all other moves where p is the path probability.  we
+	take the paths on beam at the time of early stop to be the whole
+	set of paths as an approx.  when the top p approx 1, this is the
+	same as the perceptron update: if the top p is the oracle path, we
+	get no update, if it is another path we get +1 for oracle path and
+	-1 for the maxscore path.  this also means we need to keep the
+	history of moves for each path.  To figure out how good the
+	perceptron approx is we can use an existing model with beam
+	decoding and see the difference between the top 2 paths.  To
+	figure out how good the beam approx is, we could increase beam
+	size?  (still not going to tell us for sure).  Ideas:
+
+	;;; replicate zn11 with sparse features and struct perceptron.
+	;;; instrument bparser to get statistics on path scores.
+	;;; debug the new nnet update rule on a simpler tagging problem.
+	;;; apply the new update rule in bparser starting with a good model.
+
+	;;; fix bparser to keep the whole history.
+	;; we need to keep around all the x's
+	;; we need to calculate cumulative updates for common ancestors
+	; allocate one big x matrix for the whole sentence?
+	; we already have fidx in the parser state.
+	; use a resizeable x?
+	;; we will return a small subset back for training?
+	; a fixed number (two per move) if doing perceptron updates.
+	; however during the time when two paths together none.
+	; a larger subset if regular updates (all except childless ancestors)
+	; or we can use childless ancestors as well?
+	; no,their final scores are presumably too small
+	;; if we still group x's for efficient prediction we need to keep
+	pointers
+	;; we need to keep around all the parser states
+
+	;;; will this fit in memory?
+	; for a 40 word sentence:
+	; we have 2n-2=78 moves.
+	; beam=64 => 78x64=4992 parser states on the beam.
+	; we have 3105 feat dims => 3105x4992x4=62MB array
+	; we have ndeps=11 => single parser bytes = 3492
+	; 3492x4992 = 17MB parser array => need ~100 MB per sentence
+
+	;;; most of parser space (3200) spent on ldep/rdep, can we save?
+	; ldep[h,i]=d so what is the max number of children? can we push?
+	; start with an array of empty arrays and push when necessary.
+	; TODO: if we push we can get rid of lcnt,rcnt as well.
+	; could lose speed, profile for this change.
+	; do we need ldep?  it is only used in features.jl and we can have
+	; a little for loop there. if lcnt>0.
+
+	;;; stats from zn11beam4.net2 yatbazp.dev.jld4 first 10 sents:
+	; uas: .9526 (zn11punc), lem: 0.2
+	; out of 10 sentences,
+	; 2 have gold path finish on top.
+	; 8 have gold path in final beam, 2 lost it. (no early stop)
+	; after normalization the stats for the top beam score:
+	; n=10 m=0.333277 s=0.220646 q=[0.061805 0.133657 0.311918 0.475614 0.74421]
+	; so approximating the top with 1.0 (perceptron) is not good
+
+	;;; how about approximating the whole dist with the beam:
+	; bottom of the beam log10-score statistics:
+	; n=10 m=-3.08294 s=0.548609 q=[-4.05862 -3.54291 -2.87512 -2.66125 -2.10193]
+	; we need a way to id the same state in difft beams. hash(bs.parser.head)?
+	;; comparing beam sizes 1<<(0..10):
+	; same hash appearing more than once.  derivation ambiguity?  A LOT!
+	; assuming 1<<10 gives the full dist, here is the beam vs coverage:
+	beam	pmass
+	1	0.36064
+	2	0.490636
+	4	0.598386
+	8	0.681686
+	16	0.743913
+	32	0.797305
+	64	0.849904
+	128	0.900778
+	256	0.9423
+	512	0.977804
+	1024	1.0?
+
 2015-07-15  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
