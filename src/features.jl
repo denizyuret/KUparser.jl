@@ -56,10 +56,8 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
     np = 45                     # hardcoding the ptb postag count for now
     nw = p.nword
 
-    lcnt = zeros(Int,nw)
-    rcnt = zeros(Int,nw)
-    ldep = [Array(Int,0) for i=1:nw] # 1164
-    rdep = [Array(Int,0) for i=1:nw] # 773
+    ldep = Array(Vector{Int}, nw)
+    rdep = Array(Vector{Int}, nw)
     lset = zeros(xtype, nd, nw)      # 82
     rset = zeros(xtype, nd, nw)      # 980
     for d=1:nw
@@ -67,11 +65,11 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
         if h==0
             continue
         elseif d<h
-            lcnt[h] += 1
+            isdefined(ldep,h) || (ldep[h]=Array(Int,0))
             push!(ldep[h],d)    # 864
             lset[p.deprel[d],h]=1 # 396
         elseif d>h
-            rcnt[h] += 1        # 246
+            isdefined(rdep,h) || (rdep[h]=Array(Int,0))
             unshift!(rdep[h],d) # 401
             rset[p.deprel[d],h]=1 # 6
         else
@@ -80,32 +78,39 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
     end
 
     for f in feats
-        f1=f[1]; f1=='s' || f1=='n' || error("feature string should start with [sn]")
-        f2=f[2]; (i,n) = isdigit(f2) ? (f2 - '0', 3) : (0, 2) # 51
+        f1 = f[1]; f2 = f[2]
+        (i,n) = isdigit(f2) ? (f2 - '0', 3) : (0, 2) # feature digit and next character
         a = d = 0           # target word index and right distance
-        if ((f1 == 's') && (p.sptr - i >= 1)) # 25
-            a = int(p.stack[p.sptr - i])             # 456
-            d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # 263
-                 p.wptr <= p.nword ? (p.wptr - a) : 0)
-        elseif ((f1 == 'n') && (p.wptr + i <= p.nword)) # 29
-            a = int(p.wptr + i)                                # 14
+        if (f1 == 's')
+            if (p.sptr - i >= 1) # 25
+                a = int(p.stack[p.sptr - i])             # 456
+                d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # 263
+                     p.wptr <= p.nword ? (p.wptr - a) : 0)
+            end
+        elseif (f1 == 'n') 
+            (p.wptr + i <= p.nword) && (a = int(p.wptr + i))
+        else 
+            error("feature string should start with [sn]")
         end
-        while (fn=f[n];(fn=='h'||fn=='l'||fn=='r')) # 311
-            d = 0
-            (i,n) = isdigit(f[n+1]) ? (f[n+1] - '0', n+2) : (1, n+1) # 112
-            i > 0 || error("hlr indexing is one based") # 3
+        while n < length(f)
+            f1 = f[n]; f2 = f[n+1]
+            d = 0 # dist only defined for stack words
+            (i,n) = isdigit(f2) ? (f2 - '0', n+2) : (1, n+1) # 112 
+            i > 0 || error("hlr indexing is one based") # 3 [lrh] is one based, [sn] was zero based
             a == 0 && continue                        # 366?
-            if fn == 'l'                              # 2
+            if f1 == 'l'                              # 2
                 (a <= p.wptr) || error("buffer words other than n0 do not have ldeps") # 252
-                a = (i <= lcnt[a]) ? ldep[a][i] : 0 # 374
-            elseif fn == 'r'
+                a = (isdefined(ldep,a) && i <= length(ldep[a])) ? ldep[a][i] : 0 # 374
+            elseif f1 == 'r'
                 (a < p.wptr) || error("buffer words do not have rdeps")
-                a = (i <= rcnt[a]) ? rdep[a][i] : 0 # 272
-            else # if fn == 'h'
+                a = (isdefined(rdep,a) && i <= length(rdep[a])) ? rdep[a][i] : 0 # 272
+            elseif f1 == 'h'
                 for j=1:i       # 5
                     a = int(p.head[a]) # 147
                     a == 0 && break # 59
                 end
+            else 
+                break
             end
         end
         n == length(f) || error("n!=length(f)")
@@ -124,14 +129,14 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
             (a>0) && (d>0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1) # 232
             nx += 6
         elseif fn == 'L'
-            (a>0) && p.deprel[a] > nd && error("deprel out of bound") # 110
+            (a>0) && (p.deprel[a] > nd) && error("deprel out of bound") # 110
             (a>0) && (x[nx+1+p.deprel[a], xcol] = x1) # 41 first bit for deprel=0 (ROOT)
             nx += (nd+1)
         elseif fn == 'a'
-            (a>0) && (x[nx+1+(lcnt[a]>9?9:lcnt[a]), xcol] = x1) # 155 0-9
+            (a>0) && (lcnt=(isdefined(ldep,a) ? length(ldep[a]) : 0); x[nx+1+(lcnt>9?9:lcnt), xcol] = x1) # 155 0-9
             nx += 10
         elseif fn == 'b'
-            (a>0) && (x[nx+1+(rcnt[a]>9?9:rcnt[a]), xcol] = x1) # 28  0-9
+            (a>0) && (rcnt=(isdefined(rdep,a) ? length(rdep[a]) : 0); x[nx+1+(rcnt>9?9:rcnt), xcol] = x1) # 28  0-9
             nx += 10
         elseif fn == 'A'
             (a>0) && copy!(x, (xcol-1)*xrows+nx+1, lset, (a-1)*nd+1, nd) # 266
@@ -178,43 +183,3 @@ xsize{T<:Parser}(p::Vector{T}, c::Corpus, f::Fvec)=xsize(p[1],c,f)
 ysize(p::Parser, s::Sentence)=(nmoves(p),nmoves(p,s))
 ysize(p::Parser, c::Corpus)=(nmoves(p),nmoves(p,c))
 ysize{T<:Parser}(p::Vector{T}, c::Corpus)=ysize(p[1],c)
-
-
-# DEAD CODE
-
-# function ldep(p::Parser, a::Int, i::Int)
-#     p.lcnt[a] < i && (return 0)
-#     n = 0
-#     @inbounds for j=1:(a-1)
-#         if p.head[j] == a
-#             ((n += 1) == i) && (return j)
-#         end
-#     end
-# end
-
-# function rdep(p::Parser, a::Int, i::Int)
-#     p.rcnt[a] < i && (return 0)
-#     n = 0
-#     @inbounds for j=length(p.head):-1:(a+1)
-#         if p.head[j] == a
-#             ((n += 1) == i) && (return j)
-#         end
-#     end
-# end
-
-# function lset(p::Parser, a::Int, x::Array, nx::Int, xcol::Int)
-#     p.lcnt[a] == 0 && return
-#     x1 = one(eltype(x))
-#     @inbounds for j=1:(a-1)
-#         p.head[j] == a && (x[nx+p.deprel[j], xcol] = x1)
-#     end
-# end
-
-# function rset(p::Parser, a::Int, x::Array, nx::Int, xcol::Int)
-#     p.rcnt[a] == 0 && return
-#     x1 = one(eltype(x))
-#     @inbounds for j=length(p.head):-1:(a+1)
-#         p.head[j] == a && (x[nx+p.deprel[j], xcol] = x1)
-#     end
-# end
-
