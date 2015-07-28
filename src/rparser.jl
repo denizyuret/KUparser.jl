@@ -36,7 +36,7 @@ function rparse(p::Parser, s::Sentence, ndeps::Integer)
     while anyvalidmoves(p)
         movecosts(p, s.head, s.deprel, c)
         if rand() < 0.1
-            f = find(c .< Pinf)
+            f = find(c .< typemax(Cost))
             r = f[rand(1:length(f))]
         else
             r = indmin(c)
@@ -61,7 +61,7 @@ function rparse_dbg{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
     while anyvalidmoves(p)
         movecosts(p, s.head, s.deprel, c)
         if rand() < 0.1
-            f = find(c .< Pinf)
+            f = find(c .< typemax(Cost))
             r = f[rand(1:length(f))]
         else
             r = indmin(c)
