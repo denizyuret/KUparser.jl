@@ -7,7 +7,7 @@
 # Features can be dense or sparse.  Dense features are specified by
 # string names:
 
-typealias DFeature String
+typealias DFeature ASCIIString
 
 # Each string specifies a particular feature and has the form:
 #   [sn]\d?([hlr]\d?)*[vcpdLabAB]
@@ -33,7 +33,7 @@ typealias DFeature String
 
 # A DFvec is a String vector specifying a set of dense features.
 
-typealias DFvec{T<:String} Vector{T}
+typealias DFvec Vector{ASCIIString}
 
 # Fvec is a union of DFvec and SFvec, which specify dense and sparse
 # features respectively.  The user controls what kind of features are
@@ -41,80 +41,86 @@ typealias DFvec{T<:String} Vector{T}
 
 typealias Fvec Union(DFvec,SFvec)
 
-function features(p::Parser, s::Sentence, feats::DFvec,
+function features(p::Parser, s::Sentence, feats::DFvec, #
                   x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
-    @assert xcol <= size(x,2)
+    xcol <= size(x,2) || error("xcol > size(x,2)")
     wrows = wdim(s)             # first half word, second half context
     xrows = size(x, 1)
     x0 = zero(eltype(x))
     x1 = one(eltype(x))
-    x[:,xcol] = x0
+    x[:,xcol] = x0              # 366
     nx = 0                      # last entry in x
     nw = wrows >> 1
     nd = p.ndeps
     np = 45                     # hardcoding the ptb postag count for now
     for f in feats
-        @assert in(f[1], "sn") "feature string should start with [sn]"
-        (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2)
-        (a,d) = (0,0)           # target word index and right distance
-        if ((f[1] == 's') && (p.sptr - i >= 1))
-            a = p.stack[p.sptr - i]
-            d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : 
+        f1=f[1]; f1=='s' || f1=='n' || error("feature string should start with [sn]")
+        f2=f[2]; (i,n) = isdigit(f2) ? (f2 - '0', 3) : (0, 2) # 51
+        a = d = 0           # target word index and right distance
+        if ((f1 == 's') && (p.sptr - i >= 1)) # 25
+            a = int(p.stack[p.sptr - i])             # 458
+            d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # 229
                  p.wptr <= p.nword ? (p.wptr - a) : 0)
-        elseif ((f[1] == 'n') && (p.wptr + i <= p.nword))
-            a = p.wptr + i
+        elseif ((f1 == 'n') && (p.wptr + i <= p.nword)) # 29
+            a = int(p.wptr + i)                                # 14
         end
-        while (fn=f[n];in(fn, "hlr"))
+        while (fn=f[n];(fn=='h'||fn=='l'||fn=='r')) # 311
             d = 0
-            (i,n) = isdigit(f[n+1]) ? (f[n+1] - '0', n+2) : (1, n+1)
-            @assert i > 0 "hlr indexing is one based"
-            a == 0 && continue
-            if fn == 'l'
-                @assert (a <= p.wptr) "buffer words other than n0 do not have ldeps"
-                j = p.lcnt[a] - i + 1 # leftmost child at highest index
-                a = (j > 0) ? p.ldep[a,j] : 0
+            (i,n) = isdigit(f[n+1]) ? (f[n+1] - '0', n+2) : (1, n+1) # 112
+            i > 0 || error("hlr indexing is one based") # 3
+            a == 0 && continue                        # 366?
+            if fn == 'l'                              # 2
+                (a <= p.wptr) || error("buffer words other than n0 do not have ldeps") # 252
+                j = p.lcnt[a] - i + 1 # 399 leftmost child at highest index
+                a = (j > 0) ? int(p.ldep[a,j]) : 0 # 163
             elseif fn == 'r'
-                @assert (a < p.wptr) "buffer words do not have rdeps"
-                j = p.rcnt[a] - i + 1
-                a = (j > 0) ? p.rdep[a,j] : 0
+                (a < p.wptr) || error("buffer words do not have rdeps")
+                j = p.rcnt[a] - i + 1 # 224
+                a = (j > 0) ? int(p.rdep[a,j]) : 0 # 143
             else # if fn == 'h'
-                for j=1:i
-                    a = p.head[a]
-                    a == 0 && break
+                for j=1:i       # 5
+                    a = int(p.head[a]) # 147
+                    a == 0 && break # 59
                 end
             end
         end
-        @assert n == length(f)
-        fn = f[n]
-        if (a > 0)
-            if fn == 'v'
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nw)
-            elseif fn == 'c'
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw)
-            elseif fn == 'p'
-                @assert s.postag[a] <= np
-                x[nx+s.postag[a], xcol] = x1
-            elseif fn == 'd'
-                (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1)
-            elseif fn == 'L'
-                @assert p.deprel[a] <= nd
-                x[nx+1+p.deprel[a], xcol] = x1 # first bit for deprel=0 (ROOT)
-            elseif fn == 'a'
-                x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1 # 0-9
-            elseif fn == 'b'
-                x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a]), xcol] = x1 # 0-9
-            elseif fn == 'A'
-                for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]], xcol] = x1; end
-            elseif fn == 'B'
-                for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]], xcol] = x1; end
-            else
-                error("Unknown feature $(fn)")
-            end
-        end # if (a > 0)
-        nx += flen1(fn, nw, nd, np)
+        n == length(f) || error("n!=length(f)")
+        fn = f[n]               # 23
+        if fn == 'v'        # 293
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nw) # 314
+            nx += nw
+        elseif fn == 'c'    # 123
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw) # 489
+            nx += nw
+        elseif fn == 'p'    # 4
+            (a>0) && (s.postag[a] > np) && error("postag out of bound") # 147
+            (a>0) && (x[nx+s.postag[a], xcol] = x1) # 126
+            nx += np
+        elseif fn == 'd'                 # 3
+            (a>0) && (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1) # 232
+            nx += 6
+        elseif fn == 'L'
+            (a>0) && p.deprel[a] > nd && error("deprel out of bound") # 110
+            (a>0) && (x[nx+1+p.deprel[a], xcol] = x1) # 41 first bit for deprel=0 (ROOT)
+            nx += (nd+1)
+        elseif fn == 'a'
+            (a>0) && (x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1) # 268 0-9
+            nx += 10
+        elseif fn == 'b'
+            (a>0) && (x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a]), xcol] = x1) # 0-9
+            nx += 10
+        elseif fn == 'A'
+            (a>0) && (for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]], xcol] = x1; end) # 5044
+            nx += nd
+        elseif fn == 'B'
+            (a>0) && (for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]], xcol] = x1; end) # 160
+            nx += nd
+        else
+            error("Unknown feature $(fn)") # 717?
+        end
     end
-    @assert nx == xrows
+    nx == xrows || error("Bad feature vector length")
     return x
 end
 
@@ -123,7 +129,7 @@ function flen(p::Parser, s::Sentence, feats::DFvec)
     nw = wdim(s) >> 1
     nd = p.ndeps
     for f in feats
-        nx += flen1(f[end], nw, nd)
+        nx += flen1(f[end], nw, nd) # 1129
     end
     return nx
 end
@@ -149,3 +155,43 @@ xsize{T<:Parser}(p::Vector{T}, c::Corpus, f::Fvec)=xsize(p[1],c,f)
 ysize(p::Parser, s::Sentence)=(nmoves(p),nmoves(p,s))
 ysize(p::Parser, c::Corpus)=(nmoves(p),nmoves(p,c))
 ysize{T<:Parser}(p::Vector{T}, c::Corpus)=ysize(p[1],c)
+
+
+# DEAD CODE
+
+# function ldep(p::Parser, a::Int, i::Int)
+#     p.lcnt[a] < i && (return 0)
+#     n = 0
+#     @inbounds for j=1:(a-1)
+#         if p.head[j] == a
+#             ((n += 1) == i) && (return j)
+#         end
+#     end
+# end
+
+# function rdep(p::Parser, a::Int, i::Int)
+#     p.rcnt[a] < i && (return 0)
+#     n = 0
+#     @inbounds for j=length(p.head):-1:(a+1)
+#         if p.head[j] == a
+#             ((n += 1) == i) && (return j)
+#         end
+#     end
+# end
+
+# function lset(p::Parser, a::Int, x::Array, nx::Int, xcol::Int)
+#     p.lcnt[a] == 0 && return
+#     x1 = one(eltype(x))
+#     @inbounds for j=1:(a-1)
+#         p.head[j] == a && (x[nx+p.deprel[j], xcol] = x1)
+#     end
+# end
+
+# function rset(p::Parser, a::Int, x::Array, nx::Int, xcol::Int)
+#     p.rcnt[a] == 0 && return
+#     x1 = one(eltype(x))
+#     @inbounds for j=length(p.head):-1:(a+1)
+#         p.head[j] == a && (x[nx+p.deprel[j], xcol] = x1)
+#     end
+# end
+
