@@ -46,21 +46,46 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
                   xcol::Integer=1)
     xcol <= size(x,2) || error("xcol > size(x,2)")
     wrows = wdim(s)             # first half word, second half context
-    xrows = size(x, 1)
-    x0 = zero(eltype(x))
-    x1 = one(eltype(x))
-    x[:,xcol] = x0              # 366
+    xrows = size(x,1)
+    xtype = eltype(x)
+    x1 = one(xtype)
+    x[:,xcol] = zero(xtype)     # 366
     nx = 0                      # last entry in x
-    nw = wrows >> 1
+    nv = wrows >> 1             # size of word/context vector, assumes word vec and context vec concatenated
     nd = p.ndeps
     np = 45                     # hardcoding the ptb postag count for now
+    nw = p.nword
+
+    lcnt = zeros(Int,nw)
+    rcnt = zeros(Int,nw)
+    ldep = [Array(Int,0) for i=1:nw] # 1164
+    rdep = [Array(Int,0) for i=1:nw] # 773
+    lset = zeros(xtype, nd, nw)      # 82
+    rset = zeros(xtype, nd, nw)      # 980
+    for d=1:nw
+        h=int(p.head[d])        # 493
+        if h==0
+            continue
+        elseif d<h
+            lcnt[h] += 1
+            push!(ldep[h],d)    # 864
+            lset[p.deprel[d],h]=1 # 396
+        elseif d>h
+            rcnt[h] += 1        # 246
+            unshift!(rdep[h],d) # 401
+            rset[p.deprel[d],h]=1 # 6
+        else
+            error("h==d")
+        end
+    end
+
     for f in feats
         f1=f[1]; f1=='s' || f1=='n' || error("feature string should start with [sn]")
         f2=f[2]; (i,n) = isdigit(f2) ? (f2 - '0', 3) : (0, 2) # 51
         a = d = 0           # target word index and right distance
         if ((f1 == 's') && (p.sptr - i >= 1)) # 25
-            a = int(p.stack[p.sptr - i])             # 458
-            d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # 229
+            a = int(p.stack[p.sptr - i])             # 456
+            d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # 263
                  p.wptr <= p.nword ? (p.wptr - a) : 0)
         elseif ((f1 == 'n') && (p.wptr + i <= p.nword)) # 29
             a = int(p.wptr + i)                                # 14
@@ -72,12 +97,10 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
             a == 0 && continue                        # 366?
             if fn == 'l'                              # 2
                 (a <= p.wptr) || error("buffer words other than n0 do not have ldeps") # 252
-                j = p.lcnt[a] - i + 1 # 399 leftmost child at highest index
-                a = (j > 0) ? int(p.ldep[a,j]) : 0 # 163
+                a = (i <= lcnt[a]) ? ldep[a][i] : 0 # 374
             elseif fn == 'r'
                 (a < p.wptr) || error("buffer words do not have rdeps")
-                j = p.rcnt[a] - i + 1 # 224
-                a = (j > 0) ? int(p.rdep[a,j]) : 0 # 143
+                a = (i <= rcnt[a]) ? rdep[a][i] : 0 # 272
             else # if fn == 'h'
                 for j=1:i       # 5
                     a = int(p.head[a]) # 147
@@ -88,36 +111,36 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
         n == length(f) || error("n!=length(f)")
         fn = f[n]               # 23
         if fn == 'v'        # 293
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nw) # 314
-            nx += nw
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) # 314
+            nx += nv
         elseif fn == 'c'    # 123
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nw+1, nw) # 489
-            nx += nw
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) # 489
+            nx += nv
         elseif fn == 'p'    # 4
             (a>0) && (s.postag[a] > np) && error("postag out of bound") # 147
             (a>0) && (x[nx+s.postag[a], xcol] = x1) # 126
             nx += np
         elseif fn == 'd'                 # 3
-            (a>0) && (d > 0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1) # 232
+            (a>0) && (d>0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1) # 232
             nx += 6
         elseif fn == 'L'
             (a>0) && p.deprel[a] > nd && error("deprel out of bound") # 110
             (a>0) && (x[nx+1+p.deprel[a], xcol] = x1) # 41 first bit for deprel=0 (ROOT)
             nx += (nd+1)
         elseif fn == 'a'
-            (a>0) && (x[nx+1+(p.lcnt[a]>9?9:p.lcnt[a]), xcol] = x1) # 268 0-9
+            (a>0) && (x[nx+1+(lcnt[a]>9?9:lcnt[a]), xcol] = x1) # 155 0-9
             nx += 10
         elseif fn == 'b'
-            (a>0) && (x[nx+1+(p.rcnt[a]>9?9:p.rcnt[a]), xcol] = x1) # 0-9
+            (a>0) && (x[nx+1+(rcnt[a]>9?9:rcnt[a]), xcol] = x1) # 28  0-9
             nx += 10
         elseif fn == 'A'
-            (a>0) && (for j=1:p.lcnt[a]; x[nx+p.deprel[p.ldep[a,j]], xcol] = x1; end) # 5044
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, lset, (a-1)*nd+1, nd) # 266
             nx += nd
         elseif fn == 'B'
-            (a>0) && (for j=1:p.rcnt[a]; x[nx+p.deprel[p.rdep[a,j]], xcol] = x1; end) # 160
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, rset, (a-1)*nd+1, nd) # 33
             nx += nd
         else
-            error("Unknown feature $(fn)") # 717?
+            error("Unknown feature $(fn)") # 3
         end
     end
     nx == xrows || error("Bad feature vector length")
