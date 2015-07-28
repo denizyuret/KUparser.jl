@@ -68,7 +68,7 @@ end
 function maxscoremove(score, cost=[], col=1)
     (smax,imax) = (-Inf,0)
     for i=1:size(score,1)
-        !isempty(cost) && (cost[i]==Pinf) && continue
+        !isempty(cost) && (cost[i]==typemax(Cost)) && continue
         ((s = score[i,col]) > smax) && ((smax,imax)=(s,i))
     end
     return imax
