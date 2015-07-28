@@ -63,7 +63,7 @@ function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Integer,
                 for bs in b.beam
                     movecosts(bs.parser, b.sent.head, b.sent.deprel, cost) # 670
                     for j=1:length(cost)
-                        cost[j] == Pinf && continue
+                        cost[j] == typemax(Cost) && continue
                         push!(b.cand, BeamState(bs, j, bs.score + score[j,bs.fidx], bs.cost + cost[j])) # 1496
                         # parser and fidx are uninitialized in the candidate
                     end
@@ -75,7 +75,7 @@ function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Integer,
 
                 ### Top candidates to the beam, update mincost
                 resize!(b.beam,0)
-                b.mincost = Pinf
+                b.mincost = typemax(Cost)
                 for bc in b.cand
                     length(b.beam) == nbeam && break
                     bc.cost < b.mincost && (b.mincost = bc.cost)
