@@ -18,36 +18,28 @@
 @compat typealias DepRel UInt8
 @compat typealias Cost UInt8
 typealias Move Integer
-typealias Pvec AbstractVector{Position}
-typealias Dvec AbstractVector{DepRel}
-typealias Pmat AbstractMatrix{Position}
-const Pinf=typemax(Position)
+typealias Pvec Vector{Position}
+typealias Dvec Vector{DepRel}
 Pzeros(n::Integer...)=zeros(Position, n...)
 Dzeros(n::Integer...)=zeros(DepRel, n...)
 
 
 type Parser{T,V}
-    nword::Position       # number of words in sentence
-    ndeps::DepRel         # number of dependency labels (excluding ROOT)
-    nmove::Move           # number of possible moves (set by init!)
-    wptr::Position        # index of first word in buffer
-    sptr::Position        # index of last word (top) of stack
+    nword::Int            # number of words in sentence
+    ndeps::Int            # number of dependency labels (excluding ROOT)
+    nmove::Int            # number of possible moves (set by init!)
+    wptr::Int             # index of first word in buffer
+    sptr::Int             # index of last word (top) of stack
     stack::Pvec           # 1xn vector for stack of indices
     head::Pvec            # 1xn vector of heads
     deprel::Dvec          # 1xn vector of dependency labels
-    lcnt::Pvec            # lcnt(h): number of left deps for h
-    rcnt::Pvec            # rcnt(h): number of right deps for h
-    ldep::Pmat            # nxn matrix for left dependents
-    rdep::Pmat            # nxn matrix for right dependents
     
     function Parser(nword::Integer, ndeps::Integer)
-        @assert (nword < typemax(Position)) "nword >= $(typemax(Position))"
-        @assert (ndeps < typemax(DepRel)) "ndeps >= $(typemax(DepRel))"
+        (nword < typemax(Position)) || error("nword >= $(typemax(Position))")
+        (ndeps < typemax(DepRel))   || error("ndeps >= $(typemax(DepRel))")
         p = new(nword, ndeps, 0,               # nword, ndeps, nmove
                 1, 0, Pzeros(nword),           # wptr, sptr, stack
-                Pzeros(nword), Dzeros(nword),  # head, deprel
-                Pzeros(nword), Pzeros(nword),  # lcnt, rcnt
-                Pzeros(nword,nword), Pzeros(nword,nword)) # ldep, rdep
+                Pzeros(nword), Dzeros(nword))  # head, deprel
         init!(p)
         return p
     end
@@ -75,20 +67,20 @@ nmoves(p::Parser,c::Corpus)=(n=0; for s in c; n += nmoves(p,s); end; n)
 anyvalidmoves(p::Parser)=(shiftok(p)||reduceok(p)||leftok(p)||rightok(p))
 
 function move!(p::Parser, m::Move)
-    @assert (1 <= m <= p.nmove) "Move $m is not supported"
-    (m == shiftmove(p))  ? (@assert shiftok(p);  shift(p)) :
-    in(m, rightmoves(p)) ? (@assert rightok(p);  right(p,label(p,m))) :
-    in(m, leftmoves(p))  ? (@assert leftok(p);   left(p,label(p,m))) :
-    (m == reducemove(p)) ? (@assert reduceok(p); reduce(p)) :
+    (1 <= m <= p.nmove) || error("Move $m is not supported")
+    (m == shiftmove(p))  ? (shiftok(p)||error("Bad move");  shift(p)) :
+    in(m, rightmoves(p)) ? (rightok(p)||error("Bad move");  right(p,label(p,m))) :
+    in(m, leftmoves(p))  ? (leftok(p)||error("Bad move");   left(p,label(p,m))) :
+    (m == reducemove(p)) ? (reduceok(p)||error("Bad move"); reduce(p)) :
     error("Move $m is not supported")
 end
 
-function movecosts(p::Parser, head::AbstractArray, deprel::AbstractArray, 
+function movecosts(p::Parser, head::Pvec, deprel::Dvec, 
                    cost::Pvec=Array(Position,p.nmove))
-    @assert (length(head) == p.nword)
-    @assert (length(deprel) == p.nword)
-    @assert (length(cost) == p.nmove)
-    fill!(cost, Pinf)
+    (length(head) == p.nword)   ||error("Bad head")
+    (length(deprel) == p.nword) ||error("Bad deprel")
+    (length(cost) == p.nmove)   ||error("Bad cost")
+    fill!(cost, typemax(Cost))
     n0 = p.wptr
     s0 = (p.sptr > 0 ? p.stack[p.sptr] : 0)
     s1 = (p.sptr > 1 ? p.stack[p.sptr-1] : 0)
@@ -379,16 +371,9 @@ label(p::ArcHybridR1, m::Move)=convert(DepRel,(m+1)>>1)
 ################################################################
 # Some general utility functions:
 
-function arc!(p::Parser, h::Position, d::Position, l::DepRel)
+function arc!(p::Parser, h::Integer, d::Integer, l::Integer)
     p.head[d] = h
     p.deprel[d] = l
-    if d < h
-        p.lcnt[h] += 1
-        p.ldep[h, p.lcnt[h]] = d
-    else
-        p.rcnt[h] += 1
-        p.rdep[h, p.rcnt[h]] = d
-    end
 end
 
 function Base.isequal(a::Parser, b::Parser)
@@ -397,18 +382,12 @@ function Base.isequal(a::Parser, b::Parser)
 end
 
 function Base.copy!(dst::Parser, src::Parser)
-    @assert dst.nword == src.nword
-    @assert dst.ndeps == src.ndeps
-    @assert dst.nmove == src.nmove
+    (dst.nword == src.nword && dst.ndeps == src.ndeps && dst.nmove == src.nmove) || error("Incompatible parsers")
     dst.wptr = src.wptr
     dst.sptr = src.sptr
     copy!(dst.stack, src.stack)
     copy!(dst.head, src.head)
     copy!(dst.deprel, src.deprel)
-    copy!(dst.lcnt, src.lcnt)
-    copy!(dst.rcnt, src.rcnt)
-    copy!(dst.ldep, src.ldep)
-    copy!(dst.rdep, src.rdep)
     dst
 end # copy!
 
@@ -420,10 +399,6 @@ function reset!(p::Parser)
     p.stack[:] = 0
     p.head[:] = 0
     p.deprel[:] = 0
-    p.lcnt[:] = 0
-    p.rcnt[:] = 0
-    p.ldep[:] = 0
-    p.rdep[:] = 0
     init!(p)
 end
 
