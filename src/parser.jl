@@ -412,6 +412,8 @@ function Base.copy!(dst::Parser, src::Parser)
     dst
 end # copy!
 
+Base.copy{T<:Parser}(src::T)=copy!(T(src.nword, src.ndeps), src)
+
 function reset!(p::Parser)
     p.wptr = 1
     p.sptr = 0
