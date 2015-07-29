@@ -1,6 +1,6 @@
 using CUDArt
 @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
-using KUparser, KUnet, HDF5, JLD, ArgParse, Compat
+using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, Dates
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -51,9 +51,9 @@ function parse_commandline()
         arg_type = Int
         #default = 100
         # Just start Julia with desired workers instead
-        "--ncpu"
-        help = "Number of workers for multithreaded parsing"
-        arg_type = Int
+        # "--ncpu"
+        # help = "Number of workers for multithreaded parsing"
+        # arg_type = Int
         #default = 16
         "--strain"
         help = "Number of sentences to parse for a training batch"
@@ -76,10 +76,11 @@ function parse_commandline()
         arg_type = Int
         default = 64
         "--adagrad"
-        help = "If nonzero apply adagrad using arg as epsilon"
-        arg_type = Float32
-        nargs = '+'
-        default = [1f-8]
+        help = "Use adagrad"
+        action = :store_true
+        # arg_type = Float32
+        # nargs = '+'
+        # default = [1f-8]
         "--dropout"
         help = "Dropout probability"
         arg_type = Float32
@@ -126,9 +127,70 @@ function parse_commandline()
     return args
 end
 
+function getscore(parses, corpus, ispunct)
+    if ispunct == nothing
+        @show e = evalparse(parses, corpus)
+        return e[1]
+    else
+        @show e = evalparse(parses, corpus; ispunct=ispunct)
+        return e[2]
+    end
+end
+
+function loaddata(files)
+    data = Corpus[]
+    deprel = postag = nothing
+    ndeps = 0
+    for f in files
+        info("Loading $f")
+        @time d=load(f)
+        push!(data, d["corpus"])
+        if deprel == nothing
+            deprel = d["deprel"]
+            postag = d["postag"]
+            ndeps = length(deprel)
+        else
+            @assert deprel == d["deprel"]
+            @assert postag == d["postag"]
+        end
+    end
+    return (data, ndeps)
+end
+
+function initnet(args, pt, ndeps)
+    net = Layer[]
+    !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][1]))
+    for h in args["hidden"]
+        append!(net, [Mmul(h), Bias(), Relu()])
+        !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][end]))
+    end
+    yrows = pt(1,ndeps).nmove
+    # We are removing normalization
+    #append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
+    append!(net, [Mmul(yrows), Bias()])
+    args["parser"]!="bparser" && push!(net, XentLoss())
+    for k in [fieldnames(KUparam)]
+        haskey(args, string(k)) || continue
+        v = args[string(k)]
+        if isempty(v)
+            continue
+        elseif length(v)==1
+            @eval setparam!($net; $k=$v[1])
+        else 
+            @assert length(v)==length(net) "$k should have 1 or $(length(net)) elements"
+            for i=1:length(v)
+                @eval setparam!($net[$i]; $k=$v[$i])
+            end
+        end
+    end
+    return net
+end
+
+
 function main()
     args = parse_commandline()
-    args["ncpu"] != nothing && warn("--ncpu deprecated, will be ignored, all nworkers=$(nworkers()) will be used")
+    @show nworkers()
+    # args["ncpu"] != nothing && warn("--ncpu deprecated, will be ignored, all nworkers=$(nworkers()) will be used")
     KUnet.gpu(!args["nogpu"])
     args["nogpu"] && blas_set_num_threads(20)
     args["seed"] >= 0 && setseed(args["seed"])
@@ -139,26 +201,26 @@ function main()
     net = (args["in"]==nothing ? initnet(args, pt, ndeps) : 
            !isfile(args["in"]) ? (warn("Cannot find net file, creating blank net"); args["in"]=nothing; initnet(args, pt, ndeps)) :
            (@date loadnet(args["in"])))
-    display(net)
+    display(net); println()
     ispunct = (args["ispunct"]==nothing ? nothing : eval(parse("KUparser."*args["ispunct"])))
     @show ispunct
     accuracy = Array(Float32, length(data))
     (bestscore,bestepoch,epoch)=(0,0,0)
     
     while true
-        @date println("\nepoch => $(epoch += 1)")
-
+        println("\n$(now()) epoch => $(epoch += 1)")
         icorpus=1
         corpus=data[icorpus]          # use data[1] as the training corpus
         parses=Any[]
         for c1=1:args["strain"]:length(corpus)
             c2=min(length(corpus), c1+args["strain"]-1)
-            @show (epoch, icorpus, c1, c2)
             sentences=sub(corpus, c1:c2)
+            @show (epoch, icorpus, c1, c2)
             if (args["parser"] == "oparser") # || ((epoch==1) && (args["in"]==nothing)))
                 @date p = oparse(pt, sentences, ndeps, nworkers(), feats)
             elseif (args["parser"] == "bparser")
-                @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], nworkers(); xy=true)
+                # @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], nworkers(); xy=true)
+                @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"]; xy=true)
             elseif (args["parser"] == "gparser")
                 @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], nworkers(); xy=true)
             else
@@ -166,14 +228,8 @@ function main()
             end
             @everywhere gc()
             # this does not work otherwise if nworkers()==1
-            @show typeof(p)
             nworkers()==1 && (p = Any[p])
-            @show typeof(p)
-            @show map(typeof,p)
-            @date for pxy in p
-                @show typeof(parses)
-                @show typeof(pxy)
-                @show map(typeof, pxy)
+            for pxy in p
                 append!(parses, pxy[1])
                 train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
             end
@@ -233,66 +289,15 @@ function main()
     end # while true
 end # main
 
-function getscore(parses, corpus, ispunct)
-    if ispunct == nothing
-        @show e = evalparse(parses, corpus)
-        return e[1]
-    else
-        @show e = evalparse(parses, corpus; ispunct=ispunct)
-        return e[2]
-    end
-end
-
-function loaddata(files)
-    data = Corpus[]
-    deprel = postag = nothing
-    ndeps = 0
-    for f in files
-        info("Loading $f")
-        @time d=load(f)
-        push!(data, d["corpus"])
-        if deprel == nothing
-            deprel = d["deprel"]
-            postag = d["postag"]
-            ndeps = length(deprel)
-        else
-            @assert deprel == d["deprel"]
-            @assert postag == d["postag"]
-        end
-    end
-    return (data, ndeps)
-end
-
-function initnet(args, pt, ndeps)
-    net = Layer[]
-    !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][1]))
-    for h in args["hidden"]
-        append!(net, [Mmul(h), Bias(), Relu()])
-        !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][end]))
-    end
-    yrows = pt(1,ndeps).nmove
-    # We are removing normalization
-    #append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
-    append!(net, [Mmul(yrows), Bias()])
-    for k in [fieldnames(KUparam)]
-        haskey(args, string(k)) || continue
-        v = args[string(k)]
-        if isempty(v)
-            continue
-        elseif length(v)==1
-            @eval setparam!($net; $k=$v[1])
-        else 
-            @assert length(v)==length(net) "$k should have 1 or $(length(net)) elements"
-            for i=1:length(v)
-                @eval setparam!($net[$i]; $k=$v[$i])
-            end
-        end
-    end
-    return net
-end
-
 main()
 
+
+
+
+
+
+
+# DEAD CODE
     # Initialize training set using oparse on first corpus
     # @date (p,x,y) = oparse(pt, data[1], ndeps, args["ncpu"], feats)
     # @date (p,x,y) = oparse(pt, data[1], ndeps, feats)
