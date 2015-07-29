@@ -22,13 +22,21 @@ type Beam
     function Beam{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
         p = pt(wcnt(s),ndeps)
         b = BeamState(p)
-        new(BeamState[b], BeamState[], s, false)
+        new(BeamState[b], BeamState[], s, !anyvalidmoves(p))
     end
 end
 
 typealias Batch Vector{Beam}
 
-
+# Life cycle of a Beam:
+# 1. bp_resize!: beam[] (one element, no fidx), cand[] empty
+# 2. bp_features: beam[i] gets fidx
+# 3. predict: score matrix filled
+# 4. bp_update_cand: cand (no parser/fidx) filled with children of beam, sorted
+# 5. bp_earlystop: cand[1:nbeam] does not have a 0-cost element stop here
+# 6. bp_update_beam: beam filled with top nbeam cand, parsers added
+# 7. anyvalidmoves: if beam[1] has no valid moves stop here
+# 8. goto step 2
 
 function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int,
                            feats::DFvec, net::Net, nbeam::Int, 
@@ -41,10 +49,10 @@ function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int,
         nf = 0
         while true
             nf1 = nf + 1
-            nf2 = nf = bp_features(batch, feats, fmatrix.arr, nf) # 6431
-            nf2 < nf1 && error("No features")
+            nf2 = nf = bp_features(batch, feats, fmatrix, nf) # 6431
+            nf2 < nf1 && break
             predict(net, sub(fmatrix,:,nf1:nf2), sub(score,:,nf1:nf2); batch=0) # 12785
-            bp_update(batch, score.arr, nbeam, xy) || break
+            bp_update(batch, score, nbeam, xy)
         end
         bp_result(parses, batch, fmatrix, xy)
     end # for s1=1:nbatch:length(corpus)
@@ -75,59 +83,57 @@ function bp_resize!{T<:Parser}(pt::Type{T}, corpus::Corpus, r::UnitRange{Int}, n
     resize!(score, (size(score,1), fcols))
 end
 
-function bp_features(batch::Batch, feats::DFvec, fmatrix::Matrix, nf::Int)
+function bp_features(batch::Batch, feats::DFvec, fmatrix::KUdense, nf::Int)
     for s in batch
         s.stop && continue
         for bs in s.beam
-            f = features(bs.parser, s.sent, feats, fmatrix, (nf+=1)) # 6589
+            size(fmatrix,2) > nf || error("Out of bounds")
+            f = features(bs.parser, s.sent, feats, fmatrix.arr, (nf+=1)) # 6589
             bs.fidx = nf
         end
     end
     return nf
 end
 
-function bp_update(batch::Batch, score::Matrix, nbeam::Int, xy::Bool)
-    stop = true
+function bp_update(batch::Batch, score::KUdense, nbeam::Int, xy::Bool)
     for s in batch
         s.stop && continue
         bp_update_cand(s, score) # 568
-        sort!(s.cand; rev=true) # 339
-        bp_update_beam(s, nbeam, xy) # 369
-        s.stop || (stop = false)
+        xy && (s.stop = bp_earlystop(s,nbeam)) && continue
+        bp_update_beam(s, nbeam) # 369
+        (s.stop = !anyvalidmoves(s.beam[1].parser)) && continue
     end
-    return !stop
 end
 
-function bp_update_cand(s::Beam, score::Matrix)
+function bp_update_cand(s::Beam, score::KUdense)
     resize!(s.cand,0)
     cost = Array(Cost, size(score,1))
     for bs in s.beam
         movecosts(bs.parser, s.sent.head, s.sent.deprel, cost) # 162
         for j=1:length(cost)
             cost[j] == typemax(Cost) && continue
-            push!(s.cand, BeamState(bs, j, bs.score + score[j,bs.fidx], bs.cost + cost[j])) # 1242
+            push!(s.cand, BeamState(bs, j, bs.score + score.arr[j,bs.fidx], bs.cost + cost[j])) # 1242
         end
     end
     (length(s.cand) > 0) || error("No candidates found")
+    sort!(s.cand; rev=true) # 339
 end
 
-function bp_update_beam(s::Beam, nbeam::Int, xy::Bool)
-    s.stop && error("cannot update stopped beam")
-    (nbeam <= 0) && error("nbeam<=0")
-    (nbeam > length(s.cand)) && (nbeam = length(s.cand))
-    if xy  # early stop if no 0 cost candidate in top nbeam
-        s.stop = true
-        for i=1:nbeam; (s.cand[i].cost == 0) && (s.stop = false; break); end
-        s.stop && return
+function bp_earlystop(s::Beam, nbeam::Int)
+    for i=1:min(nbeam,length(s.cand))
+        s.cand[i].cost == 0 && (return false)
     end
+    return true
+end
+
+function bp_update_beam(s::Beam, nbeam::Int)
     resize!(s.beam,0)
-    for i=1:nbeam
+    for i=1:min(nbeam, length(s.cand))
         bc = s.cand[i]
         bc.parser = copy(bc.parent.parser)     # 378
         move!(bc.parser, bc.move)              # 20
         push!(s.beam, bc)                      # 3
     end
-    anyvalidmoves(s.beam[1].parser) || (s.stop = true)
 end
 
 function bp_result(parses, batch::Batch) # no xy version
@@ -138,7 +144,7 @@ end
 
 function bp_result(parses, batch::Batch, fmatrix::KUdense, xy::Bool) # xy version
     xy || (return bp_result(parses,batch))
-    (p, x, y) = parses      # TODO: check if pxy by reference
+    (p, x, y) = parses
     (mx,nx) = size(x)
     nf = size(fmatrix,2)
     resize!(x, (size(x,1), nx+nf))
@@ -148,8 +154,8 @@ function bp_result(parses, batch::Batch, fmatrix::KUdense, xy::Bool) # xy versio
     for s in batch
         push!(p, s.beam[1].parser)
         bp_softmax(s, grad)
-        for i=1:length(s.beam)
-            bs = s.beam[i]
+        for i=1:length(s.cand)
+            bs = s.cand[i]
             bs.cost == 0 && (grad[i] -= 1) # loss gradient is p for bad paths, p-1 for good paths
             while bs.parent != NullBeamState
                 fidx = bs.parent.fidx
@@ -164,7 +170,7 @@ function bp_result(parses, batch::Batch, fmatrix::KUdense, xy::Bool) # xy versio
                 bs = bs.parent
             end
         end
-        # print_beam(s, y.arr, f2x)
+        s.sent.form[1]=="Influential" && print_beam(s, y.arr, f2x)
     end
     resize!(x, (size(x,1), nx))
     resize!(y, (size(y,1), nx))
@@ -173,19 +179,24 @@ end
 function bp_softmax(s::Beam, prob::Vector{Float64})
     smax = typemin(Float64)
     z = zero(Float64)
-    nb = length(s.beam)
-    resize!(prob, nb)
-    for bs in s.beam; bs.score > smax && (smax = bs.score); end
-    for i=1:nb; prob[i] = exp(s.beam[i].score - smax); z += prob[i]; end
-    for i=1:nb; prob[i] /= z; end
+    nc = length(s.cand)
+    resize!(prob, nc)
+    for bc in s.cand; bc.score > smax && (smax = bc.score); end
+    for i=1:nc; prob[i] = exp(s.cand[i].score - smax); z += prob[i]; end
+    for i=1:nc; prob[i] /= z; end
 end
 
 function print_beam(s::Beam, y::Matrix, f2x::Vector{Int})
     for i = 1:length(s.beam)
-        bs = s.beam[i]
+        # bs = s.beam[i]
+        bs = s.cand[i]
         while bs.parent != NullBeamState
+            parent_id = hash(bs.parent.parser) & 0xff
+            parser_id = isdefined(bs,:parser) ? hash(bs.parser) & 0xff : 0
+            grad = y[bs.move, f2x[bs.parent.fidx]]
+            @printf "%02x/%+.2f/%.2f/%d/%02x " parser_id grad bs.score bs.cost parent_id
             # print("$(bs.score)/$(bs.cost)/$(bs.grad) ")
-            @printf "%.2f/%d/%d/%d/%+f " bs.score bs.cost bs.fidx bs.parent.fidx y[bs.move, f2x[bs.parent.fidx]]
+            # @printf "%.2f/%d/%d/%d/%+f " bs.score bs.cost bs.fidx bs.parent.fidx y[bs.move, f2x[bs.parent.fidx]]
             # print("$(bs.fidx) ")
             # print("$(pointer(bs.parser.head)) ")
             bs = bs.parent
@@ -255,3 +266,8 @@ end
         # print_beam(s); println()
         # we need to put bs.parent.fidx into x, y[bs.move]+=bs.grad, multiple children can update same y
 
+    # if xy
+    #     @show map(typeof, parses)
+    #     @show map(size, parses)
+    #     parses = (parses[1], parses[2].arr, parses[3].arr)
+    # end
