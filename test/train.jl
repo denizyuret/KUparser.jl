@@ -142,8 +142,8 @@ function loaddata(files)
     deprel = postag = nothing
     ndeps = 0
     for f in files
-        info("Loading $f")
-        @time d=load(f)
+        @show f
+        @date d=load(f)
         push!(data, d["corpus"])
         if deprel == nothing
             deprel = d["deprel"]
@@ -158,17 +158,23 @@ function loaddata(files)
 end
 
 function initnet(args, pt, ndeps)
-    net = Layer[]
-    !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][1]))
-    for h in args["hidden"]
-        append!(net, [Mmul(h), Bias(), Relu()])
-        !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][end]))
+    if isfile(args["in"])
+        @date net = loadnet(args["in"])
+    else
+        if args["in"] != nothing
+            warn("Cannot find net file, creating blank net")
+            args["in"] = nothing
+        end
+        net = Layer[]
+        length(args["dropout"]) > 1 && push!(net, Drop(args["dropout"][1]))
+        for h in args["hidden"]
+            append!(net, [Mmul(h), Bias(), Relu()])
+            !isempty(args["dropout"]) && push!(net, Drop(args["dropout"][end]))
+        end
+        yrows = pt(1,ndeps).nmove
+        append!(net, [Mmul(yrows), Bias()])
+        args["parser"]!="bparser" && push!(net, XentLoss())
     end
-    yrows = pt(1,ndeps).nmove
-    # We are removing normalization
-    #append!(net, [Mmul(yrows), Bias(), Logp(), LogpLoss()])
-    append!(net, [Mmul(yrows), Bias()])
-    args["parser"]!="bparser" && push!(net, XentLoss())
     for k in [fieldnames(KUparam)]
         haskey(args, string(k)) || continue
         v = args[string(k)]
@@ -198,9 +204,7 @@ function main()
     @show (map(size, data), ndeps)
     @show feats = eval(parse("Flist."*args["feats"]))
     @show pt = eval(parse(args["arctype"]))
-    net = (args["in"]==nothing ? initnet(args, pt, ndeps) : 
-           !isfile(args["in"]) ? (warn("Cannot find net file, creating blank net"); args["in"]=nothing; initnet(args, pt, ndeps)) :
-           (@date loadnet(args["in"])))
+    net = initnet(args, pt, ndeps)
     display(net); println()
     ispunct = (args["ispunct"]==nothing ? nothing : eval(parse("KUparser."*args["ispunct"])))
     @show ispunct
@@ -227,11 +231,12 @@ function main()
                 error("Unknown parser")
             end
             @everywhere gc()
+            @show map(size, p)
             # this does not work otherwise if nworkers()==1
             nworkers()==1 && (p = Any[p])
             for pxy in p
                 append!(parses, pxy[1])
-                train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
+                @date train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
             end
         end
         accuracy[icorpus] = getscore(parses, corpus, ispunct)
@@ -247,7 +252,8 @@ function main()
                 if in(args["parser"], ("oparser", "gparser"))
                     @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], nworkers(); xy=false)
                 elseif (args["parser"] == "bparser")
-                    @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], nworkers(); xy=false)
+                    # @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"], nworkers(); xy=false)
+                    @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"], args["pbatch"]; xy=false)
                 else
                     error("Unknown parser")
                 end
