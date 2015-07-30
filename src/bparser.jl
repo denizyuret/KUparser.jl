@@ -154,9 +154,10 @@ function bp_result(parses, batch::Batch, fmatrix::KUdense, xy::Bool) # xy versio
     for s in batch
         push!(p, s.beam[1].parser)
         bp_softmax(s, grad)
+        foundgold = false       # in case there is more than one, only treat the highest scoring zero cost answer as gold
         for i=1:length(s.cand)
             bs = s.cand[i]
-            bs.cost == 0 && (grad[i] -= 1) # loss gradient is p for bad paths, p-1 for good paths
+            bs.cost == 0 && !foundgold && (foundgold=true; grad[i] -= 1)
             while bs.parent != NullBeamState
                 fidx = bs.parent.fidx
                 xidx = f2x[fidx]
