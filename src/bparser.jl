@@ -188,18 +188,22 @@ end
 
 function print_beam(s::Beam, y::Matrix, f2x::Vector{Int})
     for i = 1:length(s.beam)
-        # bs = s.beam[i]
         bs = s.cand[i]
+        ba = Array(BeamState,0)
         while bs.parent != NullBeamState
-            parent_id = hash(bs.parent.parser) & 0xff
+            unshift!(ba, bs)
+            bs = bs.parent
+        end
+        for bs in ba
+            parent_id = isdefined(bs.parent,:parser) ? hash(bs.parent.parser) & 0xff : 0
             parser_id = isdefined(bs,:parser) ? hash(bs.parser) & 0xff : 0
             grad = y[bs.move, f2x[bs.parent.fidx]]
-            @printf "%02x/%+.2f/%.2f/%d/%02x " parser_id grad bs.score bs.cost parent_id
+            @printf "%02x/%d/%.2f/%+.2f/%02x " parent_id bs.cost bs.score grad parser_id 
             # print("$(bs.score)/$(bs.cost)/$(bs.grad) ")
             # @printf "%.2f/%d/%d/%d/%+f " bs.score bs.cost bs.fidx bs.parent.fidx y[bs.move, f2x[bs.parent.fidx]]
             # print("$(bs.fidx) ")
             # print("$(pointer(bs.parser.head)) ")
-            bs = bs.parent
+            # bs = bs.parent
         end
         println()
     end
