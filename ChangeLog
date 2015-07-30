@@ -1,3 +1,134 @@
+2015-07-30  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* foo0729*: In both experiments the accuracy steadily went down.
+	I think one problem is with batch normalization:
+
+	* NORMALIZATION: Our loss function is similar to xentloss.
+	XentLoss scales loss and gradients over the training batch, so the
+	update size is independent of the training batch size.
+
+	Note that training batch is different from parsing batch, number
+	of sentences, etc.  train.jl defines these batch sizes:
+	--strain: corpus is parsed strain sentences at a time.
+	--pbatch: parser works on pbatch sentences in parallel.
+	--nworkers: if multi-cpu, each cpu gets strain/nworkers sentences.
+	this results in nworkers xy chunks each for strain/nworkers sentences.
+	these chunks are fed to train.
+	--tbatch: train processes these chunks tbatch instances at a time.
+	xentloss uses the gradient
+
+	   (y[i,j]-p[i,j])/tbatch
+
+	where y[i,j] is the normalized output for move i instance j,
+	i.e. sum_i y[i,j]=1, and p[i,j] is gold probabilities.  The loss
+	function is
+
+	   [sum_j [sum_i -p[i,j]*log(y[i,j])]]/tbatch
+
+	i.e. we are computing per-training-instance loss and its gradient.
+	sum_i (y[i,j]) = 1, so sum_j sum_i y[i,j] = tbatch, and the part
+	of the gradient that comes from y is normalized to 1 for any
+	training batch size.  We want the final step sizes to be
+	independent of training batch size.
+
+	In bparse the probabilities are over sentences and we are not
+	doing any normalization.  We have ns sentences each with nb beams
+	each with nt[s] moves.  We normalize probabilities over
+	candidates, so forall s,t sum_b y[s,b,t]=1.  We create O(ns*nb*nt)
+	instances.  The total y is sum_sbt y[s,b,t]=O(ns*nt).  Per
+	instance y is between 1 and 1/nb.  We should use 1/tbatch as our
+	scaling factor.
+
+	Adding ScalLoss as a loss layer to do the scaling.  Testing on
+	foo0730bp.net which is foo0729bp.net with an extra ScalLoss layer.
+	After fixing the scaling problems lr=0.00011 seems to work best.
+	Restarting yesterday's experiments:
+
+
+	* TODO: why didn't percloss complain when perclossback did not have 1/nx scaling?
+
+	* src/bparser.jl: TODO: Consider no append in bp_result, just
+	return individual pxy pairs just like in the multi-cpu case.
+
+2015-07-29  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* test/foo5-adagrad.log: training with dev only we can only get
+	.31 penetration, i.e. .31 of the parsing is complete before early
+	stop.  adagrad slowing down too much?  how does this compare to
+	gparser?  what is the actual parsing performance without early
+	stop?
+
+	- train gparser to find the right capacity network for 100%
+	accuracy using dev:
+	;; julia train.jl --parser gparser --arctype ArcEager13 --feats zn11cpv --epochs 20 --hidden 4096 --lr 0.01 --adagrad yatbazp.dev.jld4
+	(0.9953635615823716,0.9973827883154163,0.9949647281701024,0.9969325153374233,0.9382352941176471,0.9311764705882353)
+	saved the net as foo0719gp.net
+	single 4096 hidden layer is enough
+
+	- train bparser using same initial network and print the first
+	sentence beam.  Same initial network gives 0.8867 (0.6770 with
+	early stop) with nbeam=8, .8492 with nbeam=64, confirmed .9954
+	with nbeam=1.
+
+	stripped foo0719gp.net of its ada matrices and saved as
+	foo0719bp.net.  Optimum lr=0.0001 from that start.  Starting with
+	that training bparser with options:
+
+	@@psub -N foo0729bp3 julia train.jl --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 5000 --hidden 4096 --lr 0.0001 --adagrad --nbeam 8 --in foo0729bp.net --out foo0729bp3.net yatbazp.dev.jld4
+
+	Seems stuck at 0.89 at epoch 30.  We could experiment with
+	resetting adagrad.  Also would be interesting to find out what the
+	accuracy is without earlystop and with other beam sizes:
+
+	nbeam	accuracy
+	1	9731	; interesting that this is the highest
+	2	9705	; zzhc15 claims beam=100 better
+	4	9660
+	8	9638	; this corresponds to 0.89 with earlystop
+	16	9586
+	32	9518
+
+	Is this fall because we started with a greedy trained net?
+
+	Trying resetting adagrad, wrote adastrip.jl, applying to
+	foo0729bp3.net to get foo0729bp3.net.adastrip.  Starting with
+	.8925 and a blank ada matrix, this time the best lr=0.0002 gives
+	.90236 in 1 epoch.  Starting with this:
+
+	@@psub -N foo0729bp5 julia train.jl --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 5000 --lr 0.0002 --adagrad --nbeam 8 --in foo0729bp3.net.adastrip --out foo0729bp5.net yatbazp.dev.jld4
+
+	If this works, we need to come up with a way to reset adagrad once
+	in a while.
+
+	- Best result on yatbazp.dev.jld4 is from zn11beam4.net2, nbeam=1:
+	(0.915322681157614,0.9260145213035402,0.9049280853503502,0.9145044183035965,0.4123529411764706,0.3729411764705882)
+
+	Use this as starting point and do structured training.  Single cpu
+	will take 20 mins/epoch with nbeam=8.  zn11beam4.net3 is the
+	version without the final Logp and LogpLoss layers.
+
+	@@psub -N foo0729bp4 julia train.jl --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 5000 --lr 0.0001 --adagrad --nbeam 8 --in nets/zn11beam4.net2 --best foo0729bp4.net --pbatch 2500 yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+
+	* TODO:
+	- rething parser calling convention.  ncpu unnecessary parallel if
+	nworkers()>1.  nbatch named option.
+	x train.jl should not oparse every iteration: can't do that when
+	we have batches.
+
+2015-07-28  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* test/foo2.jl: problem: the example net I am using only works
+	well with the final Logp layer in beam search.
+
+	* src/bparser.jl: current best: 24.95 secs for
+	nets/zn11beam4.net2 yatbazp.dev.jld4 nbeam=64 [1:100]
+
+	22.65: compute ldep/rdep internally in features.jl
+	TODO: removed ldep/rdep from parser.jl, need to fix sfeatures.jl
+
+	21.42: allow ldep/rdep to be uninitialized.
+	19.67: after cleanup of features.jl, bparser.jl.
+
 2015-07-27  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* profile: features.pl not having ldep/rdep adds 10% to time.  on
