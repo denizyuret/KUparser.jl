@@ -2,7 +2,7 @@ using CUDArt
 
 _getbytes(x::DataType,d) = sizeof(x)
 
-_getbytes(x::NTuple,d)=(length(x) * sizeof(eltype(x)))
+_getbytes(x::NTuple,d)=sum(map(y->_getbytes(y,d), x))
 
 _getbytes(x::AbstractCudaArray,d)=(haskey(d,x) ? 0 : (d[x]=1; length(x) * sizeof(eltype(x))))
 

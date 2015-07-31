@@ -9,7 +9,7 @@ include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR
 include("sfeatures.jl");
 include("features.jl");   export Fvec, flen, xsize, ysize
 include("gparser.jl");    export gparse
-include("bparser.jl");    export bparse
+include("bparser.jl");    export bparse, bparse_pmap
 include("oparser.jl");    export oparse
 include("rparser.jl");    export rparse
 include("flist.jl");      export Flist

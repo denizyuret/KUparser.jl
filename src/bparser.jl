@@ -38,25 +38,41 @@ typealias Batch Vector{Beam}
 # 7. anyvalidmoves: if beam[1] has no valid moves stop here
 # 8. goto step 2
 
+function bparse_pmap{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int,
+                                feats::DFvec, net::Net, nbeam::Int;
+                                nbatch::Int=1, xy::Bool=false)
+    d = distribute(corpus)
+    net = testnet(net)
+    @date "pmap Starting"
+    p = pmap(procs(d)) do x
+        bparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam; nbatch=nbatch, xy=xy)
+    end
+    @date "pmap Finished"
+    return p
+end
+
 function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int,
-                           feats::DFvec, net::Net, nbeam::Int, 
-                           nbatch::Int=1; xy::Bool=false)
+                           feats::DFvec, net::Net, nbeam::Int;
+                           nbatch::Int=1, xy::Bool=false)
+    @date "bparse Starting"
     (nbatch < 1 || nbatch > length(corpus)) && (nbatch = length(corpus))
     (parses, batch, fmatrix, score) = bp_init(pt, corpus, ndeps, feats, xy)
     for s1=1:nbatch:length(corpus)
         s2=min(length(corpus), s1+nbatch-1)                                     
-        bp_resize!(pt, corpus, s1:s2, ndeps, nbeam, batch, fmatrix, score) # 34
+        bp_resize!(pt, corpus, s1:s2, ndeps, nbeam, batch, fmatrix, score) # :86
         nf = 0
         while true
             nf1 = nf + 1
-            nf2 = nf = bp_features(batch, feats, fmatrix, nf) # 6431
+            nf2 = nf = bp_features(batch, feats, fmatrix, nf) # :35152
             nf2 < nf1 && break
-            predict(net, sub(fmatrix,:,nf1:nf2), sub(score,:,nf1:nf2); batch=0) # 12785
-            bp_update(batch, score, nbeam, xy)
+            predict(net, sub(fmatrix,:,nf1:nf2), sub(score,:,nf1:nf2); batch=0) # :26933
+            bp_update(batch, score, nbeam, xy) # :10750
         end
-        bp_result(parses, batch, fmatrix, xy)
+        # @show nf
+        bp_result(parses, batch, fmatrix, xy) # :1
     end # for s1=1:nbatch:length(corpus)
-    return parses
+    @date "bparse Finished"
+    return (xy ? (parses[1], copy(parses[2].arr), copy(parses[3].arr)) : parses)
 end # function bparse
 
 function bp_init{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, xy::Bool)
@@ -79,6 +95,7 @@ function bp_resize!{T<:Parser}(pt::Type{T}, corpus::Corpus, r::UnitRange{Int}, n
         nword += wcnt(corpus[i])
     end
     fcols = 2*nword*nbeam
+    # @show fcols
     resize!(fmatrix, (size(fmatrix,1), fcols))
     resize!(score, (size(score,1), fcols))
 end
@@ -88,7 +105,7 @@ function bp_features(batch::Batch, feats::DFvec, fmatrix::KUdense, nf::Int)
         s.stop && continue
         for bs in s.beam
             size(fmatrix,2) > nf || error("Out of bounds")
-            f = features(bs.parser, s.sent, feats, fmatrix.arr, (nf+=1)) # 6589
+            f = features(bs.parser, s.sent, feats, fmatrix.arr, (nf+=1)) # :35029
             bs.fidx = nf
         end
     end
@@ -98,9 +115,9 @@ end
 function bp_update(batch::Batch, score::KUdense, nbeam::Int, xy::Bool)
     for s in batch
         s.stop && continue
-        bp_update_cand(s, score) # 568
+        bp_update_cand(s, score) # :5128
         xy && (s.stop = bp_earlystop(s,nbeam)) && continue
-        bp_update_beam(s, nbeam) # 369
+        bp_update_beam(s, nbeam) # :5604
         (s.stop = !anyvalidmoves(s.beam[1].parser)) && continue
     end
 end
@@ -112,7 +129,7 @@ function bp_update_cand(s::Beam, score::KUdense)
         movecosts(bs.parser, s.sent.head, s.sent.deprel, cost) # 162
         for j=1:length(cost)
             cost[j] == typemax(Cost) && continue
-            push!(s.cand, BeamState(bs, j, bs.score + score.arr[j,bs.fidx], bs.cost + cost[j])) # 1242
+            push!(s.cand, BeamState(bs, j, bs.score + score.arr[j,bs.fidx], bs.cost + cost[j])) # :4119
         end
     end
     (length(s.cand) > 0) || error("No candidates found")
@@ -130,7 +147,7 @@ function bp_update_beam(s::Beam, nbeam::Int)
     resize!(s.beam,0)
     for i=1:min(nbeam, length(s.cand))
         bc = s.cand[i]
-        bc.parser = copy(bc.parent.parser)     # 378
+        bc.parser = copy(bc.parent.parser)     # :5480
         move!(bc.parser, bc.move)              # 20
         push!(s.beam, bc)                      # 3
     end
@@ -171,8 +188,9 @@ function bp_result(parses, batch::Batch, fmatrix::KUdense, xy::Bool) # xy versio
                 bs = bs.parent
             end
         end
-        s.sent.form[1]=="Influential" && print_beam(s, y.arr, f2x)
+        # s.sent.form[1]=="Influential" && print_beam(s, y.arr, f2x)
     end
+    # @show nx
     resize!(x, (size(x,1), nx))
     resize!(y, (size(y,1), nx))
 end

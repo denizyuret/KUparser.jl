@@ -49,7 +49,7 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
     xrows = size(x,1)
     xtype = eltype(x)
     x1 = one(xtype)
-    x[:,xcol] = zero(xtype)     # 366
+    x[:,xcol] = zero(xtype)     # :1800
     nx = 0                      # last entry in x
     nv = wrows >> 1             # size of word/context vector, assumes word vec and context vec concatenated
     nd = p.ndeps
@@ -58,8 +58,8 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
 
     ldep = Array(Vector{Int}, nw)
     rdep = Array(Vector{Int}, nw)
-    lset = zeros(xtype, nd, nw)      # 82
-    rset = zeros(xtype, nd, nw)      # 980
+    lset = zeros(xtype, nd, nw)
+    rset = zeros(xtype, nd, nw)
     for d=1:nw
         h=int(p.head[d])        # 493
         if h==0
@@ -116,10 +116,10 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
         n == length(f) || error("n!=length(f)")
         fn = f[n]               # 23
         if fn == 'v'        # 293
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) # 314
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) # :7976
             nx += nv
         elseif fn == 'c'    # 123
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) # 489
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) # :8873
             nx += nv
         elseif fn == 'p'    # 4
             (a>0) && (s.postag[a] > np) && error("postag out of bound") # 147
@@ -139,10 +139,10 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
             (a>0) && (rcnt=(isdefined(rdep,a) ? length(rdep[a]) : 0); x[nx+1+(rcnt>9?9:rcnt), xcol] = x1) # 28  0-9
             nx += 10
         elseif fn == 'A'
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, lset, (a-1)*nd+1, nd) # 266
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, lset, (a-1)*nd+1, nd) # :4245
             nx += nd
         elseif fn == 'B'
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, rset, (a-1)*nd+1, nd) # 33
+            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, rset, (a-1)*nd+1, nd) # :126
             nx += nd
         else
             error("Unknown feature $(fn)") # 3
