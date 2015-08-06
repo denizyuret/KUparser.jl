@@ -73,82 +73,82 @@ zn11cpv = DFeature["sA","nA","sa","na","sB","sb","sd",
 
 # The original zn11 set in sparse format with feature conjunctions
 zn11orig = SFeature[
-["sw"]                  # STw		StackWord
-["sp"]                  # STt		StackTag
-["sw","sp"]             # STwt		StackWordTag
-["nw"]                  # N0w		NextWord
-["np"]                  # N0t		NextTag
-["nw","np"]             # N0wt		NextWordTag
-["n1w"]                 # N1w		Next+1Word
-["n1p"]                 # N1t		Next+1Tag
-["n1w","n1p"]           # N1wt		Next+1WordTag
-["n2w"]                 # N2w		Next+2Word
-["n2p"]                 # N2t		Next+2Tag
-["n2w","n2p"]           # N2wt		Next+2WordTag
-["shw"]                 # STHw		StackHeadWord
-["shp"]                 # STHt		StackHeadTag
-["sL"]                  # STi		StackLabel
-["sh2w"]                # STHHw		StackHeadHeadWord
-["sh2p"]                # STHHt		StackHeadHeadTag
-["shL"]                 # STHi		StackLabel ?? StackHeadLabel
-["slw"]                 # STLDw		StackLDWord
-["slp"]                 # STLDt		StackLDTag
-["slL"]                 # STLDi		StackLDLabel
-["srw"]                 # STRDw		StackRDWord
-["srp"]                 # STRDt		StackRDTag
-["srL"]                 # STRDi		StackRDLabel
-["nlw"]                 # N0LDw		NextLDWord
-["nlp"]                 # N0LDt		NextLDTag
-["nlL"]                 # N0LDi		NextLDLabel
-["sl2w"]                # STL2Dw	StackL2DWord
-["sl2p"]                # STL2Dt	StackL2DTag
-["sl2L"]                # STL2Di	StackL2DLabel
-["sr2w"]                # STR2Dw	StackR2DWord
-["sr2p"]                # STR2Dt	StackR2DTag
-["sr2L"]                # STR2Di	StackR2DLabel
-["nl2w"]                # N0L2Dw	NextL2DWord
-["nl2p"]                # N0L2Dt	NextL2DTag
-["nl2L"]                # N0L2Di	NextL2DLabel
+["sw"],                  # STw		StackWord
+["sp"],                  # STt		StackTag
+["sw","sp"],             # STwt		StackWordTag
+["nw"],                  # N0w		NextWord
+["np"],                  # N0t		NextTag
+["nw","np"],             # N0wt		NextWordTag
+["n1w"],                 # N1w		Next+1Word
+["n1p"],                 # N1t		Next+1Tag
+["n1w","n1p"],           # N1wt		Next+1WordTag
+["n2w"],                 # N2w		Next+2Word
+["n2p"],                 # N2t		Next+2Tag
+["n2w","n2p"],           # N2wt		Next+2WordTag
+["shw"],                 # STHw		StackHeadWord
+["shp"],                 # STHt		StackHeadTag
+["sL"],                  # STi		StackLabel
+["sh2w"],                # STHHw		StackHeadHeadWord
+["sh2p"],                # STHHt		StackHeadHeadTag
+["shL"],                 # STHi		StackLabel ?? StackHeadLabel
+["slw"],                 # STLDw		StackLDWord
+["slp"],                 # STLDt		StackLDTag
+["slL"],                 # STLDi		StackLDLabel
+["srw"],                 # STRDw		StackRDWord
+["srp"],                 # STRDt		StackRDTag
+["srL"],                 # STRDi		StackRDLabel
+["nlw"],                 # N0LDw		NextLDWord
+["nlp"],                 # N0LDt		NextLDTag
+["nlL"],                 # N0LDi		NextLDLabel
+["sl2w"],                # STL2Dw	StackL2DWord
+["sl2p"],                # STL2Dt	StackL2DTag
+["sl2L"],                # STL2Di	StackL2DLabel
+["sr2w"],                # STR2Dw	StackR2DWord
+["sr2p"],                # STR2Dt	StackR2DTag
+["sr2L"],                # STR2Di	StackR2DLabel
+["nl2w"],                # N0L2Dw	NextL2DWord
+["nl2p"],                # N0L2Dt	NextL2DTag
+["nl2L"],                # N0L2Di	NextL2DLabel
 			## HTw		HeadStackWord
 			## HTt		HeadStackTag
 			## HTwt		HeadStackWordTag
-["sw","sp","nw","np"]	# STwtN0wt	StackWordTagNextWordTag
-["sw","sp","nw"]	# STwtN0w	StackWordTagNextWord
-["sw","nw","np"]	# STwN0wt	StackWordNextWordTag
-["sp","nw","np"]	# STtN0wt	StackTagNextWordTag
-["sw","sp","np"]	# STwtN0t	StackWordTagNextTag
-["sw","nw"]             # STwN0w	StackWordNextWord
-["sp","np"]             # STtN0t	StackTagNextTag
-["np","n1p"]            # N0tN1t	NextTagNext+1Tag
-["np","n1p","n2p"]	# N0tN1tN2t	NextTagTrigram
-["sp","np","n1p"]	# STtN0tN1t	StackTagNextTagNext+1Tag
-["sp","np","nlp"]	# STtN0tN0LDt	StackTagNextTagNextLDTag
-["np","nlp","nl2p"]     # N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextL2DTag
-["shp","sp","np"]       # STHtSTtN0t	StackHeadTagStackTagNextTag
+["sw","sp","nw","np"],	# STwtN0wt	StackWordTagNextWordTag
+["sw","sp","nw"],	# STwtN0w	StackWordTagNextWord
+["sw","nw","np"],	# STwN0wt	StackWordNextWordTag
+["sp","nw","np"],	# STtN0wt	StackTagNextWordTag
+["sw","sp","np"],	# STwtN0t	StackWordTagNextTag
+["sw","nw"],             # STwN0w	StackWordNextWord
+["sp","np"],             # STtN0t	StackTagNextTag
+["np","n1p"],            # N0tN1t	NextTagNext+1Tag
+["np","n1p","n2p"],	# N0tN1tN2t	NextTagTrigram
+["sp","np","n1p"],	# STtN0tN1t	StackTagNextTagNext+1Tag
+["sp","np","nlp"],	# STtN0tN0LDt	StackTagNextTagNextLDTag
+["np","nlp","nl2p"],     # N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextL2DTag
+["shp","sp","np"],       # STHtSTtN0t	StackHeadTagStackTagNextTag
 			## HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
-["sh2p","shp","sp"]     # STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
-["sp","slp","np"]       # STtSTLDtN0t	StackTagStackLDTagNextTag
-["sp","slp","sl2p"]     # STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
-["sp","srp","np"]       # STtSTRDtN0t	StackTagStackRDTagNextTag
-["sp","srp","sr2p"]     # STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
-["sw","sd"]             # STwd		StackWordDist
-["sp","sd"]             # STtd		StackTagDist
-["nw","sd"]             # N0wd		NextWordDist
-["np","sd"]             # N0td		NextTagDist
-["sw","nw","sd"]        # STwN0wd	StackWordNextWordDist
-["sp","np","sd"]        # STtN0td	StackTagNextTagDist
-["sw","sb"]             # STwra		StackWordRightArity
-["sp","sb"]             # STtra		StackTagRightArity
-["sw","sa"]             # STwla		StackWordLeftArity
-["sp","sa"]             # STtla		StackTagLeftArity
-["nw","na"]             # N0wla		NextWordRightArity ?? NextWordLeftArity
-["np","na"]             # N0tla		NextTagRightArity  ?? NextTagLeftArity
-["sw","sB"]             # STwrp		StackWordRightSetoftags
-["sp","sB"]             # STtrp		StackTagRightSetoftags
-["sw","sA"]             # STwlp		StackWordLeftSetoftags
-["sp","sA"]             # STtlp		StackTagLeftSetoftags
-["nw","nA"]             # N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
-["np","nA"]             # N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
+["sh2p","shp","sp"],     # STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
+["sp","slp","np"],       # STtSTLDtN0t	StackTagStackLDTagNextTag
+["sp","slp","sl2p"],     # STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
+["sp","srp","np"],       # STtSTRDtN0t	StackTagStackRDTagNextTag
+["sp","srp","sr2p"],     # STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
+["sw","sd"],             # STwd		StackWordDist
+["sp","sd"],             # STtd		StackTagDist
+["nw","sd"],             # N0wd		NextWordDist
+["np","sd"],             # N0td		NextTagDist
+["sw","nw","sd"],        # STwN0wd	StackWordNextWordDist
+["sp","np","sd"],        # STtN0td	StackTagNextTagDist
+["sw","sb"],             # STwra		StackWordRightArity
+["sp","sb"],             # STtra		StackTagRightArity
+["sw","sa"],             # STwla		StackWordLeftArity
+["sp","sa"],             # STtla		StackTagLeftArity
+["nw","na"],             # N0wla		NextWordRightArity ?? NextWordLeftArity
+["np","na"],             # N0tla		NextTagRightArity  ?? NextTagLeftArity
+["sw","sB"],             # STwrp		StackWordRightSetoftags
+["sp","sB"],             # STtrp		StackTagRightSetoftags
+["sw","sA"],             # STwlp		StackWordLeftSetoftags
+["sp","sA"],             # STtlp		StackTagLeftSetoftags
+["nw","nA"],             # N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
+["np","nA"],             # N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
 			## STl		StackLemma
 			## STc		StackCPOS
 			## STf		StackFeats
@@ -162,89 +162,89 @@ zn11orig = SFeature[
 
 # The reduced zn11 set in sparse format with singleton features
 zn11single = SFeature[
-["sw"]                  # STw		StackWord
-["sp"]                  # STt		StackTag
-#["sw","sp"]             # STwt		StackWordTag
-["nw"]                  # N0w		NextWord
-["np"]                  # N0t		NextTag
-#["nw","np"]             # N0wt		NextWordTag
-["n1w"]                 # N1w		Next+1Word
-["n1p"]                 # N1t		Next+1Tag
-#["n1w","n1p"]           # N1wt		Next+1WordTag
-["n2w"]                 # N2w		Next+2Word
-["n2p"]                 # N2t		Next+2Tag
-#["n2w","n2p"]           # N2wt		Next+2WordTag
-["shw"]                 # STHw		StackHeadWord
-["shp"]                 # STHt		StackHeadTag
-["sL"]                  # STi		StackLabel
-["sh2w"]                # STHHw		StackHeadHeadWord
-["sh2p"]                # STHHt		StackHeadHeadTag
-["shL"]                 # STHi		StackLabel ?? StackHeadLabel
-["slw"]                 # STLDw		StackLDWord
-["slp"]                 # STLDt		StackLDTag
-["slL"]                 # STLDi		StackLDLabel
-["srw"]                 # STRDw		StackRDWord
-["srp"]                 # STRDt		StackRDTag
-["srL"]                 # STRDi		StackRDLabel
-["nlw"]                 # N0LDw		NextLDWord
-["nlp"]                 # N0LDt		NextLDTag
-["nlL"]                 # N0LDi		NextLDLabel
-["sl2w"]                # STL2Dw	StackL2DWord
-["sl2p"]                # STL2Dt	StackL2DTag
-["sl2L"]                # STL2Di	StackL2DLabel
-["sr2w"]                # STR2Dw	StackR2DWord
-["sr2p"]                # STR2Dt	StackR2DTag
-["sr2L"]                # STR2Di	StackR2DLabel
-["nl2w"]                # N0L2Dw	NextL2DWord
-["nl2p"]                # N0L2Dt	NextL2DTag
-["nl2L"]                # N0L2Di	NextL2DLabel
+["sw"],                  # STw		StackWord
+["sp"],                  # STt		StackTag
+#["sw","sp"],             # STwt		StackWordTag
+["nw"],                  # N0w		NextWord
+["np"],                  # N0t		NextTag
+#["nw","np"],             # N0wt		NextWordTag
+["n1w"],                 # N1w		Next+1Word
+["n1p"],                 # N1t		Next+1Tag
+#["n1w","n1p"],           # N1wt		Next+1WordTag
+["n2w"],                 # N2w		Next+2Word
+["n2p"],                 # N2t		Next+2Tag
+#["n2w","n2p"],           # N2wt		Next+2WordTag
+["shw"],                 # STHw		StackHeadWord
+["shp"],                 # STHt		StackHeadTag
+["sL"],                  # STi		StackLabel
+["sh2w"],                # STHHw		StackHeadHeadWord
+["sh2p"],                # STHHt		StackHeadHeadTag
+["shL"],                 # STHi		StackLabel ?? StackHeadLabel
+["slw"],                 # STLDw		StackLDWord
+["slp"],                 # STLDt		StackLDTag
+["slL"],                 # STLDi		StackLDLabel
+["srw"],                 # STRDw		StackRDWord
+["srp"],                 # STRDt		StackRDTag
+["srL"],                 # STRDi		StackRDLabel
+["nlw"],                 # N0LDw		NextLDWord
+["nlp"],                 # N0LDt		NextLDTag
+["nlL"],                 # N0LDi		NextLDLabel
+["sl2w"],                # STL2Dw	StackL2DWord
+["sl2p"],                # STL2Dt	StackL2DTag
+["sl2L"],                # STL2Di	StackL2DLabel
+["sr2w"],                # STR2Dw	StackR2DWord
+["sr2p"],                # STR2Dt	StackR2DTag
+["sr2L"],                # STR2Di	StackR2DLabel
+["nl2w"],                # N0L2Dw	NextL2DWord
+["nl2p"],                # N0L2Dt	NextL2DTag
+["nl2L"],                # N0L2Di	NextL2DLabel
 			## HTw		HeadStackWord
 			## HTt		HeadStackTag
 			## HTwt		HeadStackWordTag
-#["sw","sp","nw","np"]	# STwtN0wt	StackWordTagNextWordTag
-#["sw","sp","nw"]	# STwtN0w	StackWordTagNextWord
-#["sw","nw","np"]	# STwN0wt	StackWordNextWordTag
-#["sp","nw","np"]	# STtN0wt	StackTagNextWordTag
-#["sw","sp","np"]	# STwtN0t	StackWordTagNextTag
-#["sw","nw"]             # STwN0w	StackWordNextWord
-#["sp","np"]             # STtN0t	StackTagNextTag
-#["np","n1p"]            # N0tN1t	NextTagNext+1Tag
-#["np","n1p","n2p"]	# N0tN1tN2t	NextTagTrigram
-#["sp","np","n1p"]	# STtN0tN1t	StackTagNextTagNext+1Tag
-#["sp","np","nlp"]	# STtN0tN0LDt	StackTagNextTagNextLDTag
-#["np","nlp","nl2p"]     # N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextL2DTag
-#["shp","sp","np"]       # STHtSTtN0t	StackHeadTagStackTagNextTag
+#["sw","sp","nw","np"],	# STwtN0wt	StackWordTagNextWordTag
+#["sw","sp","nw"],	# STwtN0w	StackWordTagNextWord
+#["sw","nw","np"],	# STwN0wt	StackWordNextWordTag
+#["sp","nw","np"],	# STtN0wt	StackTagNextWordTag
+#["sw","sp","np"],	# STwtN0t	StackWordTagNextTag
+#["sw","nw"],             # STwN0w	StackWordNextWord
+#["sp","np"],             # STtN0t	StackTagNextTag
+#["np","n1p"],            # N0tN1t	NextTagNext+1Tag
+#["np","n1p","n2p"],	# N0tN1tN2t	NextTagTrigram
+#["sp","np","n1p"],	# STtN0tN1t	StackTagNextTagNext+1Tag
+#["sp","np","nlp"],	# STtN0tN0LDt	StackTagNextTagNextLDTag
+#["np","nlp","nl2p"],     # N0tN0LDtN0L2Dt	StackTagNextTagNextLDTagNextTagNextL2DTag ?? NextTagNextLDTagNextL2DTag
+#["shp","sp","np"],       # STHtSTtN0t	StackHeadTagStackTagNextTag
 			## HTtHT2tN0t	HeadStackTagHeadStack2TagNextTag
-#["sh2p","shp","sp"]     # STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
-#["sp","slp","np"]       # STtSTLDtN0t	StackTagStackLDTagNextTag
-#["sp","slp","sl2p"]     # STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
-#["sp","srp","np"]       # STtSTRDtN0t	StackTagStackRDTagNextTag
-#["sp","srp","sr2p"]     # STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
-["sd"]
-#["sw","sd"]             # STwd		StackWordDist
-#["sp","sd"]             # STtd		StackTagDist
-#["nw","sd"]             # N0wd		NextWordDist
-#["np","sd"]             # N0td		NextTagDist
-#["sw","nw","sd"]        # STwN0wd	StackWordNextWordDist
-#["sp","np","sd"]        # STtN0td	StackTagNextTagDist
-["sb"]
-#["sw","sb"]             # STwra		StackWordRightArity
-#["sp","sb"]             # STtra		StackTagRightArity
-["sa"]
-#["sw","sa"]             # STwla		StackWordLeftArity
-#["sp","sa"]             # STtla		StackTagLeftArity
-["na"]
-#["nw","na"]             # N0wla		NextWordRightArity ?? NextWordLeftArity
-#["np","na"]             # N0tla		NextTagRightArity  ?? NextTagLeftArity
-["sB"]
-#["sw","sB"]             # STwrp		StackWordRightSetoftags
-#["sp","sB"]             # STtrp		StackTagRightSetoftags
-["sA"]
-#["sw","sA"]             # STwlp		StackWordLeftSetoftags
-#["sp","sA"]             # STtlp		StackTagLeftSetoftags
-["nA"]
-#["nw","nA"]             # N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
-#["np","nA"]             # N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
+#["sh2p","shp","sp"],     # STHHtSTHtSTt	StackHeadHeadTagStackHeadTagStackTag
+#["sp","slp","np"],       # STtSTLDtN0t	StackTagStackLDTagNextTag
+#["sp","slp","sl2p"],     # STtSTLDtSTL2Dt	StackTagStackLDTagStackL2DTag
+#["sp","srp","np"],       # STtSTRDtN0t	StackTagStackRDTagNextTag
+#["sp","srp","sr2p"],     # STtSTRDtSTR2Dt	StackTagStackRDTagStackR2DTag
+["sd"],
+#["sw","sd"],             # STwd		StackWordDist
+#["sp","sd"],             # STtd		StackTagDist
+#["nw","sd"],             # N0wd		NextWordDist
+#["np","sd"],             # N0td		NextTagDist
+#["sw","nw","sd"],        # STwN0wd	StackWordNextWordDist
+#["sp","np","sd"],        # STtN0td	StackTagNextTagDist
+["sb"],
+#["sw","sb"],             # STwra		StackWordRightArity
+#["sp","sb"],             # STtra		StackTagRightArity
+["sa"],
+#["sw","sa"],             # STwla		StackWordLeftArity
+#["sp","sa"],             # STtla		StackTagLeftArity
+["na"],
+#["nw","na"],             # N0wla		NextWordRightArity ?? NextWordLeftArity
+#["np","na"],             # N0tla		NextTagRightArity  ?? NextTagLeftArity
+["sB"],
+#["sw","sB"],             # STwrp		StackWordRightSetoftags
+#["sp","sB"],             # STtrp		StackTagRightSetoftags
+["sA"],
+#["sw","sA"],             # STwlp		StackWordLeftSetoftags
+#["sp","sA"],             # STtlp		StackTagLeftSetoftags
+["nA"],
+#["nw","nA"],             # N0wlp		Next0WordLeftSetoftags ?? NextWordLeftSetoftags
+#["np","nA"],             # N0tlp		Next0TagLeftSetoftags  ?? NextTagLeftSetoftags
 			## STl		StackLemma
 			## STc		StackCPOS
 			## STf		StackFeats
@@ -346,20 +346,20 @@ hybrid54 = DFeature[
 
 tacl13hybrid = DFeature[
 	# (1)
-"s0v"	# append("s0_%s" % s0)
-"s0c"	# append("Ts0_%s" % Ts0)
+"s0v",	# append("s0_%s" % s0)
+"s0c",	# append("Ts0_%s" % Ts0)
         # append("Ts0s0_%s_%s" % (Ts0, s0))
 
-"s1v"	# append("s1_%s" % s1)
-"s1c"	# append("Ts1_%s" % Ts1)
+"s1v",	# append("s1_%s" % s1)
+"s1c",	# append("Ts1_%s" % Ts1)
      	# append("Ts1s1_%s_%s" % (Ts1, s1))
 
-"n0v"	# append("w0_%s" % w0)
-"n0c"	# append("Tw0_%s" % Tw0)
+"n0v",	# append("w0_%s" % w0)
+"n0c",	# append("Tw0_%s" % Tw0)
 	# append("Tw0w0_%s_%s" % (Tw0, w0))
 	# +hybrid
-"n1v"	# append("w1_%s" % w1)
-"n1c"	# append("Tw1_%s" % Tw1)
+"n1v",	# append("w1_%s" % w1)
+"n1c",	# append("Tw1_%s" % Tw1)
 	# append("Tw1w1_%s_%s" % (Tw1, w1))
 
 	# (2)
@@ -388,11 +388,11 @@ tacl13hybrid = DFeature[
 	# append("Ts1s0Tw0_%s_%s_%s" % (Ts1,s0,Tw0))
 	
 	# (4) rc -1  lc 1
-"s1rc"	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
+"s1rc",	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Tw0)) => Trcs1
 	# append("Ts1Trcs1Tw0_%s_%s_%s" % (Ts1, Trcs1, Ts0))
-"s1lc"	# append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
-"s0lc"	# append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
-"s0rc"	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
+"s1lc",	# append("Ts1Tlcs1Ts0_%s_%s_%s" % (Ts1, Tlcs1, Ts0)) => Tlcs1
+"s0lc",	# append("Ts1Ts0Tlcs0_%s_%s_%s" % (Ts1, Ts0, Tlcs0)) => Tlcs0
+"s0rc",	# append("Ts1Trcs0Ts0_%s_%s_%s" % (Ts1, Trcs0, Ts0)) => Trcs0
 	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Tlcs1, s0))
 	# append("Ts1s0Trcs0_%s_%s_%s" % (Ts1, s0, Trcs0))
 	# append("Ts0Tlcs1s0_%s_%s_%s" % (Ts0, Trcs1, s0))
@@ -402,7 +402,7 @@ tacl13hybrid = DFeature[
 	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw0))
 	# append("Ts0Trcs0Tw0_%s_%s_%s" % (Ts0,Trcs0,Tw1))
 	# append("Ts0Tlcs0Tw0_%s_%s_%s" % (Ts0,Tlcs0,Tw0))
-"n0lc"	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
+"n0lc",	# append("Ts0Tw0Tlcw0_%s_%s_%s" % (Ts0,Tw0,Tlcw0)) => Tlcw0
 	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Tlcs0,w0))
 	# append("Ts0Tlcs0w0_%s_%s_%s" % (Ts0,Trcs0,w0))
 	# append("Ts0w0Tlcw0_%s_%s_%s" % (Ts0,w0,Tlcw0))
@@ -442,17 +442,17 @@ hybrid13 = tacl13hybrid
 acl11eager = DFeature[
 	# # Single Words
 	# f("s0wp_%s" % (s0wp))
-"s0v"	# f("s0w_%s"  % (s0w))
-"s0c"	# f("s0p_%s"  % (s0p))
+"s0v",	# f("s0w_%s"  % (s0w))
+"s0c",	# f("s0p_%s"  % (s0p))
 	# f("n0wp_%s" % (n0wp))
-"n0v"	# f("n0w_%s"  % (n0w))
-"n0c"	# f("n0p_%s"  % (n0p))
+"n0v",	# f("n0w_%s"  % (n0w))
+"n0c",	# f("n0p_%s"  % (n0p))
 	# f("n1wp_%s" % (n1wp))
-"n1v"	# f("n1w_%s"  % (n1w))
-"n1c"	# f("n1p_%s"  % (n1p))
+"n1v",	# f("n1w_%s"  % (n1w))
+"n1c",	# f("n1p_%s"  % (n1p))
 	# f("n2wp_%s" % (n2wp))
-"n2v"	# f("n2w_%s"  % (n2w))
-"n2c"	# f("n2p_%s"  % (n2p))
+"n2v",	# f("n2w_%s"  % (n2w))
+"n2c",	# f("n2p_%s"  % (n2p))
 	# 
 	# # Pairs
 	# f("s0wp,n0wp_%s_%s" % (s0wp, n0wp))
@@ -473,7 +473,7 @@ acl11eager = DFeature[
 	# f("s0p,n0p,n0lp_%s_%s_%s" % (s0p, n0p, n0lp)) => n0lp (handled in unigram section)
 	# 
 	# # Distance
-"s0d"	# f("s0wd_%s:%s" % (s0w, d)) => d
+"s0d",	# f("s0wd_%s:%s" % (s0w, d)) => d
 	# f("s0pd_%s:%s" % (s0p, d))
 	# f("n0wd_%s:%s" % (n0w, d))
 	# f("n0pd_%s:%s" % (n0p, d))
@@ -481,55 +481,55 @@ acl11eager = DFeature[
 	# f("s0p,n0p,d_%s:%s:%s" % (s0p, n0p, d))
 	# 
 	# # Valence
-"s0b"	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
+"s0b",	# f("s0wvr_%s:%s" % (s0w, s0vr)) => s0vr
 	# f("s0pvr_%s:%s" % (s0p, s0vr))
-"s0a"	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
+"s0a",	# f("s0wvl_%s:%s" % (s0w, s0vl)) => s0vl
 	# f("s0pvl_%s:%s" % (s0p, s0vl))
-"n0a"	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
+"n0a",	# f("n0wvl_%s:%s" % (n0w, n0vl)) => n0vl
 	# f("n0pvl_%s:%s" % (n0p, n0vl))
 	# 
 	# # Unigrams
-"s0hv"	# f("s0hw_%s" % (s0hw))
-"s0hc"	# f("s0hp_%s" % (s0hp))
-"s0L"	# f("s0L_%s" % (s0L))
+"s0hv",	# f("s0hw_%s" % (s0hw))
+"s0hc",	# f("s0hp_%s" % (s0hp))
+"s0L",	# f("s0L_%s" % (s0L))
 	# 
-"s0lv"	# f("s0lw_%s" % (s0lw))
-"s0lc"	# f("s0lp_%s" % (s0lp))
-"s0lL"	# f("s0lL_%s" % (s0lL))
+"s0lv",	# f("s0lw_%s" % (s0lw))
+"s0lc",	# f("s0lp_%s" % (s0lp))
+"s0lL",	# f("s0lL_%s" % (s0lL))
 	# 
-"s0rv"	# f("s0rw_%s" % (s0rw))
-"s0rc"	# f("s0rp_%s" % (s0rp))
-"s0rL"	# f("s0rL_%s" % (s0rL))
+"s0rv",	# f("s0rw_%s" % (s0rw))
+"s0rc",	# f("s0rp_%s" % (s0rp))
+"s0rL",	# f("s0rL_%s" % (s0rL))
 	# 
-"n0lv"	# f("n0lw_%s" % (n0lw))
-"n0lc"	# f("n0lp_%s" % (n0lp))
-"n0lL"	# f("n0lL_%s" % (n0lL))
+"n0lv",	# f("n0lw_%s" % (n0lw))
+"n0lc",	# f("n0lp_%s" % (n0lp))
+"n0lL",	# f("n0lL_%s" % (n0lL))
 	# 
 	# # Third-order
 	# #do we really need the non-grandparent ones?
-"s0h2v"	# f("s0h2w_%s" % (s0h2w))
-"s0h2c"	# f("s0h2p_%s" % (s0h2p))
-"s0hL"	# f("s0hL_%s"  % (s0hL))
-"s0l2v"	# f("s0l2w_%s" % (s0l2w))
-"s0l2c"	# f("s0l2p_%s" % (s0l2p))
-"s0l2L"	# f("s0l2L_%s" % (s0l2L))
-"s0r2v"	# f("s0r2w_%s" % (s0r2w))
-"s0r2c"	# f("s0r2p_%s" % (s0r2p))
-"s0r2L"	# f("s0r2L_%s" % (s0r2L))
-"n0l2v"	# f("n0l2w_%s" % (n0l2w))
-"n0l2c"	# f("n0l2p_%s" % (n0l2p))
-"n0l2L"	# f("n0l2L_%s" % (n0l2L))
+"s0h2v",	# f("s0h2w_%s" % (s0h2w))
+"s0h2c",	# f("s0h2p_%s" % (s0h2p))
+"s0hL",	# f("s0hL_%s"  % (s0hL))
+"s0l2v",	# f("s0l2w_%s" % (s0l2w))
+"s0l2c",	# f("s0l2p_%s" % (s0l2p))
+"s0l2L",	# f("s0l2L_%s" % (s0l2L))
+"s0r2v",	# f("s0r2w_%s" % (s0r2w))
+"s0r2c",	# f("s0r2p_%s" % (s0r2p))
+"s0r2L",	# f("s0r2L_%s" % (s0r2L))
+"n0l2v",	# f("n0l2w_%s" % (n0l2w))
+"n0l2c",	# f("n0l2p_%s" % (n0l2p))
+"n0l2L",	# f("n0l2L_%s" % (n0l2L))
 	# f("s0p,s0lp,s0l2p_%s_%s_%s" % (s0p, s0lp, s0l2p))
 	# f("s0p,s0rp,s0r2p_%s_%s_%s" % (s0p, s0rp, s0r2p))
 	# f("s0p,s0hp,s0h2p_%s_%s_%s" % (s0p, s0hp, s0h2p))
 	# f("n0p,n0lp,n0l2p_%s_%s_%s" % (n0p, n0lp, n0l2p))
 	# 
 	# # Labels
-"s0B"	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
+"s0B",	# f("s0wsr_%s_%s" % (s0w, s0sr)) => s0sr
 	# f("s0psr_%s_%s" % (s0p, s0sr))
-"s0A"	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
+"s0A",	# f("s0wsl_%s_%s" % (s0w, s0sl)) => s0sl
 	# f("s0psl_%s_%s" % (s0p, s0sl))
-"n0A"	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
+"n0A",	# f("n0wsl_%s_%s" % (n0w, n0sl)) => n0sl
 	# f("n0psl_%s_%s" % (n0p, n0sl))
 ] # tacl13eager
 

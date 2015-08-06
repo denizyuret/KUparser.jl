@@ -61,7 +61,7 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
     lset = zeros(xtype, nd, nw)
     rset = zeros(xtype, nd, nw)
     for d=1:nw
-        h=int(p.head[d])        # 493
+        h=convert(Int,p.head[d])        # 493
         if h==0
             continue
         elseif d<h
@@ -83,12 +83,12 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
         a = d = 0           # target word index and right distance
         if (f1 == 's')
             if (p.sptr - i >= 1) # 25
-                a = int(p.stack[p.sptr - i])             # 456
+                a = convert(Int,p.stack[p.sptr - i])             # 456
                 d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # 263
                      p.wptr <= p.nword ? (p.wptr - a) : 0)
             end
         elseif (f1 == 'n') 
-            (p.wptr + i <= p.nword) && (a = int(p.wptr + i))
+            (p.wptr + i <= p.nword) && (a = convert(Int,p.wptr + i))
         else 
             error("feature string should start with [sn]")
         end
@@ -106,7 +106,7 @@ function features(p::Parser, s::Sentence, feats::DFvec, #
                 a = (isdefined(rdep,a) && i <= length(rdep[a])) ? rdep[a][i] : 0 # 272
             elseif f1 == 'h'
                 for j=1:i       # 5
-                    a = int(p.head[a]) # 147
+                    a = convert(Int,p.head[a]) # 147
                     a == 0 && break # 59
                 end
             else 
