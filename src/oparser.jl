@@ -4,8 +4,8 @@
 # pt::ParserType: ArcHybridR1, ArcEagerR1, ArcHybrid13, ArcEager13
 # s::Sentence or c::Corpus: input sentence(s), a single parser is returned for s, a vector of parsers for c
 # ndeps::Integer: number of dependency types
-# ncpu::Integer: (optional) performs parallel processing
 # feats::Fvec: (optional) specification of features, a (p,x,y) tuple returned if specified, only p if not
+# usepmap::Bool: (optional) performs parallel processing
 
 
 function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
@@ -18,65 +18,31 @@ function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats::Fvec
     oparse(p, s, ndeps, feats)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer)
-    pa = map(s->pt(wcnt(s), ndeps), c)
-    oparse(pa, c, ndeps)
-end
-
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer)
-    ncpu==1 && (return oparse(pt,c,ndeps))
-    d = distribute(c)
-    pmap(procs(d)) do x
-        oparse(pt, localpart(d), ndeps)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer; usepmap::Bool=false)
+    if usepmap
+        d = distribute(c)
+        p = pmap(procs(d)) do x
+            oparse(pt, localpart(d), ndeps)
+        end
+        pcat(p)
+    else
+        pa = map(s->pt(wcnt(s), ndeps), c)
+        oparse(pa, c, ndeps)
     end
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec)
-    pa = map(s->pt(wcnt(s), ndeps), c)
-    oparse(pa, c, ndeps, feats)
-end
-
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats::DFvec)
-    ncpu==1 && (return oparse(pt,c,ndeps,feats))
-    d = distribute(c)
-    pmap(procs(d)) do x
-        oparse(pt, localpart(d), ndeps, feats)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::DFvec; usepmap::Bool=false)
+    if usepmap
+        d = distribute(c)
+        p = pmap(procs(d)) do x
+            oparse(pt, localpart(d), ndeps, feats)
+        end
+        pcat(p)
+    else
+        pa = map(s->pt(wcnt(s), ndeps), c)
+        oparse(pa, c, ndeps, feats)
     end
 end
-
-# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer)
-#     @date Main.resetworkers(ncpu)
-#     sa = distribute(c)                                  # distributed sentence array
-#     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
-#     @sync for p in procs(sa)
-#         @spawnat p oparse(localpart(pa), localpart(sa), ndeps)
-#     end
-#     pa = convert(Vector{pt}, pa)
-#     @date Main.rmworkers()
-#     return pa
-# end
-
-# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats::DFvec)
-#     # Sparse fvec not supported yet, we need SharedSparseArray
-#     @date Main.resetworkers(ncpu)
-#     sa = distribute(c)                                  # distributed sentence array
-#     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
-#     xtype = wtype(c[1])
-#     x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
-#     y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
-#     fill!(y, zero(xtype))
-#     nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
-#     p1 = pt(1,ndeps)
-#     for i=1:length(c)-1
-#         nx[i+1] = nx[i] + nmoves(p1, c[i])
-#     end
-#     @sync for p in procs(sa)
-#         @spawnat p oparse(localpart(pa), localpart(sa), ndeps, feats, x, y, nx[localindexes(sa)[1][1]])
-#     end
-#     pa = convert(Vector{pt}, pa)
-#     @date Main.rmworkers()
-#     return (pa, sdata(x), sdata(y))
-# end
 
 function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer)
     for i=1:length(c)
@@ -170,4 +136,75 @@ function initoparse(p, s, d, f, x, y, n)
     end
     return (x,y)
 end
+
+function pcat(p)
+    if isa(p[1], Vector)
+        q = similar(p[1], 0)
+        for pi in p
+            append!(q, pi)
+        end
+        return q
+    else
+        pp = similar(p[1][1],0)
+        xx = Array(eltype(p[1][2]), 0)
+        yy = Array(eltype(p[1][3]), 0)
+        for i=1:length(p)
+            append!(pp, p[i][1])
+            append!(xx, vec(p[i][2]))
+            append!(yy, vec(p[i][3]))
+        end
+        ncols = size(p[1][2], 2)
+        xrows = size(p[1][2], 1)
+        yrows = size(p[1][3], 1)
+        xx = reshape(xx, xrows, div(length(xx), xrows))
+        yy = reshape(yy, yrows, div(length(yy), yrows))
+        return (pp, xx, yy)
+    end
+end
+
+### DEAD CODE
+
+# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec)
+#     pa = map(s->pt(wcnt(s), ndeps), c)
+#     oparse(pa, c, ndeps, feats)
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer)
+#     pa = map(s->pt(wcnt(s), ndeps), c)
+#     oparse(pa, c, ndeps)
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer)
+#     @date Main.resetworkers(ncpu)
+#     sa = distribute(c)                                  # distributed sentence array
+#     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
+#     @sync for p in procs(sa)
+#         @spawnat p oparse(localpart(pa), localpart(sa), ndeps)
+#     end
+#     pa = convert(Vector{pt}, pa)
+#     @date Main.rmworkers()
+#     return pa
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, ncpu::Integer, feats::DFvec)
+#     # Sparse fvec not supported yet, we need SharedSparseArray
+#     @date Main.resetworkers(ncpu)
+#     sa = distribute(c)                                  # distributed sentence array
+#     pa = map(s->pt(wcnt(s), ndeps), sa)                 # distributed parser array
+#     xtype = wtype(c[1])
+#     x = SharedArray(xtype, xsize(pa[1],c,feats))    # shared x array
+#     y = SharedArray(xtype, ysize(pa[1],c))          # shared y array
+#     fill!(y, zero(xtype))
+#     nx = zeros(Int, length(c))                      # 1+nx[i] is the starting x column for i'th sentence
+#     p1 = pt(1,ndeps)
+#     for i=1:length(c)-1
+#         nx[i+1] = nx[i] + nmoves(p1, c[i])
+#     end
+#     @sync for p in procs(sa)
+#         @spawnat p oparse(localpart(pa), localpart(sa), ndeps, feats, x, y, nx[localindexes(sa)[1][1]])
+#     end
+#     pa = convert(Vector{pt}, pa)
+#     @date Main.rmworkers()
+#     return (pa, sdata(x), sdata(y))
+# end
 

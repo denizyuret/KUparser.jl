@@ -14,7 +14,7 @@ p0 = pt(1,ndeps)
 s1 = corpus[1]
 
 if !isdefined(:net)
-    @date net = loadnet("testbparser4.net")
+    @date net = loadnet("nets/zn11beam4.net4")
     # info("Let's train a reasonable model")
     # h0 = 20000
     # net = [Mmul(h0), Bias(), Relu(), 

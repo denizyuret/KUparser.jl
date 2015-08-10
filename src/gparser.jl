@@ -5,42 +5,47 @@
 # ndeps::Integer: number of dependency types
 # feats::Fvec: specification of features
 # net::Net: model used for move prediction
-# nbatch::Integer: (optional) parse sentences in batches for efficiency
-# ncpu::Integer: (optional) perform parallel processing
-# xy::Bool: (keyword) return (p,x,y) tuple for training, by default only parsers returned.
+# nbatch::Integer: (keyword) parse sentences in batches for efficiency
+# returnxy::Bool: (keyword) return (p,x,y) tuple for training, by default only parsers returned.
+# usepmap::Bool: (keyword) perform parallel processing
 
-function gparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, 
-                           nbatch::Integer=1, ncpu::Integer=1; xy::Bool=false)
-    if ncpu > 1
-        @assert ncpu==nworkers() "ncpu must be 1 or nworkers()"
-        d = distribute(c)
-        net = testnet(net)
-        pmap(procs(d)) do x
-            gparse(pt, localpart(d), ndeps, feats, gpucopy(net), nbatch, 1; xy=xy)
-        end
+function gparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Integer, feats::Fvec, net::Net;
+                           nbatch::Int=1, returnxy::Bool=false, usepmap::Bool=false)
+    usepmap ? 
+    gp_pmap(pt, corpus, ndeps, feats, net, nbatch, returnxy) :
+    gp_main(pt, corpus, ndeps, feats, net, nbatch, returnxy)
+end
+
+function gp_pmap{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Int, returnxy::Bool)
+    d = distribute(c)
+    net = testnet(net)
+    p = pmap(procs(d)) do x
+        gp_main(pt, localpart(d), ndeps, feats, gpucopy(net), nbatch, returnxy)
+    end
+    return pcat(p)
+end
+
+function gp_main{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Int, returnxy::Bool)
+    pa = map(s->pt(wcnt(s), ndeps), c)
+    if returnxy
+        xtype = wtype(c[1])
+        x = Array(xtype, xsize(pa[1], c, feats))
+        y = zeros(xtype, ysize(pa[1], c))
+        gp_work(pa, c, ndeps, feats, net, nbatch, x, y)
+        return (pa, x, y)
     else
-        pa = map(s->pt(wcnt(s), ndeps), c)
-        if xy
-            xtype = wtype(c[1])
-            x = Array(xtype, xsize(pa[1], c, feats))
-            y = zeros(xtype, ysize(pa[1], c))
-            gparse(pa, c, ndeps, feats, net, nbatch, x, y)
-            return (pa, x, y)
-        else
-            gparse(pa, c, ndeps, feats, net, nbatch)
-            return pa
-        end
+        gp_work(pa, c, ndeps, feats, net, nbatch)
+        return pa
     end
 end
 
 # Here is the workhorse:
-function gparse{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Integer,
-                           x::AbstractArray=[], y::AbstractArray=[], nx::Integer=0)
+function gp_work{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Integer,
+                            x::AbstractArray=[], y::AbstractArray=[], nx::Integer=0)
     (nbatch == 0 || nbatch > length(c)) && (nbatch = length(c))
     isempty(x) && (x=Array(wtype(c[1]), flen(p[1],c[1],feats), nbatch))
     score = Array(wtype(c[1]), p[1].nmove, nbatch)
     cost = Array(Position, p[1].nmove)
-
     for s1 = 1:nbatch:length(c)
         s2 = min(length(c), s1+nbatch-1)
         while true
