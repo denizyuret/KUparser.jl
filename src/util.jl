@@ -97,7 +97,7 @@ function testnet(net)
     net = cpucopy(net)
     KUnet.strip!(net)
     for l in net
-        for n in names(l)
+        for n in fieldnames(l)
             if isdefined(l,n) && isa(l.(n), KUparam)
                 # Get rid of all the training fields
                 l.(n) = KUparam(l.(n).arr)

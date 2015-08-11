@@ -408,7 +408,7 @@ Base.show(io::IO, p::Parser)=print(io, map(int,p.stack[1:p.sptr]), Int[p.wptr], 
 
 function Base.hash(p::Parser, h::Uint)
     h += uint(0xac816432c42f6df9)
-    for n in names(p)
+    for n in fieldnames(p)
         h = hash(p.(n), h)
     end
     return h
