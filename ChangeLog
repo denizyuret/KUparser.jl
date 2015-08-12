@@ -1,3 +1,9 @@
+2015-08-11  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* test/testbparser.jl: to be consistent in return values we should
+	always have three vectors for pxy even if they have a single
+	element, currently at least gparser violates this.
+
 2015-07-30  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* foo0729*: In both experiments the accuracy steadily went down.

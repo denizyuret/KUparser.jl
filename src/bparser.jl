@@ -47,7 +47,7 @@ typealias Batch Vector{Beam}
 # 8. goto step 2
 
 function bp_main{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
-    @date "bp_main Starting"
+    #@date "bp_main Starting"
     (nbatch < 1 || nbatch > length(corpus)) && (nbatch = length(corpus))
     (parses, batch, fmatrix, score) = bp_init(pt, corpus, ndeps, feats, returnxy)
     for s1=1:nbatch:length(corpus)
@@ -64,7 +64,7 @@ function bp_main{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFve
         # @show nf
         bp_append(parses, batch, fmatrix, score, returnxy) # :1
     end # for s1=1:nbatch:length(corpus)
-    @date "bp_main Finished"
+    #@date "bp_main Finished"
     return parses
 end # function bp_main
 
@@ -95,19 +95,19 @@ function bp_init{T<:Parser}(pt::Type{T}, corpus::Corpus, r::UnitRange{Int}, ndep
     return (batch, fmatrix, score)
 end
 
-function bp_features(batch::Batch, feats::DFvec, fmatrix::KUdense, nf::Int)
+function bp_features(batch::Batch, feats::DFvec, fmatrix::Matrix, nf::Int)
     for s in batch
         s.stop && continue
         for bs in s.beam
             size(fmatrix,2) > nf || error("Out of bounds")
-            f = features(bs.parser, s.sent, feats, fmatrix.arr, (nf+=1)) # :35029
+            f = features(bs.parser, s.sent, feats, fmatrix, (nf+=1)) # :35029
             bs.fidx = nf
         end
     end
     return nf
 end
 
-function bp_update(batch::Batch, score::KUdense, nbeam::Int, returnxy::Bool)
+function bp_update(batch::Batch, score::Matrix, nbeam::Int, returnxy::Bool)
     for s in batch
         s.stop && continue
         bp_update_cand(s, score) # :5128
@@ -117,14 +117,14 @@ function bp_update(batch::Batch, score::KUdense, nbeam::Int, returnxy::Bool)
     end
 end
 
-function bp_update_cand(s::Beam, score::KUdense)
+function bp_update_cand(s::Beam, score::Matrix)
     resize!(s.cand,0)
     cost = Array(Cost, size(score,1))
     for bs in s.beam
         movecosts(bs.parser, s.sent.head, s.sent.deprel, cost) # 162
         for j=1:length(cost)
             cost[j] == typemax(Cost) && continue
-            push!(s.cand, BeamState(bs, j, bs.score + score.arr[j,bs.fidx], bs.cost + cost[j])) # :4119
+            push!(s.cand, BeamState(bs, j, bs.score + score[j,bs.fidx], bs.cost + cost[j])) # :4119
         end
     end
     (length(s.cand) > 0) || error("No candidates found")
@@ -222,11 +222,11 @@ end
 function bp_pmap{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
     d = distribute(corpus)
     net = testnet(net)
-    @date "pmap Starting"
+    #@date "pmap Starting"
     p = pmap(procs(d)) do x
         bp_main(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam, nbatch, returnxy)
     end
-    @date "pmap Finished"
+    #@date "pmap Finished"
     return pcat(p)
 end
 

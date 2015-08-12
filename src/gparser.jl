@@ -32,7 +32,7 @@ function gp_main{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec,
         x = Array(xtype, xsize(pa[1], c, feats))
         y = zeros(xtype, ysize(pa[1], c))
         gp_work(pa, c, ndeps, feats, net, nbatch, x, y)
-        return (pa, x, y)
+        return (pa, typeof(x)[x], typeof(y)[y]) # return expects three vectors
     else
         gp_work(pa, c, ndeps, feats, net, nbatch)
         return pa

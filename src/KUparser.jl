@@ -3,7 +3,7 @@ module KUparser
 using Compat
 using KUnet
 
-include("util.jl");	  export @date, evalparse, pxyequal, testnet
+include("util.jl");	  export @date, evalparse, testnet
 include("sentence.jl");   export Sentence, Corpus, wdim, wcnt, wtype
 include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1, Parser, reset!
 include("sfeatures.jl");

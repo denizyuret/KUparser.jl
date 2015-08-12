@@ -40,10 +40,6 @@ function sortpermx{I<:Integer}(x::AbstractVector{I}, v::AbstractVector; alg::Alg
     sort!(x, alg, Perm(ord(lt,by,rev,order),v))
 end
 
-# Compare two pxy results when xy may be shuffled due to batch processing
-pxyequal(a,b)=(isequal(a[1],b[1]) && xyequal(a,b))
-xyequal(a,b)=isequal(sortcols(vcat(a[2],a[3])), sortcols(vcat(b[2],b[3])))
-
 # Compute relevant scores
 function evalparse(parsers, sentences; ispunct=zn11punct, postag=[])
     ph = map(p->p.head, parsers)

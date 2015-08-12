@@ -7,60 +7,35 @@
 # feats::Fvec: (optional) specification of features, a (p,x,y) tuple returned if specified, only p if not
 # usepmap::Bool: (optional) performs parallel processing
 
-
-function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
-    p = pt(wcnt(s), ndeps)
-    oparse(p, s, ndeps)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats=nothing; usepmap::Bool=false)
+    usepmap ?
+    op_pmap(pt, c, ndeps, feats) :
+    op_main(pt, c, ndeps, feats)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats::Fvec)
-    p = pt(wcnt(s), ndeps)
-    oparse(p, s, ndeps, feats)
-end
-
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer; usepmap::Bool=false)
-    if usepmap
-        d = distribute(c)
-        p = pmap(procs(d)) do x
-            oparse(pt, localpart(d), ndeps)
-        end
-        pcat(p)
-    else
-        pa = map(s->pt(wcnt(s), ndeps), c)
-        oparse(pa, c, ndeps)
+function op_pmap{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats)
+    d = distribute(c)
+    p = pmap(procs(d)) do x
+        op_main(pt, localpart(d), ndeps, feats)
     end
+    return pcat(p)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::DFvec; usepmap::Bool=false)
-    if usepmap
-        d = distribute(c)
-        p = pmap(procs(d)) do x
-            oparse(pt, localpart(d), ndeps, feats)
-        end
-        pcat(p)
-    else
-        pa = map(s->pt(wcnt(s), ndeps), c)
-        oparse(pa, c, ndeps, feats)
-    end
+function op_main{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats)
+    pa = map(s->pt(wcnt(s), ndeps), c)
+    feats == nothing ?
+    op_work(pa, c, ndeps) :
+    op_work(pa, c, ndeps, feats)
 end
 
-function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer)
+function op_work{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer)
     for i=1:length(c)
-        oparse(pa[i], c[i], ndeps)
+        op_work(pa[i], c[i], ndeps)
     end
     return pa
 end
 
-function oparse{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, x=nothing, y=nothing, nx=0)
-    (x,y) = initoparse(pa,c,ndeps,feats,x,y,nx)
-    for i=1:length(c)
-        oparse(pa[i], c[i], ndeps, feats, x, y, nx)
-        nx += nmoves(pa[i], c[i])
-    end
-    return (pa,x,y)
-end
-
-function oparse(p::Parser, s::Sentence, ndeps::Integer)
+function op_work(p::Parser, s::Sentence, ndeps::Integer)
     c = Array(Position, p.nmove)
     totalcost = 0
     while anyvalidmoves(p)
@@ -73,7 +48,16 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer)
     return p
 end
 
-function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::DFvec, x=nothing, y=nothing, nx=0)
+function op_work{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, x=nothing, y=nothing, nx=0)
+    (x,y) = initoparse(pa,c,ndeps,feats,x,y,nx)
+    for i=1:length(c)
+        op_work(pa[i], c[i], ndeps, feats, x, y, nx)
+        nx += nmoves(pa[i], c[i])
+    end
+    return (pa,typeof(x)[x],typeof(y)[y])  # must return tuple of three vectors
+end
+
+function op_work(p::Parser, s::Sentence, ndeps::Integer, feats::DFvec, x=nothing, y=nothing, nx=0)
     (x,y) = initoparse(p,s,ndeps,feats,x,y,nx)
     c = Array(Position, p.nmove)
     totalcost = 0; nx0 = nx
@@ -91,7 +75,7 @@ function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::DFvec, x=nothing,
     return (p,x,y)
 end
 
-function oparse(p::Parser, s::Sentence, ndeps::Integer, feats::SFvec, x::AbstractSparseMatrix, y::AbstractArray, nx::Integer)
+function op_work(p::Parser, s::Sentence, ndeps::Integer, feats::SFvec, x::AbstractSparseMatrix, y::AbstractArray, nx::Integer)
     c = Array(Position, p.nmove)
     totalcost = 0; nx0 = nx
     while anyvalidmoves(p)
@@ -206,5 +190,41 @@ end
 #     pa = convert(Vector{pt}, pa)
 #     @date Main.rmworkers()
 #     return (pa, sdata(x), sdata(y))
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
+#     p = pt(wcnt(s), ndeps)
+#     oparse(p, s, ndeps)
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats::Fvec)
+#     p = pt(wcnt(s), ndeps)
+#     oparse(p, s, ndeps, feats)
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer; usepmap::Bool=false)
+#     if usepmap
+#         d = distribute(c)
+#         p = pmap(procs(d)) do x
+#             oparse(pt, localpart(d), ndeps)
+#         end
+#         pcat(p)
+#     else
+#         pa = map(s->pt(wcnt(s), ndeps), c)
+#         oparse(pa, c, ndeps)
+#     end
+# end
+
+# function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::DFvec; usepmap::Bool=false)
+#     if usepmap
+#         d = distribute(c)
+#         p = pmap(procs(d)) do x
+#             oparse(pt, localpart(d), ndeps, feats)
+#         end
+#         pcat(p)
+#     else
+#         pa = map(s->pt(wcnt(s), ndeps), c)
+#         oparse(pa, c, ndeps, feats)
+#     end
 # end
 

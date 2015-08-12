@@ -1,4 +1,5 @@
 using HDF5,JLD,KUparser,KUnet,Base.Test
+include("pxyequal.jl")
 
 info("Load data")
 @date @load "conll07.tst.jld4"
@@ -18,14 +19,14 @@ net = [Mmul(h0), Bias(), Relu(),
        Mmul(p0.nmove), Bias(), Logp(), 
        LogpLoss()]
 @date (p,x,y)=oparse(pt, corpus, ndeps, ft)
-# @date train(net, x, y; loss=logploss)
-@date train(net, x, y)
+@date train(net, hcat(x...), hcat(y...))
 
 info("Single sentence")
 @date p1=gparse(pt, [s1], ndeps, ft, net)
 @show evalparse(p1, [s1])
 @date (p2,x2,y2)=gparse(pt, [s1], ndeps, ft, net; returnxy=true)
 @show map(size, (p2,x2,y2))
+@show I2 = 1:size(x2[1],2)
 @test @show isequal(p2,p1)
 
 info("Multiple sentences")
@@ -35,9 +36,8 @@ info("Multiple sentences")
 @date pxy4=(p4,x4,y4)=gparse(pt, corpus, ndeps, ft, net; returnxy=true)
 @show map(size, pxy4)
 @test @show isequal(p4, p3)
-I2 = 1:size(x2,2)
-@test @show isequal(x4[:,I2], x2)
-@test @show isequal(y4[:,I2], y2)
+@test @show isequal(x4[1][:,I2], x2[1])
+@test @show isequal(y4[1][:,I2], y2[1])
 
 info("Batch processing")
 @date p5=gparse(pt, corpus, ndeps, ft, net; nbatch=nbatch)
