@@ -1,6 +1,7 @@
 using CUDArt
 @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
-using KUparser, KUnet, HDF5, JLD, ArgParse, Compat, Dates
+using KUparser, KUnet, HDF5, JLD, ArgParse, Compat
+VERSION < v"0.4-" && eval(Expr(:using,:Dates))
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -178,7 +179,7 @@ function initnet(args, pt, ndeps)
         append!(net, [Mmul(yrows), Bias()])
         args["parser"]!="bparser" && push!(net, XentLoss())
     end
-    for k in [fieldnames(KUparam)]
+    for k in fieldnames(KUparam)
         haskey(args, string(k)) || continue
         v = args[string(k)]
         if isempty(v)
