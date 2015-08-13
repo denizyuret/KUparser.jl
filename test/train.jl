@@ -55,6 +55,9 @@ function parse_commandline()
         # help = "Number of workers for multithreaded parsing"
         # arg_type = Int
         #default = 16
+        "--usepmap"
+        help = "Use multiple processes"
+        action = :store_true
         "--strain"
         help = "Number of sentences to parse for a training batch"
         arg_type = Int
@@ -196,7 +199,6 @@ end
 function main()
     args = parse_commandline()
     @show nworkers()
-    # args["ncpu"] != nothing && warn("--ncpu deprecated, will be ignored, all nworkers=$(nworkers()) will be used")
     KUnet.gpu(!args["nogpu"])
     args["nogpu"] && blas_set_num_threads(20)
     args["seed"] >= 0 && setseed(args["seed"])
@@ -215,27 +217,29 @@ function main()
         println("\n$(now()) epoch => $(epoch += 1)")
         icorpus=1
         corpus=data[icorpus]          # use data[1] as the training corpus
-        parses=Any[]
+        parses=pt[]
         for c1=1:args["strain"]:length(corpus)
             c2=min(length(corpus), c1+args["strain"]-1)
             sentences=sub(corpus, c1:c2)
             @show (epoch, icorpus, c1, c2)
             if (args["parser"] == "oparser") # || ((epoch==1) && (args["in"]==nothing)))
-                @date p = oparse(pt, sentences, ndeps, nworkers(), feats)
-            elseif (args["parser"] == "bparser")
-                @date p = bparse_mp(pt, sentences, ndeps, feats, net, args["nbeam"]; nbatch=args["pbatch"], xy=true)
+                @date (p,x,y) = oparse(pt, sentences, ndeps, feats; usepmap=args["usepmap"])
             elseif (args["parser"] == "gparser")
-                @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], nworkers(); xy=true)
+                @date (p,x,y) = gparse(pt, sentences, ndeps, feats, net; usepmap=args["usepmap"], nbatch=args["pbatch"], returnxy=true)
+            elseif (args["parser"] == "bparser")
+                @date (p,x,y) = bparse(pt, sentences, ndeps, feats, net, args["nbeam"]; usepmap=args["usepmap"], nbatch=args["pbatch"], returnxy=true)
             else
                 error("Unknown parser")
             end
-            @everywhere gc()
-            @show map(size, p)
-            # this does not work otherwise if nworkers()==1
-            nworkers()==1 && (p = Any[p])
-            for pxy in p
-                append!(parses, pxy[1])
-                @date train(net, pxy[2], pxy[3]; batch=args["tbatch"], shuffle=args["shuffle"])
+            @show map(size, (p,x,y))
+            @assert isa(p, Vector{pt})
+            @assert isa(x, Vector{Matrix{wtype(sentences)}})
+            @assert isa(y, Vector{Matrix{wtype(sentences)}})
+            @assert length(x)==length(y)
+            @everywhere gc(); @everywhere gc()
+            append!(parses, p)
+            @date for i=1:length(x)
+                train(net, x[i], y[i]; batch=args["tbatch"], shuffle=args["shuffle"])
             end
         end
         accuracy[icorpus] = getscore(parses, corpus, ispunct)
@@ -243,22 +247,22 @@ function main()
 
         for icorpus=2:length(data)
             corpus=data[icorpus]
-            parses=Any[]
+            parses=pt[]
             for c1=1:args["stest"]:length(corpus)
                 c2=min(length(corpus), c1+args["stest"]-1)
                 @show (:corpus, icorpus, c1, c2)
                 sentences=sub(corpus, c1:c2)
                 if in(args["parser"], ("oparser", "gparser"))
-                    @date p = gparse(pt, sentences, ndeps, feats, net, args["pbatch"], nworkers(); xy=false)
+                    @date p = gparse(pt, sentences, ndeps, feats, net; usepmap=args["usepmap"], nbatch=args["pbatch"], returnxy=false)
                 elseif (args["parser"] == "bparser")
-                    @date p = bparse_mp(pt, sentences, ndeps, feats, net, args["nbeam"]; nbatch=args["pbatch"], xy=false)
+                    @date p = bparse(pt, sentences, ndeps, feats, net, args["nbeam"]; usepmap=args["usepmap"], nbatch=args["pbatch"], returnxy=false)
                 else
                     error("Unknown parser")
                 end
-                @everywhere gc()
-                # this does not work otherwise if nworkers()==1
-                nworkers()==1 && (p = Any[p])
-                for pp in p; append!(parses, pp); end
+                @show size(p)
+                @assert isa(p, Vector{pt})
+                @everywhere gc(); @everywhere gc()
+                append!(parses, p)
             end
             accuracy[icorpus] = getscore(parses, corpus, ispunct)
         end            
