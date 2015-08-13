@@ -1,5 +1,5 @@
 using HDF5,JLD,KUparser,KUnet,Base.Test
-require("pxyequal.jl")
+include("pxyequal.jl")
 infoln(x)=(println();info(x))
 
 infoln("Loading data")
