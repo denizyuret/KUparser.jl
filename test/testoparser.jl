@@ -1,4 +1,5 @@
 using HDF5,JLD,KUparser,Base.Test
+include("pxyequal.jl")
 
 # All interfaces give the same result
 info("Load data")
@@ -30,4 +31,4 @@ info("Multi-cpu processing")
 @test @show isequal(p5,p4)
 info("with features")
 @date pxy6=(p6,x6,y6)=oparse(pt, corpus, ndeps, ft; usepmap=true)
-@test @show isequal(pxy6,pxy4)
+@test @show pxyequal(pxy6,pxy4)

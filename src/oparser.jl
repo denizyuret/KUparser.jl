@@ -130,18 +130,13 @@ function pcat(p)
         return q
     else
         pp = similar(p[1][1],0)
-        xx = Array(eltype(p[1][2]), 0)
-        yy = Array(eltype(p[1][3]), 0)
+        xx = similar(p[1][2],0)
+        yy = similar(p[1][3],0)
         for i=1:length(p)
             append!(pp, p[i][1])
-            append!(xx, vec(p[i][2]))
-            append!(yy, vec(p[i][3]))
+            append!(xx, p[i][2])
+            append!(yy, p[i][3])
         end
-        ncols = size(p[1][2], 2)
-        xrows = size(p[1][2], 1)
-        yrows = size(p[1][3], 1)
-        xx = reshape(xx, xrows, div(length(xx), xrows))
-        yy = reshape(yy, yrows, div(length(yy), yrows))
         return (pp, xx, yy)
     end
 end
