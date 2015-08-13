@@ -177,7 +177,7 @@ function initnet(args, pt, ndeps)
         end
         yrows = pt(1,ndeps).nmove
         append!(net, [Mmul(yrows), Bias()])
-        args["parser"]!="bparser" && push!(net, XentLoss())
+        push!(net, args["parser"]=="bparser" ? ScalLoss() : XentLoss())
     end
     for k in fieldnames(KUparam)
         haskey(args, string(k)) || continue
