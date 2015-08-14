@@ -162,13 +162,8 @@ function loaddata(files)
 end
 
 function initnet(args, pt, ndeps)
-    if isfile(args["in"])
-        @date net = loadnet(args["in"])
-    else
-        if args["in"] != nothing
-            warn("Cannot find net file, creating blank net")
-            args["in"] = nothing
-        end
+    args["in"] != nothing && !isfile(args["in"]) && (warn("Cannot find net file, creating blank net"); args["in"]=nothing)
+    if args["in"] == nothing
         net = Layer[]
         length(args["dropout"]) > 1 && push!(net, Drop(args["dropout"][1]))
         for h in args["hidden"]
@@ -178,6 +173,8 @@ function initnet(args, pt, ndeps)
         yrows = pt(1,ndeps).nmove
         append!(net, [Mmul(yrows), Bias()])
         push!(net, args["parser"]=="bparser" ? ScalLoss() : XentLoss())
+    else
+        @date net = loadnet(args["in"])
     end
     for k in fieldnames(KUparam)
         haskey(args, string(k)) || continue
