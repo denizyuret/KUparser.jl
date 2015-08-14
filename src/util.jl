@@ -48,12 +48,12 @@ function evalparse(parsers, sentences; ispunct=zn11punct, postag=[])
     sd = map(s->s.deprel, sentences)
     wf = map(s->s.form, sentences)
     sp = map(s->s.postag, sentences)
-    phcat = vcat(ph...)
-    shcat = vcat(sh...)
-    pdcat = vcat(pd...)
-    sdcat = vcat(sd...)
-    wfcat = vcat(wf...)
-    spcat = vcat(sp...)
+    phcat = vcat2(ph)
+    shcat = vcat2(sh)
+    pdcat = vcat2(pd)
+    sdcat = vcat2(sd)
+    wfcat = vcat2(wf)
+    spcat = vcat2(sp)
     uas = mean(phcat .== shcat) # unlabeled attachment score
     las = mean((phcat .== shcat) & (pdcat .== sdcat)) # labeled attachment score
     uem = mean(ph .== sh)                             # unlabeled exact match
@@ -67,6 +67,12 @@ function evalparse(parsers, sentences; ispunct=zn11punct, postag=[])
     uas2 = mean(phcat[isword] .== shcat[isword])
     las2 = mean((phcat[isword] .== shcat[isword]) & (pdcat[isword] .== sdcat[isword]))
     return (uas, uas2, las, las2, uem, lem)
+end
+
+function vcat2{T}(v::Vector{Vector{T}})
+    w = similar(v[1], 0)
+    for vi in v; append!(w, vi); end
+    return w
 end
 
 # Everybody means something else by "excluding punctuation":
