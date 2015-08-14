@@ -1,3 +1,4 @@
+.julia
 setup.sh
 *.pbs
 *~
