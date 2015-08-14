@@ -1,8 +1,64 @@
+2015-08-13  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Experiments:
+	- foo0813bp1: nbeam=8 start=zn11beam4
+	- foo0813bp2: nbeam=64 start=zn11beam4
+	- foo0813bp3: nbeam=8 start=blank
+	- foo0813bp4: nbeam=64 start=blank
+
+	* gc.c: removing 16 from line 164 solved memory problem:
+	#define REGION_PG_COUNT 8*4096 // 8G because virtual memory is cheap
+
+	* train.jl: TODO: train gives different results with different
+	numbers of workers.  make sure this is an instance ordering issue.
+	echo '16*hpc3002' > foo.machine4; julia4 --machinefile foo.machine4 train.jl --usepmap --pbatch 25 --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 3 --lr 0.0001 --adagrad --nbeam 8 --in foo0730bp.net yatbazp.dev.jld4
+
+2015-08-12  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* RESULTS:
+
+	foo0730bp4.out: starting with zn11beam4.net4, which is a 2x4096 hidden
+	layer net pre-trained on trn to give:
+	gparse: (0.915322681157614,0.9260145213035402,0.9049280853503502,0.9145044183035965,0.4123529411764706,0.3729411764705882)
+	bparse1: (0.915322681157614,0.9260145213035402,0.9049280853503502,0.9145044183035965,0.4123529411764706,0.3729411764705882)
+	bparse10: (0.8389710097963456,0.8631451567512805,0.8289253932248174,0.8518883323014578,0.15764705882352942,0.1411764705882353)
+	Trained with: julia train.jl --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 5000 --lr 0.0001 --adagrad --nbeam 8 --in nets/zn11beam4.net4 --best foo0730bp4.net --pbatch 2500 yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
+	We get the learning curve:
+	DATA:	1	0.7194051	0.90517735	0.9034119
+	DATA:	5	0.77772236	0.9124311	0.91149175
+	DATA:	10	0.7924482	0.9151731	0.91177404
+	DATA:	20	0.8062447	0.9166189	0.91318536
+	DATA:	29	0.8134834	0.91888726	0.9145791
+	-punc:	29	0.82310969	0.92860359	0.921712526
+
+	foo0730bp3.out: starting with foo0730bp.net, which is a single layer
+	4096 hidden unit net gparser trained on dev to give .99566
+	accuracy.  Train using: julia train.jl --parser bparser --arctype
+	ArcEager13 --feats zn11cpv --epochs 5000 --lr 0.0001 --adagrad
+	--nbeam 8 --in foo0730bp.net --out foo0730bp3.net
+	yatbazp.dev.jld4.  Learning curve:
+	DATA:	1	0.6770197
+	DATA:	2	0.8088591
+	DATA:	10	0.8741182
+	DATA:	100	0.9549318
+	DATA:	1000	0.99551314
+
+	foo0730bp5.out: starting with foo0729bp3.net.adastrip2 which is a
+	1x4096 net trained first with gparser then with bparser.  See the
+	effect of adagrad reset.  julia train.jl --parser bparser
+	--arctype ArcEager13 --feats zn11cpv --epochs 5000 --lr 0.0001
+	--adagrad --nbeam 8 --in foo0729bp3.net.adastrip2 --out
+	foo0730bp5.net yatbazp.dev.jld4 We get the learning curve:
+	DATA:	1	0.8925393
+	DATA:	10	0.93758255
+	DATA:	100	0.9760949
+	DATA:	997	0.99900293
+
 2015-08-11  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* test/testbparser.jl: to be consistent in return values we should
 	always have three vectors for pxy even if they have a single
-	element, currently at least gparser violates this.
+	element, currently at least gparser violates this.  FIXED.
 
 2015-07-30  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -53,7 +109,7 @@
 
 	* TODO: why didn't percloss complain when perclossback did not have 1/nx scaling?
 
-	* src/bparser.jl: TODO: Consider no append in bp_result, just
+	* src/bparser.jl: DONE: Consider no append in bp_result, just
 	return individual pxy pairs just like in the multi-cpu case.
 
 2015-07-29  Deniz Yuret  <dyuret@ku.edu.tr>
@@ -115,7 +171,7 @@
 
 	@@psub -N foo0729bp4 julia train.jl --parser bparser --arctype ArcEager13 --feats zn11cpv --epochs 5000 --lr 0.0001 --adagrad --nbeam 8 --in nets/zn11beam4.net2 --best foo0729bp4.net --pbatch 2500 yatbazp.trn.jld4 yatbazp.dev.jld4 yatbazp.tst.jld4
 
-	* TODO:
+	* DONE:
 	- rething parser calling convention.  ncpu unnecessary parallel if
 	nworkers()>1.  nbatch named option.
 	x train.jl should not oparse every iteration: can't do that when
