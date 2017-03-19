@@ -20,7 +20,7 @@ function rmworkers()
 end
 
 function restartmachines()
-    machines = ASCIIString[]
+    machines = String[]
     for i in keys(Base.map_pid_wrkr)
         i == 1 && continue
         w = Base.map_pid_wrkr[i]
@@ -47,7 +47,7 @@ function restartcuda()
     end
 end
 
-function restartmachines(host::ASCIIString)
+function restartmachines(host::String)
     wid = 0
     for i in keys(Base.map_pid_wrkr)
         i == 1 && continue

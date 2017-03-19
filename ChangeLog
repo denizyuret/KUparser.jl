@@ -1,3 +1,20 @@
+2017-03-19  EC2 Default User  <ec2-user@ip-172-31-7-253.us-west-1.compute.internal>
+
+	* features:
+	..sfeatures.jl defines:
+	features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector{Int}=Array(Int, length(feats)), idx=0)
+	..features.jl defines:
+	features(p::Parser, s::Sentence, feats::DFvec, x::AbstractArray=Array(wtype(s),flen(p,s,feats),1),xcol::Integer=1)
+
+	What is wtype(s)?
+	Why do we have xcol?
+	Why do we have idx?
+	Why do we have flen?
+	How does SFvec, DFvec differ?
+	How is features1 different?
+	Why do we need xsize, ysize?
+	What are the different flist.jl entries?
+
 2015-08-13  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* Experiments:

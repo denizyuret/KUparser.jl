@@ -1,6 +1,16 @@
-# using KUnet
+using Knet
 
 macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
+
+typealias Net Vector{Any}       # vector of model weights
+
+cpucopy(a::Array)=copy(a)
+cpucopy(a::KnetArray)=Array(a)
+cpucopy(net::Net)=map(cpucopy,net)
+gpucopy(a::Array)=KnetArray(a)
+gpucopy(a::KnetArray)=copy(a)
+gpucopy(net::Net)=map(gpucopy,net)
+testnet(net::Net)=cpucopy(net)
 
 # findprev does not exist in v0.3
 # if VERSION < v"0.4-"
