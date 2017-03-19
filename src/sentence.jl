@@ -13,5 +13,5 @@ function Base.show(io::IO, s::Sentence)
                join(s.form, " ") :
                join([s.form[1:3], "…", s.form[end-2:end]], " ")))
     print(io, "]")
-    print(io, map(int, s.head))
+    print(io, map(Int, s.head))
 end

@@ -68,7 +68,7 @@ function rparse_dbg{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
         end
         cost += c[r]
         move!(p, r)
-        println("$((r,int(c[r]),cost)) $(int(p.stack[1:p.sptr])) $(p.wptr) $(int(c))")
+        println("$((r,Int(c[r]),cost)) $(Int(p.stack[1:p.sptr])) $(p.wptr) $(Int(c))")
     end
     @assert cost == truecost(p,s)
     return p

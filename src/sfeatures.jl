@@ -1,7 +1,7 @@
 # Sparse compound features are specified using a vector of feature
 # names, e.g. ["s0w", "s0p"]
 
-typealias SFeature Vector{String}
+typealias SFeature{T<:AbstractString} Vector{T}
 
 # Each string specifies a particular feature and has the form:
 #   [sn]\d?([hlr]\d?)*[wpdLabAB]
@@ -27,7 +27,7 @@ typealias SFeature Vector{String}
 # Sparse compound feature vectors are specified using a vector of
 # SFeature's (possibly headed by a hash?)
 
-typealias SFvec Vector{SFeature}
+typealias SFvec{T<:SFeature} Vector{T}
 
 # It does not cost anything to increase the height of a
 # SparseMatrixCSC, so we'll just use a large fixed height
@@ -44,7 +44,7 @@ SFhash = Dict{Any,Int}()
 # To construct a sparse feature vector, we go through the compound
 # features in SFvec in order, lookup their values using features1, get
 # the index of the key-value pair from SFhash, and set the
-# corresponding entry in the feature hash x to 1.
+# corresponding entry in the binary feature vector x to 1.
 
 # This is the deprecated slow version
 # function features0(p::Parser, s::Sentence, feats::SFvec,
@@ -79,7 +79,7 @@ function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector{Int}=Arra
         for j=1:length(f); v[j] = features1(p,s,f[j]); end # 422
         rowval[idx+i] = get!(SFhash, (f,v), 1+length(SFhash)) # 779
     end
-    sort!(sub(rowval, (idx+1):(idx+length(feats)))) # 10
+    sort!(view(rowval, (idx+1):(idx+length(feats)))) # 10
     if rowval[idx+length(feats)] >= SFmax; error("SFmax exceeded"); end
     return rowval
 end
@@ -111,12 +111,12 @@ function features1(p::Parser, s::Sentence, f::String)
         a == 0 && break
         if fn == 'l'
             if a > p.wptr; error("buffer words other than n0 do not have ldeps"); end
-            j = p.lcnt[a] - i + 1 # leftmost child at highest index
-            a = (j > 0) ? p.ldep[a,j] : 0
+#TODO            j = p.lcnt[a] - i + 1 # leftmost child at highest index
+#TODO            a = (j > 0) ? p.ldep[a,j] : 0
         elseif fn == 'r'
             if a >= p.wptr; error("buffer words do not have rdeps"); end
-            j = p.rcnt[a] - i + 1
-            a = (j > 0) ? p.rdep[a,j] : 0
+#TODO            j = p.rcnt[a] - i + 1
+#TODO            a = (j > 0) ? p.rdep[a,j] : 0
         else # if fn == 'h'
             for j=1:i
                 a = p.head[a]
@@ -134,9 +134,10 @@ function features1(p::Parser, s::Sentence, f::String)
      (fn == 'p') ? s.postag[a] :
      (fn == 'd') ? (d>10 ? 6 : d>5 ? 5 : d>0 ? d : nothing) :
      (fn == 'L') ? p.deprel[a] :
-     (fn == 'a') ? p.lcnt[a] :
-     (fn == 'b') ? p.rcnt[a] :
-     (fn == 'A') ? unique(sort(p.deprel[vec(p.ldep[a,1:p.lcnt[a]])])) :
-     (fn == 'B') ? unique(sort(p.deprel[vec(p.rdep[a,1:p.rcnt[a]])])) :
+     # TODO:
+     (fn == 'a') ? 0 : # p.lcnt[a] :
+     (fn == 'b') ? 0 : # p.rcnt[a] :
+     (fn == 'A') ? [] : # unique(sort(p.deprel[vec(p.ldep[a,1:p.lcnt[a]])])) :
+     (fn == 'B') ? [] : # unique(sort(p.deprel[vec(p.rdep[a,1:p.rcnt[a]])])) :
      error("Unknown feature letter $fn"))
 end

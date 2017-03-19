@@ -7,7 +7,7 @@
 # Features can be dense or sparse.  Dense features are specified by
 # string names:
 
-typealias DFeature String
+typealias DFeature AbstractString
 
 # Each string specifies a particular feature and has the form:
 #   [sn]\d?([hlr]\d?)*[vcpdLabAB]
@@ -33,7 +33,7 @@ typealias DFeature String
 
 # A DFvec is a String vector specifying a set of dense features.
 
-typealias DFvec Vector{String}
+typealias DFvec{T<:DFeature} Vector{T}
 
 # Fvec is a union of DFvec and SFvec, which specify dense and sparse
 # features respectively.  The user controls what kind of features are
@@ -44,7 +44,7 @@ typealias Fvec Union{DFvec,SFvec}
 function features(p::Parser, s::Sentence, feats::DFvec, #
                   x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
-    xcol <= size(x,2) || error("xcol > size(x,2)")
+    if xcol > size(x,2); error("xcol > size(x,2)"); end
     wrows = wdim(s)             # first half word, second half context
     xrows = size(x,1)
     xtype = eltype(x)

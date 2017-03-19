@@ -405,7 +405,7 @@ end
 
 reset!{T<:Parser}(pa::Vector{T})=(for p in pa; reset!(p); end)
 
-Base.show(io::IO, p::Parser)=print(io, map(int,p.stack[1:p.sptr]), Int[p.wptr], map(int,p.head))
+Base.show(io::IO, p::Parser)=print(io, map(Int,p.stack[1:p.sptr]), Int[p.wptr], map(Int,p.head))
 
 function Base.hash(p::Parser, h::UInt)
     h += UInt(0xac816432c42f6df9)
