@@ -1,7 +1,7 @@
 # Sparse compound features are specified using a vector of feature
 # names, e.g. ["s0w", "s0p"]
 
-typealias SFeature Vector{ASCIIString}
+typealias SFeature Vector{String}
 
 # Each string specifies a particular feature and has the form:
 #   [sn]\d?([hlr]\d?)*[wpdLabAB]
@@ -46,38 +46,41 @@ SFhash = Dict{Any,Int}()
 # the index of the key-value pair from SFhash, and set the
 # corresponding entry in the feature hash x to 1.
 
-function features0(p::Parser, s::Sentence, feats::SFvec,
-                  x::AbstractSparseArray=spzeros(wtype(s),flen(p,s,feats),1), 
-                  xcol::Integer=1)
-    x[:,xcol] = zero(eltype(x)) # 117
-    for f in feats
-        # fv = (f, map(x->features1(p, s, x), f)) # 869
-        # Removing map gives some speedup:
-        v = Array(Any,length(f))
-        for i=1:length(f); v[i] = features1(p,s,f[i]); end # 491
-        # This cost is unavoidable:
-        idx = get!(SFhash, (f,v), 1+length(SFhash)) # 840
-        @assert idx < SFmax
-        # Figure out how to do this faster:
-        @assert x[idx,xcol]==0 "Duplicate fv $((f,v))"
-        x[idx, xcol] = one(eltype(x)) # 1149
-    end
-    return x
-end
+# This is the deprecated slow version
+# function features0(p::Parser, s::Sentence, feats::SFvec,
+#                   x::AbstractSparseArray=spzeros(wtype(s),flen(p,s,feats),1), 
+#                   xcol::Integer=1)
+#     x[:,xcol] = zero(eltype(x)) # 117
+#     for f in feats
+#         # fv = (f, map(x->features1(p, s, x), f)) # 869
+#         # Removing map gives some speedup:
+#         v = Array(Any,length(f))
+#         for i=1:length(f); v[i] = features1(p,s,f[i]); end # 491
+#         # This cost is unavoidable:
+#         idx = get!(SFhash, (f,v), 1+length(SFhash)) # 840
+#         @assert idx < SFmax
+#         # Figure out how to do this faster:
+#         @assert x[idx,xcol]==0 "Duplicate fv $((f,v))"
+#         x[idx, xcol] = one(eltype(x)) # 1149
+#     end
+#     return x
+# end
 
-# Faster grow sparse array: we have a SparseMatrixCSC: m,n,colptr,rowval,nzval
-# rowval is the only array features needs to set.
+# Faster grow sparse array: we have a SparseMatrixCSC:
+# m,n,colptr,rowval,nzval rowval is the only array features needs to
+# set. This version inserts integers into the rowval Vector{Int}
+# possibly starting at idx > 1.
 
-function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector=Array(Int, length(feats)), idx=0)
-    @assert length(rowval) >= idx + length(feats) "$((length(rowval),idx,length(feats)))"
+function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector{Int}=Array(Int, length(feats)), idx=0)
+    if length(rowval) < idx + length(feats); error("features: $((length(rowval),idx,length(feats)))"); end
     for i=1:length(feats)
         f = feats[i]
-        v = Array(Any, length(f))
+        v = Array(Any, length(f))                             # TODO: get rid of alloc here
         for j=1:length(f); v[j] = features1(p,s,f[j]); end # 422
         rowval[idx+i] = get!(SFhash, (f,v), 1+length(SFhash)) # 779
     end
     sort!(sub(rowval, (idx+1):(idx+length(feats)))) # 10
-    @assert rowval[idx+length(feats)] < SFmax
+    if rowval[idx+length(feats)] >= SFmax; error("SFmax exceeded"); end
     return rowval
 end
 
@@ -86,8 +89,8 @@ end
 # can return strings etc.  Returns 'nothing' if target word does not
 # exist or the feature is not available.
 
-function features1(p::Parser, s::Sentence, f::ASCIIString)
-    @assert in(f[1], "sn") "feature string should start with [sn]"
+function features1(p::Parser, s::Sentence, f::String)
+    if !in(f[1], "sn"); error("feature string should start with [sn]"); end
     (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2) # target index and start of feature spec
     (a,d) = (0,0)           # target word position and right distance
     if ((f[1] == 's') && (p.sptr - i >= 1))
@@ -104,14 +107,14 @@ function features1(p::Parser, s::Sentence, f::ASCIIString)
     while (fn=f[n];in(fn, "hlr"))
         d = 0                   # only stack words get distance
         (i,n) = isdigit(f[n+1]) ? (f[n+1] - '0', n+2) : (1, n+1)
-        @assert i > 0 "hlr indexing is one based" # l1 is the leftmost child, h1 is the direct head etc.
+        if i <= 0; error("hlr indexing is one based"); end # l1 is the leftmost child, h1 is the direct head etc.
         a == 0 && break
         if fn == 'l'
-            @assert (a <= p.wptr) "buffer words other than n0 do not have ldeps"
+            if a > p.wptr; error("buffer words other than n0 do not have ldeps"); end
             j = p.lcnt[a] - i + 1 # leftmost child at highest index
             a = (j > 0) ? p.ldep[a,j] : 0
         elseif fn == 'r'
-            @assert (a < p.wptr) "buffer words do not have rdeps"
+            if a >= p.wptr; error("buffer words do not have rdeps"); end
             j = p.rcnt[a] - i + 1
             a = (j > 0) ? p.rdep[a,j] : 0
         else # if fn == 'h'
@@ -125,7 +128,7 @@ function features1(p::Parser, s::Sentence, f::ASCIIString)
 
     # At this point (a) should be the target word position and we
     # should only have one character left specifying a feature
-    @assert n == length(f)
+    if n != length(f); error(); end
     fn = f[n]
     ((fn == 'w') ? s.form[a] :
      (fn == 'p') ? s.postag[a] :

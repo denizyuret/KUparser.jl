@@ -14,12 +14,12 @@
 # this design.
 
 
-@compat typealias Position UInt8
-@compat typealias DepRel UInt8
-@compat typealias Cost UInt8
-typealias Move Integer
-typealias Pvec Vector{Position}
-typealias Dvec Vector{DepRel}
+typealias Position UInt8        # [1:nword]
+typealias DepRel UInt8          # [1:ndeps]
+typealias Cost UInt8            # [0:nword]
+typealias Move Integer          # [1:nmove]
+typealias Pvec Vector{Position} # used for stack, head
+typealias Dvec Vector{DepRel}   # used for deprel
 Pzeros(n::Integer...)=zeros(Position, n...)
 Dzeros(n::Integer...)=zeros(DepRel, n...)
 
@@ -47,9 +47,10 @@ end # Parser
 
 # A parser provides four functions: 
 #
-# nmoves(p,[s]): how many moves it has or takes to parse a sentence or a corpus
-# anyvalidmoves(p): whether there are any valid moves in current state
-# move!(p,m): execute a particular move
+# nmoves(p): number of possible moves for parser p
+# nmoves(p,s): number of moves it takes for parser p to parse s (a sentence or a corpus)
+# anyvalidmoves(p): whether there are any valid moves in the current state
+# move!(p,m): execute move m with parser p
 # movecosts(p,h,d,c): the number of gold arcs that become unreachable for each move
 #
 # Default definitions are provided below.  A new parser Parser{T} will
@@ -406,8 +407,8 @@ reset!{T<:Parser}(pa::Vector{T})=(for p in pa; reset!(p); end)
 
 Base.show(io::IO, p::Parser)=print(io, map(int,p.stack[1:p.sptr]), Int[p.wptr], map(int,p.head))
 
-function Base.hash(p::Parser, h::Uint)
-    h += uint(0xac816432c42f6df9)
+function Base.hash(p::Parser, h::UInt)
+    h += UInt(0xac816432c42f6df9)
     for n in fieldnames(p)
         h = hash(p.(n), h)
     end

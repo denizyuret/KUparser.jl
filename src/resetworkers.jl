@@ -6,7 +6,7 @@ function resetworkers(ncpu)
     require("CUDArt")
     @everywhere CUDArt.device((myid()-1) % CUDArt.devcount())
     require("CUBLAS")
-    require("KUnet")
+    require("Knet")
     require("KUparser")
 end # resetworkers
 

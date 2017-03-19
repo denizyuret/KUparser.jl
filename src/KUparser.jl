@@ -1,9 +1,8 @@
 module KUparser
 
-using Compat
-using KUnet
+using Compat, Knet, DistributedArrays
 
-include("util.jl");	  export @date, evalparse, testnet
+include("util.jl");	  export @date, evalparse #, testnet
 include("sentence.jl");   export Sentence, Corpus, wdim, wcnt, wtype
 include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1, Parser, reset!
 include("sfeatures.jl");

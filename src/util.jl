@@ -1,18 +1,21 @@
-using KUnet
+# using KUnet
+
+macro date(_x) :(println("$(now()) "*$(string(_x)));flush(STDOUT);@time $(esc(_x))) end
 
 # findprev does not exist in v0.3
-if VERSION < v"0.4-"
-function findprev(A, v, start)
-    for i = start:-1:1
-        A[i] == v && return i
-    end
-    0
-end
-end
+# if VERSION < v"0.4-"
+# function findprev(A, v, start)
+#     for i = start:-1:1
+#         A[i] == v && return i
+#     end
+#     0
+# end
+# end
 
 # This is "distribute" with an extra procs argument:
 # will be fixed in Julia 0.4
-VERSION >= v"0.4-" && eval(Expr(:using,:DistributedArrays))
+# VERSION >= v"0.4-" && eval(Expr(:using,:DistributedArrays))
+
 function distproc(a::AbstractArray, procs)
     owner = myid()
     rr = RemoteRef()
@@ -85,26 +88,26 @@ kcc08punct(p)=in(p,["``", "''", ":", ",", "."])
 
 # Copying net between cpu and gpu
 
-import Base: copy
-KUnet.GPU && eval(Expr(:using,:CUDArt))
+# import Base: copy
+# KUnet.GPU && eval(Expr(:using,:CUDArt))
 
-function copy(net::Net, to::Symbol)
-    net = KUnet.strip!(net)
-    ((to == :gpu) ? gpucopy(net) :
-     (to == :cpu) ? cpucopy(net) :
-     error("Don't know how to copy net to $to"))
-end
+# function copy(net::Net, to::Symbol)
+#     net = KUnet.strip!(net)
+#     ((to == :gpu) ? gpucopy(net) :
+#      (to == :cpu) ? cpucopy(net) :
+#      error("Don't know how to copy net to $to"))
+# end
 
-function testnet(net)
-    net = cpucopy(net)
-    KUnet.strip!(net)
-    for l in net
-        for n in fieldnames(l)
-            if isdefined(l,n) && isa(l.(n), KUparam)
-                # Get rid of all the training fields
-                l.(n) = KUparam(l.(n).arr)
-            end
-        end
-    end
-    return net
-end
+# function testnet(net)
+#     net = cpucopy(net)
+#     KUnet.strip!(net)
+#     for l in net
+#         for n in fieldnames(l)
+#             if isdefined(l,n) && isa(l.(n), KUparam)
+#                 # Get rid of all the training fields
+#                 l.(n) = KUparam(l.(n).arr)
+#             end
+#         end
+#     end
+#     return net
+# end
