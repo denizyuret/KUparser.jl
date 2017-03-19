@@ -2,8 +2,8 @@
 
 	* TODO:
 	# sfeatures is broken, fix it (lcnt,rcnt no longer parser fields).
-	# implement, run model with sparse features.
-	# implement, run model with dense features.
+	# implement, train, run model with sparse features.
+	# implement, train, run model with dense features.
 
 	* features:
 	..sfeatures.jl defines:
