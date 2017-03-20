@@ -1,5 +1,18 @@
-# Number of postags:
-const NPOSTAG = 45                     # hardcoding the ptb postag count for now
+# TODO: fix hardcoding the ptb postag count
+const NPOSTAG = 45
+
+# TODO: It does not cost anything to increase the height of a
+# SparseMatrixCSC, so we'll just use a large fixed height
+# (bad idea?)
+SFmax = (1<<30)
+
+# TODO: We will also use a global dictionary to look up feature-value pairs
+# (another bad idea?) (especially for multi-threaded operation!)
+SFhash = Dict{Any,Int}()
+
+# All problem variables: NPOSTAG, SFhash, SFmax etc. are Corpus
+# variables! TODO: define corpus type to have these? Have parser point
+# to sentence and sentence point to corpus?
 
 # Feature specifications:
 
@@ -14,6 +27,7 @@ typealias DFvec{T<:DFeature} Vector{T}
 typealias SFeature{T<:AbstractString} Vector{T}
 
 # SFVec is an vector of SFeatures specifying a set of sparse features.
+# e.g. [["sw"],["nw","np"]]
 typealias SFvec{T<:SFeature} Vector{T}
 
 # Fvec is a union of DFvec and SFvec, which specify dense and sparse
@@ -27,16 +41,17 @@ typealias Fvec Union{DFvec,SFvec}
     features(p::Parser, s::Sentence, feats, [x, idx])
 
 Return a feature vector given a [`Parser`](@ref) state, a
-[`Sentence`](@ref), and an [`Fvec`](@ref) feature specification
-vector.  The last two arguments (optional) can provide a preallocated
-output array and an offset position in that array.
+[`Sentence`](@ref), and a feature specification vector.  The last two
+arguments (optional) can provide a preallocated output array and an
+offset position in that array.
 
 Primitive features are represented by strings of the following form:
 
     [sn]\d?([hlr]\d?)*[wvcpdLabAB]
 
 The meaning of each character is described below. The letter i
-represents an optional single digit integer.
+represents an optional single digit integer. A default value is used
+if i is not specified.
 
 |char|meaning|
 |:---|:------|
@@ -75,6 +90,7 @@ notable differences between dense and sparse features are:
 
 * Dense vectors do not support "word", sparse vectors do not support "word vector" or "context vector".
 * Sparse vectors represent number of children exactly, dense vectors use the encoding 0,1,...,8,9+.
+* For dense features, `x` is a float matrix and `idx=1` is the column number to fill. For sparse features `x` is an int vector and `idx=0` is an offset.
 
 """
 function features(p::Parser, s::Sentence, feats::DFvec,
@@ -95,36 +111,60 @@ function features(p::Parser, s::Sentence, feats::DFvec,
     for f in feats
         a = getanchor(f,p,ldep,rdep)
         fn = f[end]               # 23
-        if fn == 'v'        # 293
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) # :7976
-            nx += nv
+        if fn == 'v'
+            if a>0        # 293
+                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) # :7976
+            end; nx += nv
         elseif fn == 'c'    # 123
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) # :8873
-            nx += nv
+            if a>0
+                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) # :8873
+            end; nx += nv
         elseif fn == 'p'    # 4
-            (a>0) && (s.postag[a] > np) && error("postag out of bound") # 147
-            (a>0) && (x[nx+s.postag[a], xcol] = x1) # 126
-            nx += np
+            if a>0
+                if s.postag[a] > np; error("postag out of bound"); end # 147
+                x[nx+s.postag[a], xcol] = x1 # 126
+            end; nx += np
         elseif fn == 'd'                 # 3
-            d = getrdist(f,p)
-            (a>0) && (d>0) && (x[nx+(d>10?6:d>5?5:d), xcol] = x1) # 232
-            nx += 6
+            if a>0
+                d = getrdist(f,p,a)
+                if d>0; x[nx+(d>10?6:d>5?5:d), xcol] = x1; end # 232
+            end; nx += 6
         elseif fn == 'L'
-            (a>0) && (p.deprel[a] > nd) && error("deprel out of bound") # 110
-            (a>0) && (x[nx+1+p.deprel[a], xcol] = x1) # 41 first bit for deprel=0 (ROOT)
-            nx += (nd+1)
+            if a>0
+                r = p.deprel[a]
+                if r > nd; error("deprel out of bound"); end # 110
+                x[nx+1+r, xcol] = x1 # 41 first bit for deprel=0 (ROOT)
+            end; nx += (nd+1)
         elseif fn == 'a'
-            (a>0) && (lcnt=(isassigned(ldep,a) ? length(ldep[a]) : 0); x[nx+1+(lcnt>9?9:lcnt), xcol] = x1) # 155 0-9
-            nx += 10
+            if a>0
+                if isassigned(ldep,a)
+                    lcnt=length(ldep[a])
+                    if lcnt > 9; lcnt = 9; end
+                else
+                    lcnt = 0
+                end
+                x[nx+1+lcnt, xcol] = x1 # 155 0-9
+            end; nx += 10
         elseif fn == 'b'
-            (a>0) && (rcnt=(isassigned(rdep,a) ? length(rdep[a]) : 0); x[nx+1+(rcnt>9?9:rcnt), xcol] = x1) # 28  0-9
-            nx += 10
+            if a>0
+                if isassigned(ldep,a)
+                    rcnt=length(ldep[a])
+                    if rcnt > 9; rcnt = 9; end
+                else
+                    rcnt = 0
+                end
+                x[nx+1+rcnt, xcol] = x1 # 155 0-9
+            end; nx += 10
         elseif fn == 'A'
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(lset[a]), 1, nd) # :4245
-            nx += nd
+            if a>0 && isassigned(lset,a)
+                copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(lset[a]), 1, nd) # :4245
+            end; nx += nd
         elseif fn == 'B'
-            (a>0) && copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(rset[a]), 1, nd) # :126
-            nx += nd
+            if a>0 && isassigned(rset,a)
+                copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(rset[a]), 1, nd) # :126
+            end; nx += nd
+        elseif fn == 'w'
+            error("Dense features do not support 'w'")
         else
             error("Unknown feature $(fn)") # 3
         end
@@ -132,6 +172,52 @@ function features(p::Parser, s::Sentence, feats::DFvec,
     nx == xrows || error("Bad feature vector length")
     return x
 end
+
+# Sparse feature extractor:
+
+# TODO: change default idx=1.
+
+function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector{Int}=Array(Int, length(feats)), idx=0)
+    if length(rowval) < idx + length(feats); error("features: $((length(rowval),idx,length(feats)))"); end
+    deps = getdeps(p)
+    @inbounds for i = 1:length(feats)
+        f = feats[i]
+        v = Array(Any, length(f))                             # TODO: get rid of alloc here?
+        for j=1:length(f)
+            v[j] = features1(p,s,f[j],deps...)
+        end # 422
+        rowval[idx+i] = get!(SFhash, (f,v), 1+length(SFhash)) # 779
+    end
+    sort!(view(rowval, (idx+1):(idx+length(feats)))) # 10; TODO: do we still need this?
+    if rowval[idx+length(feats)] >= SFmax; error("SFmax exceeded"); end
+    return rowval
+end
+
+
+# Here is where the actual feature lookup happens.  Similar to the
+# dense lookup.  But does not have to convert everything to a number,
+# can return strings etc.  Returns 'nothing' if target word does not
+# exist or the feature is not available.
+
+function features1(p::Parser, s::Sentence, f::String, ldep, rdep, lset, rset)
+    a = getanchor(f,p,ldep,rdep)
+    if a == 0; return nothing; end
+    fn = f[end]
+    if fn == 'w'; s.form[a]
+    elseif fn == 'p'; s.postag[a]
+    elseif fn == 'L'; p.deprel[a]
+    elseif fn == 'a'; if isassigned(ldep,a); length(ldep[a]); else; 0; end
+    elseif fn == 'b'; if isassigned(rdep,a); length(rdep[a]); else; 0; end
+    elseif fn == 'A'; if isassigned(lset,a); lset[a]; else; nothing; end
+    elseif fn == 'B'; if isassigned(rset,a); rset[a]; else; nothing; end
+    elseif fn == 'd'; (d=getrdist(f,p,a); if d>10; 6; elseif d>5; 5; else; d; end)
+    elseif fn == 'v'; error("Sparse features do not support 'v'")
+    elseif fn == 'c'; error("Sparse features do not support 'c'")
+    else error("Unknown feature letter $fn")
+    end
+end
+
+flen(p::Parser, s::Sentence, feats::SFvec)=SFmax
 
 function flen(p::Parser, s::Sentence, feats::DFvec)
     nx = 0
@@ -202,20 +288,6 @@ function getdeps{T<:Parser}(p::T)
     return (ldep,rdep,lset,rset)
 end    
 
-function getrdist(f::AbstractString, p::Parser)
-    if f[1]=='s'
-        if isdigit(f[2]); i=f[2]-'0'; else; i=0; end
-            if i>0
-                d = p.stack[p.sptr - i + 1] - a
-            elseif p.wptr <= p.nword
-                d = p.wptr - a
-            end
-        
-    else
-        return 0 # dist only defined for stack words
-    end
-end
-
 function getanchor(f::AbstractString, p::Parser, ldep, rdep)
     f1 = f[1]; f2 = f[2]
     if isdigit(f2)
@@ -228,7 +300,7 @@ function getanchor(f::AbstractString, p::Parser, ldep, rdep)
     a = 0                       # target word
     if f1 == 's'
         if (p.sptr - i >= 1) # 25
-            a = p.stack[p.sptr - i]             # 456
+            a = Int(p.stack[p.sptr - i])             # 456
         end
     elseif f1 == 'n'
         if p.wptr + i <= p.nword
@@ -252,21 +324,21 @@ function getanchor(f::AbstractString, p::Parser, ldep, rdep)
         end
         if f1 == 'l'                              # 2
             if a > p.wptr; error("buffer words other than n0 do not have ldeps"); end # 252
-            if isassigned(ldep,Int(a)) && i <= length(ldep[a])
-                a = ldep[a][i]
+            if isassigned(ldep,a) && i <= length(ldep[a])
+                a = Int(ldep[a][i])
             else
                 return 0
             end
         elseif f1 == 'r'
             if a >= p.wptr; error("buffer words do not have rdeps"); end
-            if isassigned(rdep,Int(a)) && i <= length(rdep[a])
-                a = rdep[a][i]
+            if isassigned(rdep,a) && i <= length(rdep[a])
+                a = Int(rdep[a][i])
             else
                 return 0
             end
         elseif f1 == 'h'
             for j=1:i       # 5
-                a = convert(Int,p.head[a]) # 147
+                a = Int(p.head[a]) # 147
                 if a == 0
                     return 0
                 end
@@ -279,94 +351,17 @@ function getanchor(f::AbstractString, p::Parser, ldep, rdep)
     return a
 end    
 
-# It does not cost anything to increase the height of a
-# SparseMatrixCSC, so we'll just use a large fixed height
-# (bad idea?)
-
-SFmax = (1<<30)
-flen(p::Parser, s::Sentence, feats::SFvec)=SFmax
-
-# We will also use a global dictionary to look up feature-value pairs
-# (another bad idea?) (especially for multi-threaded operation!)
-
-SFhash = Dict{Any,Int}()
-
-# All problem variables: NPOSTAG, SFhash, SFmax etc. are Corpus
-# variables! TODO: define corpus type to have these. Have parser point
-# to sentence and sentence point to corpus?
-
-# Sparse feature extractor:
-
-function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector{Int}=Array(Int, length(feats)), idx=0)
-    if length(rowval) < idx + length(feats); error("features: $((length(rowval),idx,length(feats)))"); end
-    for i=1:length(feats)
-        f = feats[i]
-        v = Array(Any, length(f))                             # TODO: get rid of alloc here
-        for j=1:length(f); v[j] = features1(p,s,f[j]); end # 422
-        rowval[idx+i] = get!(SFhash, (f,v), 1+length(SFhash)) # 779
-    end
-    sort!(view(rowval, (idx+1):(idx+length(feats)))) # 10
-    if rowval[idx+length(feats)] >= SFmax; error("SFmax exceeded"); end
-    return rowval
-end
-
-
-# Here is where the actual feature lookup happens.  Similar to the
-# dense lookup.  But does not have to convert everything to a number,
-# can return strings etc.  Returns 'nothing' if target word does not
-# exist or the feature is not available.
-
-function features1(p::Parser, s::Sentence, f::String)
-    if !in(f[1], "sn"); error("feature string should start with [sn]"); end
-    (i,n) = isdigit(f[2]) ? (f[2] - '0', 3) : (0, 2) # target index and start of feature spec
-    (a,d) = (0,0)           # target word position and right distance
-    if ((f[1] == 's') && (p.sptr - i >= 1))
-        a = p.stack[p.sptr - i]                    # target word is in the stack
-        d = (i>0 ? (p.stack[p.sptr - i + 1] - a) : # distance between two stack words
-             p.wptr <= p.nword ? (p.wptr - a) : 0) # distance between top of stack and top of buffer, 0 if buffer empty
-    elseif ((f[1] == 'n') && (p.wptr + i <= p.nword))
-        a = p.wptr + i          # target word is in the buffer
-    end
-    (a == 0) && (return nothing) # target word invalid
-
-    # if next character is in "hlr" treat current (a) as an anchor and
-    # find the appropriate head, left, right as the actual target
-    while (fn=f[n];in(fn, "hlr"))
-        d = 0                   # only stack words get distance
-        (i,n) = isdigit(f[n+1]) ? (f[n+1] - '0', n+2) : (1, n+1)
-        if i <= 0; error("hlr indexing is one based"); end # l1 is the leftmost child, h1 is the direct head etc.
-        a == 0 && break
-        if fn == 'l'
-            if a > p.wptr; error("buffer words other than n0 do not have ldeps"); end
-#TODO            j = p.lcnt[a] - i + 1 # leftmost child at highest index
-#TODO            a = (j > 0) ? p.ldep[a,j] : 0
-        elseif fn == 'r'
-            if a >= p.wptr; error("buffer words do not have rdeps"); end
-#TODO            j = p.rcnt[a] - i + 1
-#TODO            a = (j > 0) ? p.rdep[a,j] : 0
-        else # if fn == 'h'
-            for j=1:i
-                a = p.head[a]
-                a == 0 && break
+function getrdist(f::AbstractString, p::Parser, a::Integer)
+    if f[1]=='s'
+        if isdigit(f[2]); i=f[2]-'0'; else; i=0; end
+            if i>0
+                d = p.stack[p.sptr - i + 1] - a
+            elseif p.wptr <= p.nword
+                d = p.wptr - a
             end
-        end
+        
+    else
+        return 0 # dist only defined for stack words
     end
-    (a == 0) && (return nothing)
-
-    # At this point (a) should be the target word position and we
-    # should only have one character left specifying a feature
-    if n != length(f); error(); end
-    fn = f[n]
-    ((fn == 'w') ? s.form[a] :
-     (fn == 'p') ? s.postag[a] :
-     (fn == 'd') ? (d>10 ? 6 : d>5 ? 5 : d>0 ? d : nothing) :
-     (fn == 'L') ? p.deprel[a] :
-     # TODO:
-     (fn == 'a') ? 0 : # p.lcnt[a] :
-     (fn == 'b') ? 0 : # p.rcnt[a] :
-     (fn == 'A') ? [] : # unique(sort(p.deprel[vec(p.ldep[a,1:p.lcnt[a]])])) :
-     (fn == 'B') ? [] : # unique(sort(p.deprel[vec(p.rdep[a,1:p.rcnt[a]])])) :
-     error("Unknown feature letter $fn"))
 end
-
 
