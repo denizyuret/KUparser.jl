@@ -1,14 +1,20 @@
 # TODO: fix hardcoding the ptb postag count
-const NPOSTAG = 45
+# const NPOSTAG = 45
+# Now we are hardcoding the upostag count
+const NPOSTAG = 17
 
 # TODO: It does not cost anything to increase the height of a
 # SparseMatrixCSC, so we'll just use a large fixed height
 # (bad idea?)
-SFmax = (1<<30)
+# SFmax = typemax(Int32)
+
+# Let us not use SparseMatrixCSC at all.  Just keep around the integer
+# values.  Can always convert back to Sparse by using these as rowval
+# if needed.
 
 # TODO: We will also use a global dictionary to look up feature-value pairs
 # (another bad idea?) (especially for multi-threaded operation!)
-SFhash = Dict{Any,Int}()
+SFhash = Dict{Any,SFtype}()
 
 # All problem variables: NPOSTAG, SFhash, SFmax etc. are Corpus
 # variables! TODO: define corpus type to have these? Have parser point
@@ -61,8 +67,8 @@ if i is not specified.
 |li|i'th leftmost child, default i=1 means the leftmost child|
 |ri|i'th rightmost child, default i=1 means the rightmost child|
 |w|word|
-|v|word vector|
-|c|context vector|
+|v|word vector (first half of wvec)|
+|c|context vector (second half of wvec)|
 |p|postag|
 |d|distance to the right using encoding: 1,2,3,4,5-10,10+|
 |L|dependency label (0 is ROOT or NONE)|
@@ -94,46 +100,46 @@ notable differences between dense and sparse features are:
 
 """
 function features(p::Parser, s::Sentence, feats::DFvec,
-                  x::AbstractArray=Array(wtype(s),flen(p,s,feats),1), 
+                  x::AbstractMatrix=Array(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
     if xcol > size(x,2); error("xcol > size(x,2)"); end
-    wrows = wdim(s)             # first half word, second half context
+    wrows = wdim(s)             #11 first half word, second half context
     xrows = size(x,1)
     xtype = eltype(x)
     x1 = one(xtype)
-    x[:,xcol] = zero(xtype)     # :1800
+    x[:,xcol] = zero(xtype)     #173
     nx = 0                      # last entry in x
     nv = wrows >> 1             # size of word/context vector, assumes word vec and context vec concatenated
     nd = p.ndeps
     np = NPOSTAG
     nw = p.nword
-    ldep,rdep,lset,rset = getdeps(p)
-    for f in feats
-        a = getanchor(f,p,ldep,rdep)
-        fn = f[end]               # 23
-        if fn == 'v'
-            if a>0        # 293
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) # :7976
-            end; nx += nv
-        elseif fn == 'c'    # 123
-            if a>0
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) # :8873
-            end; nx += nv
-        elseif fn == 'p'    # 4
-            if a>0
-                if s.postag[a] > np; error("postag out of bound"); end # 147
-                x[nx+s.postag[a], xcol] = x1 # 126
-            end; nx += np
-        elseif fn == 'd'                 # 3
+    ldep,rdep,lset,rset = getdeps(p) #3775
+    for f in feats                   #48
+        a = getanchor(f,p,ldep,rdep) #1402
+        fn = f[end]                  #642
+        if fn == 'v'                 #234
+            if a>0                   #91
+                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) #331
+            end; nx += nv       #5
+        elseif fn == 'c'        #200
+            if a>0              #122
+                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) #492
+            end; nx += nv       #6
+        elseif fn == 'p'        #114
+            if a>0              #159
+                if s.postag[a] > np; error("postag out of bound"); end #210
+                x[nx+s.postag[a], xcol] = x1 #839
+            end; nx += np                    #5
+        elseif fn == 'd'
             if a>0
                 d = getrdist(f,p,a)
-                if d>0; x[nx+(d>10?6:d>5?5:d), xcol] = x1; end # 232
+                if d>0; x[nx+(d>10?6:d>5?5:d), xcol] = x1; end
             end; nx += 6
         elseif fn == 'L'
             if a>0
                 r = p.deprel[a]
-                if r > nd; error("deprel out of bound"); end # 110
-                x[nx+1+r, xcol] = x1 # 41 first bit for deprel=0 (ROOT)
+                if r > nd; error("deprel out of bound"); end
+                x[nx+1+r, xcol] = x1 # first bit for deprel=0 (ROOT)
             end; nx += (nd+1)
         elseif fn == 'a'
             if a>0
@@ -143,7 +149,7 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                 else
                     lcnt = 0
                 end
-                x[nx+1+lcnt, xcol] = x1 # 155 0-9
+                x[nx+1+lcnt, xcol] = x1 # 0-9
             end; nx += 10
         elseif fn == 'b'
             if a>0
@@ -153,15 +159,15 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                 else
                     rcnt = 0
                 end
-                x[nx+1+rcnt, xcol] = x1 # 155 0-9
+                x[nx+1+rcnt, xcol] = x1 # 0-9
             end; nx += 10
         elseif fn == 'A'
             if a>0 && isassigned(lset,a)
-                copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(lset[a]), 1, nd) # :4245
+                copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(lset[a]), 1, nd) #
             end; nx += nd
         elseif fn == 'B'
             if a>0 && isassigned(rset,a)
-                copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(rset[a]), 1, nd) # :126
+                copy!(x, (xcol-1)*xrows+nx+1, Array{wtype(s)}(rset[a]), 1, nd) #
             end; nx += nd
         elseif fn == 'w'
             error("Dense features do not support 'w'")
@@ -169,7 +175,7 @@ function features(p::Parser, s::Sentence, feats::DFvec,
             error("Unknown feature $(fn)") # 3
         end
     end
-    nx == xrows || error("Bad feature vector length")
+    nx == xrows || error("Bad feature vector length $nx != $xrows")
     return x
 end
 
@@ -177,20 +183,19 @@ end
 
 # TODO: change default idx=1.
 
-function features(p::Parser, s::Sentence, feats::SFvec, rowval::Vector{Int}=Array(Int, length(feats)), idx=0)
-    if length(rowval) < idx + length(feats); error("features: $((length(rowval),idx,length(feats)))"); end
+function features(p::Parser, s::Sentence, feats::SFvec,
+                  x::AbstractMatrix=Array(SFtype, length(feats), 1), xcol=1)
+    if xcol > size(x,2); error("xcol > size(x,2)"); end
     deps = getdeps(p)
     @inbounds for i = 1:length(feats)
         f = feats[i]
         v = Array(Any, length(f))                             # TODO: get rid of alloc here?
         for j=1:length(f)
-            v[j] = features1(p,s,f[j],deps...)
-        end # 422
-        rowval[idx+i] = get!(SFhash, (f,v), 1+length(SFhash)) # 779
+            v[j] = features1(p,s,f[j],deps...) #1023
+        end
+        x[i,xcol] = get!(SFhash, (f,v), 1+length(SFhash)) #7782 TODO: need a better hash function here
     end
-    sort!(view(rowval, (idx+1):(idx+length(feats)))) # 10; TODO: do we still need this?
-    if rowval[idx+length(feats)] >= SFmax; error("SFmax exceeded"); end
-    return rowval
+    return x
 end
 
 
@@ -217,29 +222,32 @@ function features1(p::Parser, s::Sentence, f::String, ldep, rdep, lset, rset)
     end
 end
 
-flen(p::Parser, s::Sentence, feats::SFvec)=SFmax
+function flen(p::Parser, s::Sentence, feats::SFvec)
+    length(feats) # one integer per feature
+end
 
 function flen(p::Parser, s::Sentence, feats::DFvec)
     nx = 0
     nw = wdim(s) >> 1
     nd = p.ndeps
     for f in feats
-        nx += flen1(f[end], nw, nd) # 1129
+        nx += flen1(f[end], nw, nd, NPOSTAG) # 1129
     end
     return nx
 end
 
-function flen1(c::Char, nw::Integer=100, nd::Integer=11, np::Integer=45)
-    (c == 'v' ? nw :
-     c == 'c' ? nw :
-     c == 'p' ? np :
-     c == 'd' ? 6 :
-     c == 'L' ? (nd+1) :        # ROOT is not included in nd
-     c == 'a' ? 10 :
-     c == 'b' ? 10 :
-     c == 'A' ? nd :
-     c == 'B' ? nd :
-     error("Unknown feature character $c"))
+function flen1(c::Char, nw::Int, nd::Int, np::Int)
+    if c == 'v'; nw
+    elseif c == 'c'; nw
+    elseif c == 'p'; np
+    elseif c == 'd'; 6
+    elseif c == 'L'; (nd+1) # ROOT is not included in nd, TODO: fix this
+    elseif c == 'a'; 10
+    elseif c == 'b'; 10
+    elseif c == 'A'; nd
+    elseif c == 'B'; nd
+    else error("Unknown feature character $c")
+    end
 end
 
 # Utility functions to calculate the size of the feature matrix
@@ -266,20 +274,20 @@ function getdeps{T<:Parser}(p::T)
         elseif d<h
             if !isassigned(ldep,h)
                 ldep[h]=[d]
-                lset[h]=falses(nd)
-                lset[h][dr[d]]=true
+                lset[h]=zeros(UInt8,nd) # falses(nd) is slower
+                lset[h][dr[d]]=1
             else
                 push!(ldep[h],d)
-                lset[h][dr[d]]=true
+                lset[h][dr[d]]=1
             end
         elseif d>h
             if !isassigned(rdep,h)
                 rdep[h]=[d]
-                rset[h]=falses(nd)
-                rset[h][dr[d]]=true
+                rset[h]=zeros(UInt8,nd)
+                rset[h][dr[d]]=1
             else
                 unshift!(rdep[h],d)
-                rset[h][dr[d]]=true
+                rset[h][dr[d]]=1
             end
         else
             error("h==d")
@@ -288,8 +296,8 @@ function getdeps{T<:Parser}(p::T)
     return (ldep,rdep,lset,rset)
 end    
 
-function getanchor(f::AbstractString, p::Parser, ldep, rdep)
-    f1 = f[1]; f2 = f[2]
+function getanchor(f::String, p::Parser, ldep, rdep)
+    f1 = f[1]; f2 = f[2]; flen = length(f)
     if isdigit(f2)
         i = f2 - '0'            # index
         n = 3                   # next character
@@ -310,7 +318,7 @@ function getanchor(f::AbstractString, p::Parser, ldep, rdep)
         error("feature string should start with [sn]")
     end
     if a==0; return 0; end
-    while n < length(f)
+    while n < flen
         f1 = f[n]; f2 = f[n+1]
         if isdigit(f2)
             i = f2 - '0'
@@ -353,13 +361,18 @@ end
 
 function getrdist(f::AbstractString, p::Parser, a::Integer)
     if f[1]=='s'
-        if isdigit(f[2]); i=f[2]-'0'; else; i=0; end
-            if i>0
-                d = p.stack[p.sptr - i + 1] - a
-            elseif p.wptr <= p.nword
-                d = p.wptr - a
-            end
-        
+        if isdigit(f[2])
+            i=f[2]-'0'
+        else
+            i=0
+        end
+        if i>0
+            return p.stack[p.sptr - i + 1] - a
+        elseif p.wptr <= p.nword
+            return p.wptr - a
+        else
+            return 0
+        end
     else
         return 0 # dist only defined for stack words
     end

@@ -13,20 +13,9 @@
 # julia-users members Toivo Henningsson and Simon Danisch for suggesting
 # this design.
 
-
-typealias Position UInt8        # [1:nword]
-typealias DepRel UInt8          # [1:ndeps]
-typealias Cost UInt8            # [0:nword]
-typealias Move Integer          # [1:nmove]
-typealias Pvec Vector{Position} # used for stack, head
-typealias Dvec Vector{DepRel}   # used for deprel
-Pzeros(n::Integer...)=zeros(Position, n...)
-Dzeros(n::Integer...)=zeros(DepRel, n...)
-
-
 type Parser{T,V}
     nword::Int            # number of words in sentence
-    ndeps::Int            # number of dependency labels (excluding ROOT)
+    ndeps::Int            # number of dependency labels (excluding ROOT) TODO: why exclude root?
     nmove::Int            # number of possible moves (set by init!)
     wptr::Int             # index of first word in buffer
     sptr::Int             # index of last word (top) of stack
@@ -34,7 +23,7 @@ type Parser{T,V}
     head::Pvec            # 1xn vector of heads
     deprel::Dvec          # 1xn vector of dependency labels
     
-    function Parser(nword::Integer, ndeps::Integer)
+    function Parser(nword::Int, ndeps::Int)
         (nword < typemax(Position)) || error("nword >= $(typemax(Position))")
         (ndeps < typemax(DepRel))   || error("ndeps >= $(typemax(DepRel))")
         p = new(nword, ndeps, 0,               # nword, ndeps, nmove
@@ -61,23 +50,23 @@ end # Parser
 # initialization and ensures 2n-2 moves for each sentence.
 
 init!(p::Parser)=(p.nmove=(2+p.ndeps<<1);shift(p))
+anyvalidmoves(p::Parser)=(shiftok(p)||reduceok(p)||leftok(p)||rightok(p))
 nmoves(p::Parser)=p.nmove
 nmoves(p::Parser,s::Sentence)=((wcnt(s)-1)<<1)
 nmoves(p::Parser,c::Corpus)=(n=0; for s in c; n += nmoves(p,s); end; n)
 
-anyvalidmoves(p::Parser)=(shiftok(p)||reduceok(p)||leftok(p)||rightok(p))
-
 function move!(p::Parser, m::Move)
-    (1 <= m <= p.nmove) || error("Move $m is not supported")
-    (m == shiftmove(p))  ? (shiftok(p)||error("Bad move");  shift(p)) :
-    in(m, rightmoves(p)) ? (rightok(p)||error("Bad move");  right(p,label(p,m))) :
-    in(m, leftmoves(p))  ? (leftok(p)||error("Bad move");   left(p,label(p,m))) :
-    (m == reducemove(p)) ? (reduceok(p)||error("Bad move"); reduce(p)) :
-    error("Move $m is not supported")
+    if !(1 <= m <= p.nmove); error("Move $m is not supported"); end
+    if (m == shiftmove(p));      if shiftok(p);  shift(p);            else; error("Bad move"); end
+    elseif in(m, rightmoves(p)); if rightok(p);  right(p,label(p,m)); else; error("Bad move"); end
+    elseif in(m, leftmoves(p));  if leftok(p);   left(p,label(p,m));  else; error("Bad move"); end
+    elseif (m == reducemove(p)); if reduceok(p); reduce(p);           else; error("Bad move"); end
+    else error("Move $m is not supported")
+    end
 end
 
 function movecosts(p::Parser, head::Pvec, deprel::Dvec, 
-                   cost::Pvec=Array(Position,p.nmove))
+                   cost::Pvec=Array(Cost,p.nmove))
     (length(head) == p.nword)   ||error("Bad head")
     (length(deprel) == p.nword) ||error("Bad deprel")
     (length(cost) == p.nmove)   ||error("Bad cost")
@@ -88,8 +77,12 @@ function movecosts(p::Parser, head::Pvec, deprel::Dvec,
     n0l=0; for i=1:p.sptr; si=p.stack[i]; head[si]==n0 && p.head[si]==0 && (n0l+=1); end
     s0r=0; for i=p.wptr:p.nword; (head[i]==s0) && (s0r += 1); end
 
-    shiftok(p)  && (cost[shiftmove(p)]  =  shiftcost(p, head, n0l, s0r))
-    reduceok(p) && (cost[reducemove(p)] = reducecost(p, head, n0l, s0r))
+    if shiftok(p)
+        cost[shiftmove(p)]  =  shiftcost(p, head, n0l, s0r)
+    end
+    if reduceok(p)
+        cost[reducemove(p)] = reducecost(p, head, n0l, s0r)
+    end
     if leftok(p)                 
         (lh,ld) = leftmovepair(p)                               # left adds the arc (lh,ld)
         lcost = leftcost(p, head, n0l, s0r)
@@ -113,6 +106,15 @@ function movecosts(p::Parser, head::Pvec, deprel::Dvec,
     return cost
 end # movecosts
 
+function truecost(p::Parser, s::Sentence)
+    cost = 0
+    @inbounds for i=1:p.nword
+        if (p.head[i] != s.head[i]) || (p.deprel[i] != s.deprel[i])
+            cost += 1
+        end
+    end
+    return cost
+end
 
 ################################ ArcEager,GN13 ##################
 # We provide default fallback definitions for Parser based on the
@@ -183,22 +185,22 @@ s0head0(p::Parser)=((p.wptr > p.nword) && (p.sptr > 1))
 # moves the token to s0, so buffer words never have heads) or as s0
 # after rdeps.
 
-function shiftcost(p::Parser, head::AbstractArray, n0l::Integer, s0r::Integer)
+function shiftcost(p::Parser, head::AbstractArray, n0l::Int, s0r::Int)
     # eager: n0 gets no more ldeps or lhead
     (n0l + (0 < findprev(p.stack, head[p.wptr], p.sptr)))
 end
 
-function reducecost(p::Parser, head::AbstractArray, n0l::Integer, s0r::Integer)
+function reducecost(p::Parser, head::AbstractArray, n0l::Int, s0r::Int)
     s0r # eager: s0 gets no more rdeps
 end
 
-function leftcost(p::Parser, head::AbstractArray, n0l::Integer, s0r::Integer)
+function leftcost(p::Parser, head::AbstractArray, n0l::Int, s0r::Int)
     # eager: s0 gets no more rdeps, rhead>n0, 0head
     s0 = p.stack[p.sptr]; s0h = head[s0]
     (s0r + (s0h > p.wptr) + (s0h == 0))
 end
 
-function rightcost(p::Parser, head::AbstractArray, n0l::Integer, s0r::Integer)
+function rightcost(p::Parser, head::AbstractArray, n0l::Int, s0r::Int)
     # eager: n0 gets no more ldeps, rhead, 0head, or lhead<s0
     n0 = p.wptr; n0h = head[n0]
     (n0l + (n0h > n0) + (n0h == 0) + (0 < findprev(p.stack, n0h, p.sptr-1)))
@@ -314,25 +316,25 @@ anyvalidmoves(p::ArcHybrid)=((p.wptr <= p.nword) || (p.sptr > 1))
 # or ni (i>0) as head.  It also cannot acquire any more right
 # children: (s0,b) + (b\n0,s0) + (s1 or 0,s0)
 
-function shiftcost(p::ArcHybrid, head::AbstractArray, n0l::Integer, s0r::Integer)
+function shiftcost(p::ArcHybrid, head::AbstractArray, n0l::Int, s0r::Int)
     # n0 gets no more ldeps or lhead<s0 or root head if there is s0
     n0 = p.wptr; n0h = head[n0]
     (n0l + (findprev(p.stack, n0h, p.sptr-1) > 0) + ((n0h==0) && (p.sptr>0)))
 end
 
-function reducecost(p::ArcHybrid, head::AbstractArray, n0l::Integer, s0r::Integer)
+function reducecost(p::ArcHybrid, head::AbstractArray, n0l::Int, s0r::Int)
     # s0 gets no more rdeps or rhead
     s0 = p.stack[p.sptr]; s0h = head[s0]
     (s0r + (s0h >= p.wptr))
 end
 
-function leftcost(p::ArcHybrid, head::AbstractArray, n0l::Integer, s0r::Integer)
+function leftcost(p::ArcHybrid, head::AbstractArray, n0l::Int, s0r::Int)
     # s0 gets no more rdeps, rhead>n0, s1 head or 0head if alone
     s0 = p.stack[p.sptr]; s0h = head[s0]
     (s0r + ((s0h > p.wptr) || ((p.sptr == 1) && (s0h == 0)) || ((p.sptr > 1) && (s0h == p.stack[p.sptr-1]))))
 end
 
-function rightcost(p::ArcHybrid, head::AbstractArray, n0l::Integer, s0r::Integer)
+function rightcost(p::ArcHybrid, head::AbstractArray, n0l::Int, s0r::Int)
     # s0 gets no more rdeps or rhead
     s0 = p.stack[p.sptr]; s0h = head[s0]
     (s0r + (s0h >= p.wptr))
@@ -372,7 +374,7 @@ label(p::ArcHybridR1, m::Move)=convert(DepRel,(m+1)>>1)
 ################################################################
 # Some general utility functions:
 
-function arc!(p::Parser, h::Integer, d::Integer, l::Integer)
+function arc!(p::Parser, h::Position, d::Position, l::DepRel)
     p.head[d] = h
     p.deprel[d] = l
 end
