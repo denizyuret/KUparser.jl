@@ -15,6 +15,8 @@ typealias Corpus AbstractVector{Sentence}
 type Corpus2
     postags::Dict{String,PosTag}
     deprels::Dict{String,DepRel}
+    wvecs::Dict{String,Vector{Float32}}
+    vocab::Dict{String,Int32}
     # TODO: add word vectors, vocab, how do we add context vectors?
     sentences::Vector{Sentence}
     Corpus2()=new()

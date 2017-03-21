@@ -10,13 +10,16 @@
 # 9. DEPS: Enhanced dependency graph in the form of a list of head-deprel pairs.
 # 10. MISC: Any other annotation.
 
-function readconllu(filename::AbstractString)
+function readconllu(filename::AbstractString,wordvecs=nothing)
     c = Corpus2()
     c.postags = UPOSTAG
     c.deprels = UDEPREL
+    c.wvecs = Dict{String,Vector{Float32}}()
+    c.vocab = Dict{String,Int32}()
     c.sentences = Sentence[]
     s = Sentence()
     nw = 0
+    info(filename)
     for line in eachline(filename)
         line = chomp(line)
         fields = split(line, '\t') # TODO: this makes fields[2] a substring preventing garbage collection.
@@ -32,6 +35,7 @@ function readconllu(filename::AbstractString)
             nw += 1
             if fields[1] != "$nw"; error("Token out of order in [$line]"); end
             push!(s.form, fields[2])
+            get!(c.wvecs, lowercase(fields[2]), Vector{Float32}())
             hd = parse(Int,fields[7])
             if !(0 <= hd <= typemax(eltype(s.head))); Base.warn_once("Bad head: $hd"); hd=0; end
             push!(s.head, hd)
@@ -49,6 +53,36 @@ function readconllu(filename::AbstractString)
             # skip
         else
             error("Cannot parse [$line]")
+        end
+    end
+    if wordvecs != nothing
+        info(wordvecs)
+        wdims = 0
+        open(`xzcat $wordvecs`) do io
+            readline(io) # first line gives count and dim
+            for line in eachline(io)
+                n = search(line, ' ')
+                w = SubString(line,1,n-1)
+                if !haskey(c.wvecs,w); continue; end
+                v = map(s->parse(Float32,s), split(SubString(line,n+1)))
+                if wdims == 0; wdims = length(v); elseif wdims != length(v); error(); end
+                c.wvecs[w] = v
+            end
+        end
+        # At this point the vectors for unknown words are empty
+        # We have several options:
+        # replace them with random vectors.
+        # replace them with the same random vector.
+        # use the zero vector. stick with this for now, TODO: think about this
+        for s in c.sentences
+            nw = length(s.form)
+            s.wvec = zeros(Float32, wdims, nw)
+            for i in 1:nw
+                v = c.wvecs[lowercase(s.form[i])]
+                if !isempty(v)
+                    s.wvec[:,i] = v
+                end
+            end
         end
     end
     return c

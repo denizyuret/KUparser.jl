@@ -1,3 +1,13 @@
+2017-03-21  dyuret  <dyuret@ku.edu.tr>
+
+	* ideas:
+	# try wvecs from conll, no cvec, get baseline, compare with static wvec on acl11.
+	# try wvecs from facebook.
+	# try wvecs from volkan.
+	# try wvec/cvec from bilstm model from omer, compare with static wvec/cvec on acl11.
+	# we can use lstm hiddens for cvec, or do the softmax and use averaged wvecs.
+	# parse with an rnn, possibly preinitialized embeddings from bilstm.
+
 2017-03-19  dyuret  <dyuret@ku.edu.tr>
 
 	* TODO:
