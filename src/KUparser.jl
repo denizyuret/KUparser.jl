@@ -11,7 +11,7 @@ include("bparser.jl");    export bparse, bparse_pmap
 include("oparser.jl");    export oparse
 include("rparser.jl");    export rparse
 include("flist.jl");      export Flist
-include("conll17.jl");    export readconllu, readvocab
+# include("conll17.jl");    export readconllu, readvocab
 
 end # module
 

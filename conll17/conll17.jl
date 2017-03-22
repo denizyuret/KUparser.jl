@@ -1,3 +1,5 @@
+using KUparser
+
 # CONLL-U FORMAT:
 # 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
 # 2. FORM: Word form or punctuation symbol.
