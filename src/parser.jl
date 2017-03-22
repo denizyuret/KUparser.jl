@@ -15,23 +15,24 @@
 
 type Parser{T,V}
     nword::Int            # number of words in sentence
-    ndeps::Int            # number of dependency labels (excluding ROOT) TODO: why exclude root?
+    ndeps::Int            # number of dependency labels (ROOT=1)
     nmove::Int            # number of possible moves (set by init!)
-    wptr::Int             # index of first word in buffer
+    wptr::Position        # index of first word in buffer
     sptr::Int             # index of last word (top) of stack
-    stack::Pvec           # 1xn vector for stack of indices
-    head::Pvec            # 1xn vector of heads
-    deprel::Dvec          # 1xn vector of dependency labels
+    stack::Pvec           # nword vector for stack of indices
+    head::Pvec            # nword vector of heads
+    deprel::Dvec          # nword vector of dependency labels
     
-    function Parser(nword::Int, ndeps::Int)
-        (nword < typemax(Position)) || error("nword >= $(typemax(Position))")
-        (ndeps < typemax(DepRel))   || error("ndeps >= $(typemax(DepRel))")
-        p = new(nword, ndeps, 0,               # nword, ndeps, nmove
-                1, 0, Pzeros(nword),           # wptr, sptr, stack
-                Pzeros(nword), Dzeros(nword))  # head, deprel
-        init!(p)
-        return p
+    function Parser(nword::Int,ndeps::Int)
+        init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword)))
     end
+
+    function Parser(s::Sentence)
+        nword = length(s.word)
+        ndeps = length(s.vocab.deprels)
+        init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword)))
+    end
+
 end # Parser
 
 # A parser provides four functions: 
@@ -49,7 +50,7 @@ end # Parser
 # [wroot][].  This is achieved by always performing a SHIFT during
 # initialization and ensures 2n-2 moves for each sentence.
 
-init!(p::Parser)=(p.nmove=(2+p.ndeps<<1);shift(p))
+init!(p::Parser)=(p.nmove=(p.ndeps<<1);shift(p);p)
 anyvalidmoves(p::Parser)=(shiftok(p)||reduceok(p)||leftok(p)||rightok(p))
 nmoves(p::Parser)=p.nmove
 nmoves(p::Parser,s::Sentence)=((wcnt(s)-1)<<1)
@@ -141,19 +142,19 @@ left(p::Parser, l::DepRel)=(arc!(p, p.wptr, p.stack[p.sptr], l); reduce(p))
 right(p::Parser, l::DepRel)=(arc!(p, p.stack[p.sptr], p.wptr, l); shift(p))
 
 # Moves are represented by integers 1..p.nmove
-# Default order is REDUCE,L1,R1,L2,R2,..,L[ndeps],R[ndeps],SHIFT
+# Default order is SHIFT,L2,R2,..,L[ndeps],R[ndeps],REDUCE
 
-shiftmove(p::Parser)=p.nmove
-reducemove(p::Parser)=1
+shiftmove(p::Parser)=1
+reducemove(p::Parser)=p.nmove
 rightmoves(p::Parser)=(3:2:(p.nmove-1))
 leftmoves(p::Parser)=(2:2:(p.nmove-2))
 
 # Dependency labels (deprel) are represented by integers 1..p.ndeps.
-# The special ROOT deprel is represented by 0.
+# The special ROOT deprel is represented by 1 and has no associated move.
 
-rightmove(p::Parser,l::DepRel)=(1+l<<1)
-leftmove(p::Parser,l::DepRel)=(l<<1)
-label(p::Parser,m::Move)=convert(DepRel,m>>1)
+rightmove(p::Parser,l::DepRel)=(l<<1-1)
+leftmove(p::Parser,l::DepRel)=(l<<1-2)
+label(p::Parser,m::Move)=convert(DepRel,m>>1+1)
 
 # GN13 has the following preconditions for moves:
 #
@@ -353,22 +354,13 @@ reducemove(p::ArcHybridR1)=nothing
 
 # This gives us one less legal move.
 
-init!(p::ArcHybridR1)=(p.nmove=(1+p.ndeps<<1);shift(p))
+init!(p::ArcHybridR1)=(p.nmove=(p.ndeps<<1-1);shift(p);p)
 
 # Moves are represented by integers 1..p.nmove, 0 is not valid.
-# They correspond to L1,R1,L2,R2,...,L[ndeps],R[ndeps],SHIFT
+# They correspond to SHIFT,L2,R2,...,L[ndeps],R[ndeps]
 
-shiftmove(p::ArcHybridR1)=p.nmove
-leftmoves(p::ArcHybridR1)=(1:2:(p.nmove-2))
-rightmoves(p::ArcHybridR1)=(2:2:(p.nmove-1))
-
-# Dependency labels (deprel) are represented by integers 1..p.ndeps
-# The special ROOT deprel is represented by 0.
-
-leftmove(p::ArcHybridR1, l::DepRel)=(l<<1-1)
-rightmove(p::ArcHybridR1, l::DepRel)=(l<<1)
-label(p::ArcHybridR1, m::Move)=convert(DepRel,(m+1)>>1)
-
+leftmoves(p::ArcHybridR1)=(2:2:(p.nmove-1))
+rightmoves(p::ArcHybridR1)=(3:2:p.nmove)
 
 
 ################################################################

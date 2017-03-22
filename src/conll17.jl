@@ -11,13 +11,13 @@
 # 10. MISC: Any other annotation.
 
 function readconllu(filename::AbstractString,wordvecs=nothing)
-    c = Corpus2()
-    c.postags = UPOSTAG
-    c.deprels = UDEPREL
-    c.wvecs = Dict{String,Vector{Float32}}()
-    c.vocab = Dict{String,Int32}()
-    c.sentences = Sentence[]
-    s = Sentence()
+    v = Vocab()
+    v.postags = UPOSTAG
+    v.deprels = UDEPREL
+    words = Dict{String,WordId}()
+    lcwords = Dict{String,Vector{WordId}}()
+    sentences = Sentence[]
+    s = Sentence(); s.vocab = v
     nw = 0
     info(filename)
     for line in eachline(filename)
@@ -25,30 +25,43 @@ function readconllu(filename::AbstractString,wordvecs=nothing)
         fields = split(line, '\t') # TODO: this makes fields[2] a substring preventing garbage collection.
         if line == ""
             if nw > 0
-                s.wvec = Array(Float32,0,nw)
-                push!(c.sentences,s)
-                s = Sentence(); nw = 0
+                nw = 0
+                push!(sentences,s)
+                s = Sentence(); s.vocab = v
             end
         elseif line[1] == '#'
             continue
         elseif ismatch(r"^\d+$", fields[1])
             nw += 1
             if fields[1] != "$nw"; error("Token out of order in [$line]"); end
-            push!(s.form, fields[2])
-            get!(c.wvecs, lowercase(fields[2]), Vector{Float32}())
-            hd = parse(Int,fields[7])
+
+            if !haskey(words, fields[2])
+                id = 1 + length(words)
+                wform = String(fields[2])
+                lform = lowercase(wform)
+                words[wform] = id
+                if !haskey(lcwords, lform); lcwords[lform] = WordId[]; end
+                push!(lcwords[lform], id)
+                push!(v.words, wform)
+            end
+            push!(s.word, words[fields[2]])
+
+            hd = parse(Position,fields[7])
             if !(0 <= hd <= typemax(eltype(s.head))); Base.warn_once("Bad head: $hd"); hd=0; end
             push!(s.head, hd)
-            pt = get(c.postags, fields[4], -1)
-            if pt == -1; Base.warn_once("Bad postag: $(fields[4])"); end
+
+            pt = findfirst(v.postags, fields[4])
+            if pt == 0; Base.warn_once("Bad postag: $(fields[4])"); end
             push!(s.postag, pt)
+
             dr = fields[8]
             # Get rid of language specific extensions
             drcolon = search(dr, ':')
             if drcolon > 0; dr = dr[1:drcolon-1]; end
-            dr = get(c.deprels, dr, -1)
-            if dr == -1; Base.warn_once("Bad deprel: $(fields[8])"); end
+            dr = findfirst(v.deprels, dr)
+            if dr == 0; Base.warn_once("Bad deprel: $(fields[8])"); end
             push!(s.deprel, dr)
+
         elseif ismatch(r"^\d+[-.]\d+$", fields[1])
             # skip
         else
@@ -57,98 +70,87 @@ function readconllu(filename::AbstractString,wordvecs=nothing)
     end
     if wordvecs != nothing
         info(wordvecs)
-        wdims = 0
         open(`xzcat $wordvecs`) do io
-            readline(io) # first line gives count and dim
+            firstline = split(readline(io)) # first line gives count and dim
+            wdims = parse(Int,firstline[2])
+            # TODO: We are leaving unknown word vectors as zero!
+            v.wvecs = zeros(WVtype, wdims, length(v.words))
             for line in eachline(io)
                 n = search(line, ' ')
                 w = SubString(line,1,n-1)
-                if !haskey(c.wvecs,w); continue; end
-                v = map(s->parse(Float32,s), split(SubString(line,n+1)))
-                if wdims == 0; wdims = length(v); elseif wdims != length(v); error(); end
-                c.wvecs[w] = v
-            end
-        end
-        # At this point the vectors for unknown words are empty
-        # We have several options:
-        # replace them with random vectors.
-        # replace them with the same random vector.
-        # use the zero vector. stick with this for now, TODO: think about this
-        for s in c.sentences
-            nw = length(s.form)
-            s.wvec = zeros(Float32, wdims, nw)
-            for i in 1:nw
-                v = c.wvecs[lowercase(s.form[i])]
-                if !isempty(v)
-                    s.wvec[:,i] = v
+                if !haskey(lcwords,w); continue; end
+                a = map(s->parse(Float32,s), split(SubString(line,n+1)))
+                if wdims != length(a); throw(DimensionMismatch()); end
+                for i in lcwords[w]
+                    v.wvecs[:,i] = a
                 end
             end
         end
     end
-    return c
+    return sentences
 end
 
 # Universal POS tags (17)
-const UPOSTAG = Dict{String,UInt8}(
-"ADJ"   => 1, # adjective
-"ADP"   => 2, # adposition
-"ADV"   => 3, # adverb
-"AUX"   => 4, # auxiliary
-"CCONJ" => 5, # coordinating conjunction
-"DET"   => 6, # determiner
-"INTJ"  => 7, # interjection
-"NOUN"  => 8, # noun
-"NUM"   => 9, # numeral
-"PART"  => 10, # particle
-"PRON"  => 11, # pronoun
-"PROPN" => 12, # proper noun
-"PUNCT" => 13, # punctuation
-"SCONJ" => 14, # subordinating conjunction
-"SYM"   => 15, # symbol
-"VERB"  => 16, # verb
-"X"     => 17, # other
-)
+const UPOSTAG = String[ # Dict{String,UInt8}(
+"ADJ"   ,# => 1, # adjective
+"ADP"   ,# => 2, # adposition
+"ADV"   ,# => 3, # adverb
+"AUX"   ,# => 4, # auxiliary
+"CCONJ" ,# => 5, # coordinating conjunction
+"DET"   ,# => 6, # determiner
+"INTJ"  ,# => 7, # interjection
+"NOUN"  ,# => 8, # noun
+"NUM"   ,# => 9, # numeral
+"PART"  ,# => 10, # particle
+"PRON"  ,# => 11, # pronoun
+"PROPN" ,# => 12, # proper noun
+"PUNCT" ,# => 13, # punctuation
+"SCONJ" ,# => 14, # subordinating conjunction
+"SYM"   ,# => 15, # symbol
+"VERB"  ,# => 16, # verb
+"X"     ,# => 17, # other
+]
 
 # Universal Dependency Relations (37)
-const UDEPREL = Dict{String,UInt8}(
-"root"       => 0, # root
-"acl"        => 1, # clausal modifier of noun (adjectival clause)
-"advcl"      => 2, # adverbial clause modifier
-"advmod"     => 3, # adverbial modifier
-"amod"       => 4, # adjectival modifier
-"appos"      => 5, # appositional modifier
-"aux"        => 6, # auxiliary
-"case"       => 7, # case marking
-"cc"         => 8, # coordinating conjunction
-"ccomp"      => 9, # clausal complement
-"clf"        => 10, # classifier
-"compound"   => 11, # compound
-"conj"       => 12, # conjunct
-"cop"        => 13, # copula
-"csubj"      => 14, # clausal subject
-"dep"        => 15, # unspecified dependency
-"det"        => 16, # determiner
-"discourse"  => 17, # discourse element
-"dislocated" => 18, # dislocated elements
-"expl"       => 19, # expletive
-"fixed"      => 20, # fixed multiword expression
-"flat"       => 21, # flat multiword expression
-"goeswith"   => 22, # goes with
-"iobj"       => 23, # indirect object
-"list"       => 24, # list
-"mark"       => 25, # marker
-"nmod"       => 26, # nominal modifier
-"nsubj"      => 27, # nominal subject
-"nummod"     => 28, # numeric modifier
-"obj"        => 29, # object
-"obl"        => 30, # oblique nominal
-"orphan"     => 31, # orphan
-"parataxis"  => 32, # parataxis
-"punct"      => 33, # punctuation
-"reparandum" => 34, # overridden disfluency
-"vocative"   => 35, # vocative
-"xcomp"      => 36, # open clausal complement
-)
+const UDEPREL = String[ # Dict{String,UInt8}(
+"root"       ,# => 1, # root
+"acl"        ,# => 2, # clausal modifier of noun (adjectival clause)
+"advcl"      ,# => 3, # adverbial clause modifier
+"advmod"     ,# => 4, # adverbial modifier
+"amod"       ,# => 5, # adjectival modifier
+"appos"      ,# => 6, # appositional modifier
+"aux"        ,# => 7, # auxiliary
+"case"       ,# => 8, # case marking
+"cc"         ,# => 9, # coordinating conjunction
+"ccomp"      ,# => 10,# clausal complement
+"clf"        ,# => 11, # classifier
+"compound"   ,# => 12, # compound
+"conj"       ,# => 13, # conjunct
+"cop"        ,# => 14, # copula
+"csubj"      ,# => 15, # clausal subject
+"dep"        ,# => 16, # unspecified dependency
+"det"        ,# => 17, # determiner
+"discourse"  ,# => 18, # discourse element
+"dislocated" ,# => 19, # dislocated elements
+"expl"       ,# => 20, # expletive
+"fixed"      ,# => 21, # fixed multiword expression
+"flat"       ,# => 22, # flat multiword expression
+"goeswith"   ,# => 23, # goes with
+"iobj"       ,# => 24, # indirect object
+"list"       ,# => 25, # list
+"mark"       ,# => 26, # marker
+"nmod"       ,# => 27, # nominal modifier
+"nsubj"      ,# => 28, # nominal subject
+"nummod"     ,# => 29, # numeric modifier
+"obj"        ,# => 30, # object
+"obl"        ,# => 31, # oblique nominal
+"orphan"     ,# => 32, # orphan
+"parataxis"  ,# => 33, # parataxis
+"punct"      ,# => 34, # punctuation
+"reparandum" ,# => 35, # overridden disfluency
+"vocative"   ,# => 36, # vocative
+"xcomp"      ,# => 37, # open clausal complement
+]
 
 # Universal Features (21) with number of possible values
 # Abbr: abbreviation (1) Yes (all features also have None as an extra choice)
@@ -172,5 +174,52 @@ const UDEPREL = Dict{String,UInt8}(
 # Tense: tense (5) FutImpPastPqpPres
 # VerbForm: form of verb or deverbative (8) ConvFinGdvGerInfPartSupVnoun
 # Voice: voice (8) ActAntipCauDirInvMidPassRcp
+
+# conll17 word vectors
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Ancient_Greek/grc.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Arabic/ar.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Basque/eu.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Bulgarian/bg.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Catalan/ca.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/ChineseT/zh.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Croatian/hr.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Czech/cs.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Danish/da.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Dutch/nl.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/English/en.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Estonian/et.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Finnish/fi.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/French/fr.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Galician/gl.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/German/de.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Greek/el.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Hebrew/he.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Hindi/hi.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Hungarian/hu.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Indonesian/id.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Irish/ga.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Italian/it.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Japanese/ja.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Kazakh/kk.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Korean/ko.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Latin/la.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Latvian/lv.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Norwegian-Bokmaal/no_bokmaal.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Norwegian-Nynorsk/no_nynorsk.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Old_Church_Slavonic/cu.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Persian/fa.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Polish/pl.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Portuguese/pt.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Romanian/ro.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Russian/ru.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Slovak/sk.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Slovenian/sl.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Spanish/es.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Swedish/sv.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Turkish/tr.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Ukrainian/uk.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Urdu/ur.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Uyghur/ug.vectors.xz
+# /mnt/ai/data/nlp/conll17/word-embeddings-conll17/Vietnamese/vi.vectors.xz
 
 nothing

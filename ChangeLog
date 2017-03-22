@@ -8,6 +8,8 @@
 	# we can use lstm hiddens for cvec, or do the softmax and use averaged wvecs.
 	# parse with an rnn, possibly preinitialized embeddings from bilstm.
 
+	# We have multiple corpora for one language. Keep one wvec/vocab per language? Defining a Vocab type.
+
 2017-03-19  dyuret  <dyuret@ku.edu.tr>
 
 	* TODO:

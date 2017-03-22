@@ -15,42 +15,47 @@ specified, the input features and correct moves for training.
 * usepmap::Bool: (optional) performs parallel processing
 
 """
-function oparse{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer, feats=nothing; o...)
-    p = pt(wcnt(s), ndeps)
-    op_work(p, s, ndeps, feats)
+function oparse{T<:Parser}(pt::Type{T}, s::Sentence, feats=nothing; o...)
+    p = pt(s)
+    op_work(p, s, feats)
 end
 
-function oparse{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats=nothing; usepmap::Bool=false)
+function oparse{T<:Parser}(pt::Type{T}, c::Corpus, feats=nothing; usepmap::Bool=false)
     if usepmap
-        op_pmap(pt, c, ndeps, feats)
+        op_pmap(pt, c, feats)
     else
-        op_main(pt, c, ndeps, feats)
+        p = op_main(pt, c, feats)
+        if isa(p[1],Vector)     # op_main returns x,y in vectors for pcat
+            (p[1],p[2][1],p[3][1])
+        else
+            p
+        end
     end
 end
 
-function op_pmap{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats)
-    d = distribute(c)
+function op_pmap{T<:Parser}(pt::Type{T}, c::Corpus, feats)
+    d = distribute(c)           # TODO: test what happens to common s.vocab
     p = pmap(procs(d)) do x
-        op_main(pt, localpart(d), ndeps, feats)
+        op_main(pt, localpart(d), feats)
     end
     return pcat(p)
 end
 
-function op_main{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats)
-    pa = map(s->pt(wcnt(s), ndeps), c)
-    op_work(pa, c, ndeps, feats)
+function op_main{T<:Parser}(pt::Type{T}, c::Corpus, feats)
+    pa = map(pt, c)
+    op_work(pa, c, feats)
 end
 
 # With no feats specified, just parse the sentences
 
-function op_work{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats::Void=nothing)
+function op_work{T<:Parser}(pa::Vector{T}, c::Corpus, feats::Void=nothing)
     for i=1:length(c)
-        op_work(pa[i], c[i], ndeps, feats)
+        op_work(pa[i], c[i], feats)
     end
     return pa
 end
 
-function op_work(p::Parser, s::Sentence, ndeps::Integer, feats::Void=nothing)
+function op_work(p::Parser, s::Sentence, feats::Void=nothing)
     c = Array(Cost, p.nmove)
     totalcost = 0
     while anyvalidmoves(p)
@@ -65,17 +70,17 @@ end
 
 # With feats specified, parse the sentences and compute the features for training
 
-function op_work{T<:Parser}(pa::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, x=nothing, y=nothing, nx=0)
-    (x,y) = initoparse(pa,c,ndeps,feats,x,y,nx)
+function op_work{T<:Parser}(pa::Vector{T}, c::Corpus, feats::Fvec, x=nothing, y=nothing, nx=0)
+    (x,y) = initoparse(pa,c,feats,x,y,nx)
     for i=1:length(c)
-        op_work(pa[i], c[i], ndeps, feats, x, y, nx)
+        op_work(pa[i], c[i], feats, x, y, nx)
         nx += nmoves(pa[i], c[i])
     end
     return (pa,typeof(x)[x],typeof(y)[y])  # must return tuple of three vectors for pcat
 end
 
-function op_work(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, x=nothing, y=nothing, nx=0)
-    (x,y) = initoparse(p,s,ndeps,feats,x,y,nx)
+function op_work(p::Parser, s::Sentence, feats::Fvec, x=nothing, y=nothing, nx=0)
+    (x,y) = initoparse(p,s,feats,x,y,nx)
     c = Array(Cost, p.nmove)
     totalcost = 0; nx0 = nx
     while anyvalidmoves(p)
@@ -92,7 +97,7 @@ function op_work(p::Parser, s::Sentence, ndeps::Integer, feats::Fvec, x=nothing,
     return (p,x,y)
 end
 
-function initoparse(p, s, d, f, x, y, n)
+function initoparse(p, s, f, x, y, n)
     if f == nothing; error(); end
     (xrows,xcols) = xsize(p,s,f)
     (yrows,ycols) = ysize(p,s)

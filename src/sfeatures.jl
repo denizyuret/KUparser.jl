@@ -130,7 +130,7 @@ function features1(p::Parser, s::Sentence, f::String)
     # should only have one character left specifying a feature
     if n != length(f); error(); end
     fn = f[n]
-    ((fn == 'w') ? s.form[a] :
+    ((fn == 'w') ? s.word[a] :
      (fn == 'p') ? s.postag[a] :
      (fn == 'd') ? (d>10 ? 6 : d>5 ? 5 : d>0 ? d : nothing) :
      (fn == 'L') ? p.deprel[a] :

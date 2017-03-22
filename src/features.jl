@@ -1,25 +1,3 @@
-# TODO: fix hardcoding the ptb postag count
-# const NPOSTAG = 45
-# Now we are hardcoding the upostag count
-const NPOSTAG = 17
-
-# TODO: It does not cost anything to increase the height of a
-# SparseMatrixCSC, so we'll just use a large fixed height
-# (bad idea?)
-# SFmax = typemax(Int32)
-
-# Let us not use SparseMatrixCSC at all.  Just keep around the integer
-# values.  Can always convert back to Sparse by using these as rowval
-# if needed.
-
-# TODO: We will also use a global dictionary to look up feature-value pairs
-# (another bad idea?) (especially for multi-threaded operation!)
-SFhash = Dict{Any,SFtype}()
-
-# All problem variables: NPOSTAG, SFhash, SFmax etc. are Corpus
-# variables! TODO: define corpus type to have these? Have parser point
-# to sentence and sentence point to corpus?
-
 # Feature specifications:
 
 # Individual dense features are represented with strings like "s1w".
@@ -103,15 +81,15 @@ function features(p::Parser, s::Sentence, feats::DFvec,
                   x::AbstractMatrix=Array(wtype(s),flen(p,s,feats),1), 
                   xcol::Integer=1)
     if xcol > size(x,2); error("xcol > size(x,2)"); end
-    wrows = wdim(s)             #11 first half word, second half context
+    wrows = wdim(s)             #11
     xrows = size(x,1)
     xtype = eltype(x)
     x1 = one(xtype)
     x[:,xcol] = zero(xtype)     #173
     nx = 0                      # last entry in x
-    nv = wrows >> 1             # size of word/context vector, assumes word vec and context vec concatenated
+    nv = wrows # >> 1             # size of word/context vector, assumes word vec and context vec concatenated
     nd = p.ndeps
-    np = NPOSTAG
+    np = length(s.vocab.postags)
     nw = p.nword
     ldep,rdep,lset,rset = getdeps(p) #3775
     for f in feats                   #48
@@ -119,12 +97,13 @@ function features(p::Parser, s::Sentence, feats::DFvec,
         fn = f[end]                  #642
         if fn == 'v'                 #234
             if a>0                   #91
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+1, nv) #331
+                copy!(x, (xcol-1)*xrows+nx+1, s.vocab.wvecs, (s.word[a]-1)*wrows+1, nv) #331
             end; nx += nv       #5
         elseif fn == 'c'        #200
-            if a>0              #122
-                copy!(x, (xcol-1)*xrows+nx+1, s.wvec, (a-1)*wrows+nv+1, nv) #492
-            end; nx += nv       #6
+            error("Context vectors not implemented.")
+            # if a>0              #122
+            #     copy!(x, (xcol-1)*xrows+nx+1, s.vocab.wvec, (a-1)*wrows+nv+1, nv) #492
+            # end; nx += nv       #6
         elseif fn == 'p'        #114
             if a>0              #159
                 if s.postag[a] > np; error("postag out of bound"); end #210
@@ -187,6 +166,7 @@ function features(p::Parser, s::Sentence, feats::SFvec,
                   x::AbstractMatrix=Array(SFtype, length(feats), 1), xcol=1)
     if xcol > size(x,2); error("xcol > size(x,2)"); end
     deps = getdeps(p)
+    SFhash = s.vocab.fdict
     @inbounds for i = 1:length(feats)
         f = feats[i]
         v = Array(Any, length(f))                             # TODO: get rid of alloc here?
@@ -208,7 +188,7 @@ function features1(p::Parser, s::Sentence, f::String, ldep, rdep, lset, rset)
     a = getanchor(f,p,ldep,rdep)
     if a == 0; return nothing; end
     fn = f[end]
-    if fn == 'w'; s.form[a]
+    if fn == 'w'; s.word[a]
     elseif fn == 'p'; s.postag[a]
     elseif fn == 'L'; p.deprel[a]
     elseif fn == 'a'; if isassigned(ldep,a); length(ldep[a]); else; 0; end
@@ -228,10 +208,11 @@ end
 
 function flen(p::Parser, s::Sentence, feats::DFvec)
     nx = 0
-    nw = wdim(s) >> 1
+    nw = wdim(s)  # >> 1
     nd = p.ndeps
+    np = length(s.vocab.postags)
     for f in feats
-        nx += flen1(f[end], nw, nd, NPOSTAG) # 1129
+        nx += flen1(f[end], nw, nd, np) # 1129
     end
     return nx
 end
