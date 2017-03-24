@@ -1,3 +1,4 @@
+*.py
 *.udpipe
 *.conllu
 *.txt

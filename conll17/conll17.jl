@@ -59,7 +59,7 @@ function readconllu(filename::AbstractString, vocab=nothing)
     for id in 1:length(vocab.words)
         words[vocab.words[id]] = id
     end
-    info(filename)
+    # info(filename)
     sentences = Sentence[]
     s = Sentence(); s.vocab = vocab
     nw = 0
@@ -130,7 +130,7 @@ function readvectors(filename::AbstractString, vocab::Vocab)
         if !haskey(lcwords, lcword); lcwords[lcword] = WordId[]; end
         push!(lcwords[lcword], id)
     end
-    info(filename)
+    # info(filename)
     open(`xzcat $filename`) do io
         firstline = split(readline(io)) # first line gives count and dim
         wdims = parse(Int,firstline[2])

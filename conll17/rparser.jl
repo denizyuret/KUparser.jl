@@ -33,9 +33,10 @@ function main(args="")
         # we need to test with predicted toks and tags from txt data.
         txtfile = tempname()
         @tm run(pipeline(`udpipe --tokenize --tag $(o[:udpipe]) $(o[:parse])`, txtfile))
-        @tm global corpus = readconllu(txtfile); rm(txtfile)
+        @tm global corpus = readconllu(txtfile)
         @tm parses = rparse(ptype, corpus)
-        @tm writeconllu(corpus, parses)
+        @tm writeconllu(corpus, parses, txtfile)
+        rm(txtfile)
     end
 end
 
