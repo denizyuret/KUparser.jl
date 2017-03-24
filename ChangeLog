@@ -6,6 +6,9 @@
 	# implement rnn, optimize features for rnn
 	# compare results on acl11 with new code
 	# read papers
+	# knet: implement blstm and rnnlm benchmarks in knet for profiling
+	# knet: optimize sum_outgrads, overwriting did not work, try sparse outgrads
+	# knet: integrate enis's new broadcast kernels
 
 	## Optimize English
 	# rnn/fnn
@@ -19,6 +22,23 @@
 	# check zero vectors
 	# fine-tune word vectors
 	# dynamic vs static training
+	# use lcword, lemma, xpos, feats, deps, misc as features
+	# ensemble
+	# separate move and lable pred
+	# global vs local normalization
+	# character based encoder
+	# attention model
+	# self learning
+	# train non-lexical models and do loocv for surprize languages
+
+	# Can we use unlabeled data for surprize languages?
+	# What is the UD policy on coordination, single headedness, projectivity?
+	# Can we use an RNN to learn parse moves? (read papers)
+	# What are the latest state of the art techniques?
+	# Can we use wvec, cvec in surprize languages?
+	# cycles, multiple root nodes, wrong number of columns or wrong indexing of nodes will be considered invalid output.
+	# The evaluation starts by aligning the system-produced words to the gold standard ones
+
 
 2017-03-21  dyuret  <dyuret@ku.edu.tr>
 

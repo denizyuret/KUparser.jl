@@ -12,16 +12,38 @@ using KUparser
 # 9. DEPS: Enhanced dependency graph in the form of a list of head-deprel pairs.
 # 10. MISC: Any other annotation.
 
-function readconllu(filename::AbstractString,wordvecs=nothing)
-    v = Vocab()
-    v.postags = UPOSTAG
-    v.deprels = UDEPREL
+function writeconllu(sentences, parses)
+    v = sentences[1].vocab
+    for i = 1:length(sentences)
+        s = sentences[i]
+        p = parses[i]
+        for j = 1:length(s.word)
+            r = fill!(Array(String,10),"_")
+            r[1] = string(j)
+            r[2] = v.words[s.word[j]]
+            r[4] = v.postags[s.postag[j]]
+            r[7] = string(p.head[j])
+            r[8] = v.deprels[p.deprel[j]]
+            println(join(r, "\t"))
+        end
+        println()
+    end
+end
+
+function readconllu(filename::AbstractString, vocab=nothing)
+    if vocab == nothing
+        vocab = Vocab()
+        vocab.postags = UPOSTAG
+        vocab.deprels = UDEPREL
+    end
     words = Dict{String,WordId}()
-    lcwords = Dict{String,Vector{WordId}}()
-    sentences = Sentence[]
-    s = Sentence(); s.vocab = v
-    nw = 0
+    for id in 1:length(vocab.words)
+        words[vocab.words[id]] = id
+    end
     info(filename)
+    sentences = Sentence[]
+    s = Sentence(); s.vocab = vocab
+    nw = 0
     for line in eachline(filename)
         line = chomp(line)
         fields = split(line, '\t') # TODO: this makes fields[2] a substring preventing garbage collection.
@@ -29,7 +51,7 @@ function readconllu(filename::AbstractString,wordvecs=nothing)
             if nw > 0
                 nw = 0
                 push!(sentences,s)
-                s = Sentence(); s.vocab = v
+                s = Sentence(); s.vocab = vocab
             end
         elseif line[1] == '#'
             continue
@@ -40,56 +62,72 @@ function readconllu(filename::AbstractString,wordvecs=nothing)
             if !haskey(words, fields[2])
                 id = 1 + length(words)
                 wform = String(fields[2])
-                lform = lowercase(wform)
                 words[wform] = id
-                if !haskey(lcwords, lform); lcwords[lform] = WordId[]; end
-                push!(lcwords[lform], id)
-                push!(v.words, wform)
+                push!(vocab.words, wform)
             end
             push!(s.word, words[fields[2]])
 
-            hd = parse(Position,fields[7])
-            if !(0 <= hd <= typemax(eltype(s.head))); Base.warn_once("Bad head: $hd"); hd=0; end
-            push!(s.head, hd)
-
-            pt = findfirst(v.postags, fields[4])
-            if pt == 0; Base.warn_once("Bad postag: $(fields[4])"); end
+            if fields[4]=="_"
+                pt = 0
+            else
+                pt = findfirst(vocab.postags, fields[4])
+                if pt == 0; Base.warn_once("Bad postag: $(fields[4])"); end
+            end
             push!(s.postag, pt)
 
-            dr = fields[8]
-            # Get rid of language specific extensions
-            drcolon = search(dr, ':')
-            if drcolon > 0; dr = dr[1:drcolon-1]; end
-            dr = findfirst(v.deprels, dr)
-            if dr == 0; Base.warn_once("Bad deprel: $(fields[8])"); end
+            if fields[7]=="_"
+                hd = 0
+            else
+                hd = parse(Position,fields[7])
+                if !(0 <= hd <= typemax(eltype(s.head))); Base.warn_once("Bad head: $hd"); hd=0; end
+            end
+            push!(s.head, hd)
+
+            if fields[8]=="_"
+                dr = 0
+            else
+                dr = fields[8]
+                # Get rid of language specific extensions
+                drcolon = search(dr, ':')
+                if drcolon > 0; dr = dr[1:drcolon-1]; end
+                dr = findfirst(vocab.deprels, dr)
+                if dr == 0; Base.warn_once("Bad deprel: $(fields[8])"); end
+            end
             push!(s.deprel, dr)
 
         elseif ismatch(r"^\d+[-.]\d+$", fields[1])
             # skip
         else
             error("Cannot parse [$line]")
-        end
+        end # if line == ""
+    end # for line in eachline(filename)
+    return sentences
+end
+
+function readvectors(filename::AbstractString, vocab::Vocab)
+    lcwords = Dict{String,Vector{WordId}}()
+    for id in 1:length(vocab.words)
+        lcword = lowercase(vocab.words[id])
+        if !haskey(lcwords, lcword); lcwords[lcword] = WordId[]; end
+        push!(lcwords[lcword], id)
     end
-    if wordvecs != nothing
-        info(wordvecs)
-        open(`xzcat $wordvecs`) do io
-            firstline = split(readline(io)) # first line gives count and dim
-            wdims = parse(Int,firstline[2])
-            # TODO: We are leaving unknown word vectors as zero!
-            v.wvecs = zeros(WVtype, wdims, length(v.words))
-            for line in eachline(io)
-                n = search(line, ' ')
-                w = SubString(line,1,n-1)
-                if !haskey(lcwords,w); continue; end
-                a = map(s->parse(Float32,s), split(SubString(line,n+1)))
-                if wdims != length(a); throw(DimensionMismatch()); end
-                for i in lcwords[w]
-                    v.wvecs[:,i] = a
-                end
+    info(filename)
+    open(`xzcat $filename`) do io
+        firstline = split(readline(io)) # first line gives count and dim
+        wdims = parse(Int,firstline[2])
+        # TODO: We are leaving unknown word vectors as zero!
+        vocab.wvecs = zeros(WVtype, wdims, length(vocab.words))
+        for line in eachline(io)
+            n = search(line, ' ')
+            w = SubString(line,1,n-1)
+            if !haskey(lcwords,w); continue; end
+            a = map(s->parse(Float32,s), split(SubString(line,n+1)))
+            if wdims != length(a); throw(DimensionMismatch()); end
+            for i in lcwords[w]
+                vocab.wvecs[:,i] = a
             end
         end
     end
-    return sentences
 end
 
 # Universal POS tags (17)

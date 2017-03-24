@@ -1,3 +1,7 @@
+*.udpipe
+*.conllu
+*.txt
+*.xz
 .julia
 setup.sh
 *.pbs
