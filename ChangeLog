@@ -1,3 +1,25 @@
+2017-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	# benchmark, profile, optimize
+	# fix gparser, bparser, dynamic training
+	# implement rnn, optimize features for rnn
+	# compare results on acl11 with new code
+	# read papers
+
+	## Optimize English
+	# rnn/fnn
+	# flist
+	# wvecs
+	# cvecs
+	# hidden size
+	# beam
+	# arctype
+	# optimizer
+	# check zero vectors
+	# fine-tune word vectors
+	# dynamic vs static training
+
 2017-03-21  dyuret  <dyuret@ku.edu.tr>
 
 	* ideas:

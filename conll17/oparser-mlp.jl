@@ -1,34 +1,14 @@
 using KUparser,JLD,Knet
 
-## TODO:
-# benchmark, profile, optimize
-# fix gparser, bparser, dynamic training
-# implement rnn, optimize features for rnn
-# compare results on acl11 with new code
-# read papers
-
-## Optimize English
-# rnn/fnn
-# flist
-# wvecs
-# cvecs
-# hidden size
-# beam
-# arctype
-# optimizer
-# check zero vectors
-# fine-tune word vectors
-# dynamic vs static training
-
 wordvecs = "/mnt/ai/data/nlp/conll17/word-embeddings-conll17/English/en.vectors.xz"
 corpus = "/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_English/en-ud-train.conllu"
 pt = ArcEager13
 ft = Flist.zn11pv
 
 function savedata()
-    c = readconllu(corpus, wordvecs)
-    (p,x,y) = oparse(pt, c, ft)
-    save("foo.en.jld", "x", x, "y", y)
+    @date c = readconllu(corpus, wordvecs)
+    @date (p,x,y) = oparse(pt, c, ft)
+    @date save("foo.en.jld", "x", x, "y", y, "c", c, "p", p)
 end
 
 function loaddata(;batch=100,test=10000)
@@ -55,6 +35,26 @@ function mlp(w,x;pdrop=0)
         x = dropout(x, pdrop)
     end
     return w[end-1]*x .+ w[end]
+end
+
+# For use with gparser until we change the interface:
+function predict(w,x,y)
+    x = KnetArray(x)
+    for i=1:2:length(w)-2
+        x = relu(w[i]*x .+ w[i+1])
+    end
+    ccall(("cudaDeviceSynchronize","libcudart"),UInt32,())
+    copy!(y, w[end-1]*x .+ w[end])
+end
+
+using Knet: @cuda, Cptr
+
+# target may be a subarray, TODO: handle in Knet
+function Base.copy!{T}(dest::SubArray{T}, src::KnetArray{T})
+    if length(dest) < length(src); throw(BoundsError()); end
+    @cuda(cudart,cudaMemcpy,(Cptr,Cptr,Csize_t,UInt32),
+          pointer(dest), pointer(src), length(src)*sizeof(T), 2)
+    return dest
 end
 
 # Calculate cross entropy loss of a model with weights w for one minibatch (x,p)
@@ -124,8 +124,10 @@ function train(dtrn,dtst;
         end
         report(epoch)
     end
+    return w
 end
 
+# julia> dtrn,dtst = loaddata()
 # julia> train(dtrn,dtst)
 # (0,0.008304813f0,0.01f0)
 # (1,0.9219519f0,0.9071f0)

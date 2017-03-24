@@ -3,7 +3,7 @@ module KUparser
 using Compat, Knet, DistributedArrays
 
 include("util.jl");	  export @date, evalparse #, testnet
-include("types.jl");      export Sentence, Corpus, wdim, wcnt, wtype
+include("types.jl");      export Sentence, Corpus, Vocab, WordId, DepRel, PosTag, Position, Cost, Move, SFtype, WVtype, Pvec, Dvec, wdim, wcnt, wtype
 include("parser.jl");     export ArcEager13, ArcEagerR1, ArcHybrid13, ArcHybridR1, Parser, reset!
 include("features.jl");   export Fvec, flen, xsize, ysize
 include("gparser.jl");    export gparse

@@ -371,9 +371,12 @@ function arc!(p::Parser, h::Position, d::Position, l::DepRel)
     p.deprel[d] = l
 end
 
-function Base.isequal(a::Parser, b::Parser)
-    f = fieldnames(a)
-    all(map(isequal, map(n->a.(n), f), map(n->b.(n), f)))
+function Base.:(==)(a::Parser, b::Parser)
+    if typeof(a)!=typeof(b); return false; end
+    for f in fieldnames(a)
+        if getfield(a,f) != getfield(b,f); return false; end
+    end
+    return true
 end
 
 function Base.copy!(dst::Parser, src::Parser)

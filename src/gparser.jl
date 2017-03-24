@@ -4,67 +4,76 @@
 # c::Corpus: array of input sentences
 # ndeps::Integer: number of dependency types
 # feats::Fvec: specification of features
-# net::Net: model used for move prediction
+# predict::Function: function used for move prediction
 # nbatch::Integer: (keyword) parse sentences in batches for efficiency
 # returnxy::Bool: (keyword) return (p,x,y) tuple for training, by default only parsers returned.
 # usepmap::Bool: (keyword) perform parallel processing
 
-function gparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Integer, feats::Fvec, net::Net;
+function gparse{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::Fvec, predict::Function;
                            nbatch::Int=1, returnxy::Bool=false, usepmap::Bool=false)
-    usepmap ? 
-    gp_pmap(pt, corpus, ndeps, feats, net, nbatch, returnxy) :
-    gp_main(pt, corpus, ndeps, feats, net, nbatch, returnxy)
+    if usepmap
+        gp_pmap(pt, corpus, feats, predict, nbatch, returnxy)
+    else
+        # op_main returns x,y in vectors for pcat
+        p = gp_main(pt, corpus, feats, predict, nbatch, returnxy)
+        if isa(p[1],Vector); (p[1],p[2][1],p[3][1]); else; p; end
+    end
 end
 
-function gp_pmap{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Int, returnxy::Bool)
+function gp_pmap{T<:Parser}(pt::Type{T}, c::Corpus, feats::Fvec, predict::Function, nbatch::Int, returnxy::Bool)
     d = distribute(c)
-    net = testnet(net)
+    # net = cpucopy(net)
     p = pmap(procs(d)) do x
-        gp_main(pt, localpart(d), ndeps, feats, gpucopy(net), nbatch, returnxy)
+        # TODO: test this
+        # gp_main(pt, localpart(d), feats, gpucopy(net), nbatch, returnxy)
+        gp_main(pt, localpart(d), feats, predict, nbatch, returnxy)
     end
     return pcat(p)
 end
 
-function gp_main{T<:Parser}(pt::Type{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Int, returnxy::Bool)
-    pa = map(s->pt(wcnt(s), ndeps), c)
+function gp_main{T<:Parser}(pt::Type{T}, c::Corpus, feats::Fvec, predict::Function, nbatch::Int, returnxy::Bool)
+    pa = map(pt, c)
     if returnxy
         xtype = wtype(c[1])
         x = Array(xtype, xsize(pa[1], c, feats))
         y = zeros(xtype, ysize(pa[1], c))
-        gp_work(pa, c, ndeps, feats, net, nbatch, x, y)
+        gp_work(pa, c, feats, predict, nbatch, x, y)
         return (pa, typeof(x)[x], typeof(y)[y]) # return expects three vectors
     else
-        gp_work(pa, c, ndeps, feats, net, nbatch)
+        gp_work(pa, c, feats, predict, nbatch)
         return pa
     end
 end
 
 # Here is the workhorse:
-function gp_work{T<:Parser}(p::Vector{T}, c::Corpus, ndeps::Integer, feats::Fvec, net::Net, nbatch::Integer,
+function gp_work{T<:Parser}(p::Vector{T}, c::Corpus, feats::Fvec, predict::Function, nbatch::Integer,
                             x::AbstractArray=[], y::AbstractArray=[], nx::Integer=0)
-    (nbatch == 0 || nbatch > length(c)) && (nbatch = length(c))
-    isempty(x) && (x=Array(wtype(c[1]), flen(p[1],c[1],feats), nbatch))
+    if (nbatch == 0 || nbatch > length(c)); nbatch = length(c); end
+    if isempty(x); x=Array(wtype(c[1]), flen(p[1],c[1],feats), nbatch); end
     score = Array(wtype(c[1]), p[1].nmove, nbatch)
-    cost = Array(Position, p[1].nmove)
+    cost = Array(Cost, p[1].nmove)
     for s1 = 1:nbatch:length(c)
         s2 = min(length(c), s1+nbatch-1)
         while true
             nx0 = nx            
             for s=s1:s2
-                anyvalidmoves(p[s]) || continue;
+                if !anyvalidmoves(p[s]); continue; end
                 features(p[s], c[s], feats, x, (nx+=1))
             end
-            (nx == nx0) && break
+            if (nx == nx0) break; end
             nx1 = nx; nx = nx0; 
-            predict(net, sub(sdata(x), :, nx0+1:nx1), sub(score, :, 1:(nx1-nx0)))
+            # TODO: need predict function, take as arg?
+            predict(view(sdata(x), :, nx0+1:nx1), view(score, :, 1:(nx1-nx0)))
             for s=s1:s2
-                anyvalidmoves(p[s]) || continue; nx += 1
+                if !anyvalidmoves(p[s]) continue; end;
+                nx += 1
                 movecosts(p[s], c[s].head, c[s].deprel, cost)
-                isempty(y) || (y[:,nx]=zero(eltype(y)); y[indmin(cost),nx]=one(eltype(y)))
+                # TODO: keep gold answers y as integers
+                if !isempty(y); (y[:,nx]=zero(eltype(y)); y[indmin(cost),nx]=one(eltype(y))); end
                 move!(p[s], maxscoremove(score, cost, nx-nx0))
             end
             @assert nx == nx1
-            isempty(y) && (nx=0) # reuse x array if we are not returning xy
+            if isempty(y); (nx=0); end # reuse x array if we are not returning xy
         end # while true
     end # for s1 = 1:nbatch:length(c)
     return nx

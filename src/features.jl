@@ -255,7 +255,7 @@ function getdeps{T<:Parser}(p::T)
         elseif d<h
             if !isassigned(ldep,h)
                 ldep[h]=[d]
-                lset[h]=zeros(UInt8,nd) # falses(nd) is slower
+                lset[h]=zeros(UInt8,nd) # falses(nd) is slower, zeros(WVtype,nd) same speed more space
                 lset[h][dr[d]]=1
             else
                 push!(ldep[h],d)

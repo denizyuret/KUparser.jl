@@ -24,12 +24,9 @@ function oparse{T<:Parser}(pt::Type{T}, c::Corpus, feats=nothing; usepmap::Bool=
     if usepmap
         op_pmap(pt, c, feats)
     else
+        # op_main returns x,y in vectors for pcat
         p = op_main(pt, c, feats)
-        if isa(p[1],Vector)     # op_main returns x,y in vectors for pcat
-            (p[1],p[2][1],p[3][1])
-        else
-            p
-        end
+        if isa(p[1],Vector); (p[1],p[2][1],p[3][1]); else; p; end
     end
 end
 
