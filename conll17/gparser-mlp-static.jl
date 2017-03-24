@@ -257,4 +257,4 @@ initoptim(a,otype)=map(x->initoptim(x,otype), a)
 # (9,0.9904198f0,0.9358f0)
 # (10,0.99142516f0,0.9338f0)
 
-if PROGRAM_FILE=="oparser-mlp.jl"; main(ARGS); end
+if basename(PROGRAM_FILE)==basename(@__FILE__); main(ARGS); end

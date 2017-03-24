@@ -38,6 +38,8 @@
 	# Can we use wvec, cvec in surprize languages?
 	# cycles, multiple root nodes, wrong number of columns or wrong indexing of nodes will be considered invalid output.
 	# The evaluation starts by aligning the system-produced words to the gold standard ones
+	# Dealing with non-projectivity
+	# graph based alternatives?
 
 
 2017-03-21  dyuret  <dyuret@ku.edu.tr>
