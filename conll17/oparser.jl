@@ -30,7 +30,7 @@ function main(args="")
     if o[:parse] != nothing
         @tm global corpus = readconllu(o[:parse])
         @tm parses = oparse(ptype, corpus)
-        @tm writeconllu(corpus, parses)
+        @tm writeconllu(corpus, parses, o[:parse])
     end
 end
 

@@ -12,22 +12,41 @@ using KUparser
 # 9. DEPS: Enhanced dependency graph in the form of a list of head-deprel pairs.
 # 10. MISC: Any other annotation.
 
-function writeconllu(sentences, parses)
+# Only changes the HEAD and DEPREL columns of the inputfile
+function writeconllu(sentences, parses, inputfile)
+    if length(sentences) != length(parses); error(); end
     v = sentences[1].vocab
-    for i = 1:length(sentences)
-        s = sentences[i]
-        p = parses[i]
-        for j = 1:length(s.word)
-            r = fill!(Array(String,10),"_")
-            r[1] = string(j)
-            r[2] = v.words[s.word[j]]
-            r[4] = v.postags[s.postag[j]]
-            r[7] = string(p.head[j])
-            r[8] = v.deprels[p.deprel[j]]
-            println(join(r, "\t"))
+    s = p = nothing
+    ns = nw = nl = 0
+    for line in eachline(inputfile)
+        nl += 1
+        if ismatch(r"^\d+\t", line)
+            # info("$nl word")
+            if s == nothing
+                s = sentences[ns+1]
+                p = parses[ns+1]
+            end
+            f = split(line, '\t')
+            nw += 1
+            if f[1] != "$nw"; error(); end
+            if f[2] != v.words[s.word[nw]]; error(); end
+            f[7] = string(p.head[nw])
+            f[8] = v.deprels[p.deprel[nw]]
+            print(join(f, "\t"))
+        else
+            if line == "\n"
+                # info("$nl blank")
+                if s == nothing; error(); end
+                if nw != length(s.word); error(); end
+                ns += 1; nw = 0
+                s = p = nothing
+            else
+                # info("$nl non-word")
+            end
+            print(line)
         end
-        println()
     end
+    if ns != length(sentences); error(); end
 end
 
 function readconllu(filename::AbstractString, vocab=nothing)

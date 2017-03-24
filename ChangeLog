@@ -1,5 +1,10 @@
 2017-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* conll17/languages.txt: columns: $1,$2,$3,$4
+	/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_$1/$2-ud-{train,dev}.{conllu,txt}
+	/mnt/ai/data/nlp/conll17/UDPipe/udpipe-ud-2.0-conll17-170315/models/$3-ud-2.0-conll17-170315.udpipe
+	/mnt/ai/data/nlp/conll17/word-embeddings-conll17/$4/$5.vectors.xz
+
 	* TODO:
 	# benchmark, profile, optimize
 	# fix gparser, bparser, dynamic training
