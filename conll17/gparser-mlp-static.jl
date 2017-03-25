@@ -39,7 +39,7 @@ function main(args="")
         ("--l1"; arg_type=Float64; default=0.0; help="L1 regularization")
         ("--l2"; arg_type=Float64; default=0.0; help="L2 regularization")
         ("--fast"; action=:store_true; help="skip loss calculation for faster run")
-        ("--gcheck"; arg_type=Int; default=0; help="check N random gradients per parameter")
+        #TODO ("--gcheck"; arg_type=Int; default=0; help="check N random gradients per parameter")
         ("--seed"; arg_type=Int; default=-1; help="random number seed: use a nonnegative int for repeatable results")
         ("--logging"; arg_type=Int; default=1; help="Logging level: 0 to turn off")
     end

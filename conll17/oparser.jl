@@ -15,7 +15,6 @@ function main(args="")
     @add_arg_table s begin
         # Parsing options
         ("--parse"; default=grcdev; help="file in conllu format to be parsed")
-        ("--udpipe"; default=grcudp; help="UDpipe model file")
         ("--ptype"; default="ArcEagerR1"; help="Parser type")
         ("--fast"; action=:store_true; help="fewer messages")
     end
