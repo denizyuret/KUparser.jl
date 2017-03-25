@@ -1,9 +1,12 @@
-using ArgParse,JLD,KUparser,Knet
-include("conll17.jl")
-macro tm(_x) :(if o[:fast]; $(esc(_x)); else; info("$(now()) "*$(string(_x))); $(esc(_x)); end) end
-macro msg(x); :(if !o[:fast]; info($x); end); end
+using ArgParse,FileIO,JLD,KUparser,Knet
+macro msg(_x) :(if logging>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
+macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 
-# Some default data
+include("conll17.jl")
+
+# for i in `cut -f2 languages.tsv | head -2`; do echo $i; julia gparser-mlp-static.jl --train $i-ud-train.conllu $i-ud-dev.conllu --vectors $i.vectors.xz --parse $i-ud-dev.txt --udpipe $i.udpipe > foo; ./eval.py $i-ud-dev.conllu foo; done
+
+# Some example data
 grctrn = "/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_Ancient_Greek/grc-ud-train.conllu"
 grcdev = "/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_Ancient_Greek/grc-ud-dev.conllu"
 grctxt = "/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_Ancient_Greek/grc-ud-dev.txt"
@@ -17,15 +20,15 @@ function main(args="")
     s.exc_handler=ArgParse.debug_handler
     @add_arg_table s begin
         # Parsing options
-        ("--parse"; default=grctxt; help="file in plain text format to be parsed")
-        ("--udpipe"; default=grcudp; help="UDpipe model file")
+        ("--parse"; help="file in plain text format to be parsed")
+        ("--udpipe"; help="UDpipe model file")
         ("--load"; help="load model from jld file")
         ("--ptype"; default="ArcEagerR1"; help="Parser type")
         ("--flist"; default="Flist.zn11pv"; help="Feature list to use")
 
         # Training options
-        ("--train"; nargs='*'; default=[grctrn,grcdev]; help="training file(s) in conllu format")
-        ("--vectors";  default=grcvec; help="word vectors")
+        ("--train"; nargs='*'; help="training file(s) in conllu format")
+        ("--vectors"; help="word vectors")
         ("--save"; help="save model to jld file")
         ("--atype"; default=(gpu()>=0 ? "KnetArray{Float32}" : "Array{Float32}"); help="array type: Array for cpu, KnetArray for gpu")
         ("--otype"; default="Adam()"; help="Optimization algorithm and parameters.")
@@ -35,13 +38,15 @@ function main(args="")
         ("--dropout"; arg_type=Float64; default=0.0; help="dropout probability")
         ("--l1"; arg_type=Float64; default=0.0; help="L1 regularization")
         ("--l2"; arg_type=Float64; default=0.0; help="L2 regularization")
-        ("--fast"; action=:store_true; help="skip loss printing for faster run")
+        ("--fast"; action=:store_true; help="skip loss calculation for faster run")
         ("--gcheck"; arg_type=Int; default=0; help="check N random gradients per parameter")
         ("--seed"; arg_type=Int; default=-1; help="random number seed: use a nonnegative int for repeatable results")
+        ("--logging"; arg_type=Int; default=1; help="Logging level: 0 to turn off")
     end
 
     # Process args
     o = parse_args(args, s; as_symbols=true)
+    logging = o[:logging]
     @msg(s.description)
     @msg(string("opts=",[(k,v) for (k,v) in o]...))
     if o[:seed] > 0; setseed(o[:seed]); end
@@ -50,32 +55,58 @@ function main(args="")
     flist = eval(parse(o[:flist]))
 
     # Load model
-    model = optim = vocab = nothing
     if o[:load] != nothing
-        a = load(o[:load])
+        @log a = load(o[:load])
         model = a["model"]
         optim = a["optim"]
         vocab = a["vocab"]
+    else
+        model = optim = nothing
+        vocab = Vocab(); vocab.postags=UPOSTAG; vocab.deprels=UDEPREL
+    end
+
+    # Load raw text
+    if o[:parse] != nothing
+        # we need to test with predicted toks and tags from txt data.
+        parse_conllu = tempname()
+        @log run(pipeline(`udpipe --tokenize --tag $(o[:udpipe]) $(o[:parse])`, parse_conllu))
+        @log parse_sentences = readconllu(parse_conllu, vocab)
+    end
+
+    # Load training data
+    if !isempty(o[:train])
+        readc(f)=readconllu(f,vocab)
+        @log train_corpora = map(readc, o[:train])
+    end
+
+    # Load vectors: this has to be done after all conllu files have been loaded
+    if o[:vectors] != nothing
+        @log readvectors(o[:vectors], vocab)
+    end
+
+    # Fix words without vectors, this may happen if the model loaded does not have all the words in the corpora read
+    if size(vocab.wvecs,2) < length(vocab.words)
+        z = fill!(similar(vocab.wvecs, size(vocab.wvecs,1), length(vocab.words) - size(vocab.wvecs,2)), 0)
+        @log vocab.wvecs = hcat(vocab.wvecs, z)
     end
 
     # Train model
     if !isempty(o[:train])
-        if vocab == nothing; vocab = Vocab(); vocab.postags=UPOSTAG; vocab.deprels=UDEPREL; end
-        readc(f)=readconllu(f,vocab)
-        @tm corpora = map(readc, o[:train])
-        if o[:vectors] != nothing
-            @tm readvectors(o[:vectors], vocab)
-        end
-        data = map(corpora) do corpus
-            @tm (p,x,y) = oparse(ptype, corpus, flist)
-            @tm minibatch(x, y, o[:batchsize]; atype=atype)
+        data = map(train_corpora) do corpus
+            @log (p,x,y) = oparse(ptype, corpus, flist)
+            @log minibatch(x, y, o[:batchsize]; atype=atype)
         end
         if model == nothing
             xtrn,ytrn = data[1][1]
             model = initmodel(size(xtrn,1), o[:hidden]..., size(ytrn,1); atype=atype)
             optim = initoptim(model, o[:otype])
         end
-        report(ep)=if !o[:fast]; info((ep,map(d->accuracy(model,d,mlp),data)...)); end
+        if o[:fast]
+            report = (ep->nothing)
+        else
+            report = (ep->(@msg((ep,map(d->accuracy(model,d,mlp),data)...))))
+            @msg((:epoch,:trnacc,:devacc))
+        end
         report(0)
         for epoch=1:o[:epochs]
             for (x,y) in data[1]
@@ -88,18 +119,15 @@ function main(args="")
 
     # Save model
     if o[:save] != nothing
-        @tm save(o[:save], "model", model, "optim", optim, "vocab", vocab)
+        @log save(File(format"JLD",o[:save]), "model", model, "optim", optim, "vocab", vocab)
     end
 
     # Parse
     if o[:parse] != nothing
-        # we need to test with predicted toks and tags from txt data.
-        txtfile = tempname()
-        @tm run(pipeline(`udpipe --tokenize --tag $(o[:udpipe]) $(o[:parse])`, txtfile))
-        @tm corpus = readconllu(txtfile, vocab); rm(txtfile)
         pred(x,y)=copy!(y, mlp(model, atype(x)))
-        @tm parses = gparse(ptype, corpus, flist, pred; nbatch=o[:batchsize])
-        @tm writeconllu(corpus, parses)
+        @log parses = gparse(ptype, parse_sentences, flist, pred; nbatch=o[:batchsize])
+        @log writeconllu(parse_sentences, parses, parse_conllu)
+        rm(parse_conllu)
     end
 end
 

@@ -6,12 +6,14 @@
 	/mnt/ai/data/nlp/conll17/word-embeddings-conll17/$4/$5.vectors.xz
 
 	* TODO:
-	# benchmark, profile, optimize
-	# fix gparser, bparser, dynamic training
-	# implement rnn, optimize features for rnn
+	# check gparser-mlp-static results under *run*
+	# implement gparser-mlp-dynamic
+	# implement bparser demo
 	# compare results on acl11 with new code
-	# read papers
+	# benchmark, profile, optimize
 	# knet: implement blstm and rnnlm benchmarks in knet for profiling
+	# implement rnn, optimize features for rnn
+	# read papers
 	# knet: optimize sum_outgrads, overwriting did not work, try sparse outgrads
 	# knet: integrate enis's new broadcast kernels
 
@@ -29,7 +31,7 @@
 	# dynamic vs static training
 	# use lcword, lemma, xpos, feats, deps, misc as features
 	# ensemble
-	# separate move and lable pred
+	# separate move and label pred
 	# global vs local normalization
 	# character based encoder
 	# attention model
@@ -45,6 +47,7 @@
 	# The evaluation starts by aligning the system-produced words to the gold standard ones
 	# Dealing with non-projectivity
 	# graph based alternatives?
+	# What do we do with languages that have no dev data?
 
 
 2017-03-21  dyuret  <dyuret@ku.edu.tr>
