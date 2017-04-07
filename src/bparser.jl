@@ -1,16 +1,32 @@
-function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, net::Net, nbeam::Int;
-                           nbatch::Int=1, returnxy::Bool=false, usepmap::Bool=false)
-    usepmap ? 
-    bp_pmap(pt, corpus, ndeps, feats, net, nbeam, nbatch, returnxy) :
-    bp_main(pt, corpus, ndeps, feats, net, nbeam, nbatch, returnxy)
-end
+# Data structures for beam search:
+
+# A batch consists of multiple sentences and their beams.
+# A Beam consists of a sentence, a beam array and a cand array.
+# Both arrays consist of BeamStates sorted by cumulative score.
+# We also track the mincost for training and early stop.
+
+# Say we have a n sentence corpus.
+# On return we give back n parsers.
+# If training we give back x and y.  The size of x and y are uncertain.
+# During processing we need a beam for each sentence of size nbeam.
+# The beam stores BeamState's.  We allocate BeamState's dynamically.
+# Internally we process sentences in batches of size nbatch.
+# We need to keep whole of f, no reusing, and copy part of it to return x.
+# We could use KUdense or KUsparse for f and use resize... that supports sparse as well.
+# that would mean modifying features.jl and sfeatures.jl to use that too.
+# calling convention for sparse and dense features.jl are not the same now.
+# we could have both append a column at the end of a given array?
+# or just have them return the feats vector and we do the appending here using ccat.
+
+# beam: nbeam, beam, sent, mcs, cand, beam2; do we need?
+# prealloc parsers but no prealloc of beamstates? parsers dynamic too.
 
 type BeamState 
     parent::BeamState   # previous state
     move::Move          # move executed to get to this state
-    score::Float64      # cumulative score (logp)
+    score::Float64      # cumulative score (logp) TODO: should be unnormalized logp!
     cost::Cost          # cumulative cost (gold arcs that have become impossible)
-    fidx::Int           # column in feature matrix representing current parser state
+    fidx::Int           # column in feature matrix representing current parser state # TODO: what is this?
     parser::Parser 	# current parser state
     BeamState()=new()
     BeamState(p::Parser)=new(NullBeamState,0,0,0,0,p)
@@ -25,9 +41,9 @@ type Beam
     beam::Vector{BeamState}
     cand::Vector{BeamState}
     sent::Sentence
-    stop::Bool
-    function Beam{T<:Parser}(pt::Type{T}, s::Sentence, ndeps::Integer)
-        p = pt(wcnt(s),ndeps)
+    stop::Bool                  # TODO: what is this?
+    function Beam{T<:Parser}(pt::Type{T}, s::Sentence)
+        p = pt(s)
         b = BeamState(p)
         new(BeamState[b], BeamState[], s, !anyvalidmoves(p))
     end
@@ -35,6 +51,13 @@ end
 
 typealias Batch Vector{Beam}
 
+
+function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int;
+                           nbatch::Int=1, returnxy::Bool=false, usepmap::Bool=false)
+    usepmap ? 
+    bp_pmap(pt, corpus, feats, net, nbeam, nbatch, returnxy) : # TODO: test pmap
+    bp_main(pt, corpus, feats, net, nbeam, nbatch, returnxy)
+end
 
 # Life cycle of a Beam:
 # 1. bp_resize: beam[] (one element, no fidx), cand[] empty
@@ -46,44 +69,46 @@ typealias Batch Vector{Beam}
 # 7. anyvalidmoves: if beam[1] has no valid moves stop here
 # 8. goto step 2
 
-function bp_main{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
+function bp_main{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
     #@date "bp_main Starting"
-    (nbatch < 1 || nbatch > length(corpus)) && (nbatch = length(corpus))
-    (parses, batch, fmatrix, score) = bp_init(pt, corpus, ndeps, feats, returnxy)
+    if (nbatch < 1 || nbatch > length(corpus)); nbatch = length(corpus); end # TODO: sentences of different length?
+    (parses, batch, fmatrix, score) = bp_init(pt, corpus, feats, returnxy) # TODO: replace net with predict::Function
     for s1=1:nbatch:length(corpus)
         s2=min(length(corpus), s1+nbatch-1)                                     
-        (batch, fmatrix, score) = bp_init(pt, corpus, s1:s2, ndeps, nbeam, batch, fmatrix, score) # :86
+        (batch, fmatrix, score) = bp_init(pt, corpus, s1:s2, nbeam, batch, fmatrix, score) # :86
         nf = 0
-        while true
+        while true              # TODO: how do we train the rnn model? this uses batch for whole corpus!
             nf1 = nf + 1
             nf2 = nf = bp_features(batch, feats, fmatrix, nf) # :35152
-            nf2 < nf1 && break
+            nf2 < nf1 && break                                # TODO: replace sub -> view?
             predict(net, sub(fmatrix,:,nf1:nf2), sub(score,:,nf1:nf2); batch=0) # :26933
-            bp_update(batch, score, nbeam, returnxy) # :10750
+            bp_update(batch, score, nbeam, returnxy) # :10750 # TODO: is this where parsing happens?
         end
         # @show nf
         bp_append(parses, batch, fmatrix, score, returnxy) # :1
     end # for s1=1:nbatch:length(corpus)
-    #@date "bp_main Finished"
-    return parses
+    #@date "bp_main Finished"   # TODO: what is the input, who computes the features?
+    return parses               # TODO: what is the output, what is the loss function? how do we backprop to blstm?
 end # function bp_main
 
-function bp_init{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, returnxy::Bool)
+function bp_init{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, returnxy::Bool)
+    # All returned arrays have correct ndims but 0 size
     batch = Array(Beam, 0)
     s0 = corpus[1]
-    p0 = pt(wcnt(s0),ndeps)
+    p0 = pt(s0)
     wt = wtype(corpus)
     fmatrix = Array(wt, (flen(p0,s0,feats), 0))
     score = Array(wt, (p0.nmove, 0))
-    parses = (returnxy ? (pt[], Matrix{wt}[], Matrix{wt}[]) : pt[])
+    # If returnxy we prepare empty x and y matrices
+    parses = (if returnxy; (pt[], Matrix{wt}[], Matrix{wt}[]); else; pt[]; end)
     return (parses, batch, fmatrix, score)
 end
 
-function bp_init{T<:Parser}(pt::Type{T}, corpus::Corpus, r::UnitRange{Int}, ndeps::Int, nbeam::Int, batch, fmatrix, score)
+function bp_init{T<:Parser}(pt::Type{T}, corpus::Corpus, r::UnitRange{Int}, nbeam::Int, batch, fmatrix, score)
     resize!(batch, length(r))
     nword = j = 0
     for i in r
-        batch[j+=1] = Beam(pt, corpus[i], ndeps)
+        batch[j+=1] = Beam(pt, corpus[i])
         nword += wcnt(corpus[i])
     end
     fcols = 2*nword*nbeam
@@ -133,7 +158,9 @@ end
 
 function bp_earlystop(s::Beam, nbeam::Int)
     for i=1:min(nbeam,length(s.cand))
-        s.cand[i].cost == 0 && (return false)
+        if s.cand[i].cost == 0
+            return false
+        end
     end
     return true
 end
@@ -219,39 +246,16 @@ function print_beam(s::Beam, y::Matrix, f2x::Vector{Int})
     end
 end
 
-function bp_pmap{T<:Parser}(pt::Type{T}, corpus::Corpus, ndeps::Int, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
+function bp_pmap{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
     d = distribute(corpus)
     net = testnet(net)
     #@date "pmap Starting"
     p = pmap(procs(d)) do x
-        bp_main(pt, localpart(d), ndeps, feats, gpucopy(net), nbeam, nbatch, returnxy)
+        bp_main(pt, localpart(d), feats, gpucopy(net), nbeam, nbatch, returnxy)
     end
     #@date "pmap Finished"
     return pcat(p)
 end
-
-# Data structures for beam search:
-
-# A batch consists of multiple sentences and their beams.
-# A Beam consists of a sentence, a beam array and a cand array.
-# Both arrays consist of BeamStates sorted by cumulative score.
-# We also track the mincost for training and early stop.
-
-# Say we have a n sentence corpus.
-# On return we give back n parsers.
-# If training we give back x and y.  The size of x and y are uncertain.
-# During processing we need a beam for each sentence of size nbeam.
-# The beam stores BeamState's.  We allocate BeamState's dynamically.
-# Internally we process sentences in batches of size nbatch.
-# We need to keep whole of f, no reusing, and copy part of it to return x.
-# We could use KUdense or KUsparse for f and use resize... that supports sparse as well.
-# that would mean modifying features.jl and sfeatures.jl to use that too.
-# calling convention for sparse and dense features.jl are not the same now.
-# we could have both append a column at the end of a given array?
-# or just have them return the feats vector and we do the appending here using ccat.
-
-# beam: nbeam, beam, sent, mcs, cand, beam2; do we need?
-# prealloc parsers but no prealloc of beamstates? parsers dynamic too.
 
 
 ### DEAD CODE
