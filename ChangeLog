@@ -1,28 +1,24 @@
-2017-04-05  Deniz Yuret  <dyuret@ku.edu.tr>
-
-	* src/bparser.jl: bparser is written for static features trained
-	in batch style, i.e. we construct x and y matrices for training
-	where x has input features for a particular sentence/state and y
-	has the correct move. test/testbparser.jl has some sample
-	calls. test/train.jl is the main script that does training.
-
-	This assumes word and context vectors are static and features()
-	always gives the same output for the same state. If we allow
-	fine-tuning of the blstm this will no longer be true.
-
-	(1) how to integrate the current features() with dynamic word and context vectors?
-	(2) Then we need to figure out a good feature set.
-	(3) Figure out how to do minibatching.
-	(4) how to integrate blstm and the beam parser.
-
-2017-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
-
-	* conll17/languages.txt: columns: $1,$2,$3,$4
-	/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_$1/$2-ud-{train,dev}.{conllu,txt}
-	/mnt/ai/data/nlp/conll17/UDPipe/udpipe-ud-2.0-conll17-170315/models/$3-ud-2.0-conll17-170315.udpipe
-	/mnt/ai/data/nlp/conll17/word-embeddings-conll17/$4/$5.vectors.xz
+2017-04-10  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
+	# KUparser:
+	- globally normalized beam training.
+	- bilstm language model for initialization providing word/context vectors.
+	- ArcHybrid (try others as well).
+	- Should try a composition function instead of ABabL features.
+	- Should try LSTM instead of MLP to make decisions, or find a way to represent stack.
+	- But first solve efficient training of BLSTMLM and minibatch/beam training the parser.
+
+	# Dozat & Manning (2017) soa in graph based ptb 94.1 (LAS).
+	# builds on Kiperwasser & Goldberg (2016) and improves on it.
+	# Kuncoro et al (2016) soa in transition based ptb 94.6.
+	# Andor (2016) globally normalized model. 92.79 with beam=32.
+
+	# check the difference in vocab
+	# write faster blstm training
+	# write blstm parser (but too many unks)
+	# merge pull requests
+
 	# check gparser-mlp-static results under *run*
 	# implement gparser-mlp-dynamic
 	# implement bparser demo
@@ -66,6 +62,73 @@
 	# graph based alternatives?
 	# What do we do with languages that have no dev data?
 
+	* okirnap:
+
+	/Users/okirnap/scratch/charNL/trained_models/english_ch12kmodel.jld
+	directorysinde conll-Ingilizce raw datadan egittigim character
+	based bir model 35 dakikada bir update oluyor. Bu modeli yazarken
+	konustugumuz-bildigim butun trickleri uyguladim, perplexity
+	hesabinda SOS ve EOS yok, ama initial state olarak baslatiliyor.
+	Charlstm de kelimelerin start ve end characterlerini goruyor. Bir
+	de running average loss kullaniyorum boylelikle hep gormedigimiz
+	data perplexitysi hesaba katilmis oluyor. Chracter embedding 15-20
+	arasinda cok benzer sonuc verdigi icin(daha az olursa 2-3puan
+	kotu) 15 kullandim, char-embeddingsiz 12 puan civarinda yavas
+	dusen perplexity vardi, outOfMemory olmayacak sekilde sequence
+	length ve hidden sizelari optimize ettim.
+
+	/Users/okirnap/scratch/charNL/char_english.txt de perplexity
+	bilgisini bulabilirsiniz.
+
+	/mnt/kufs/scratch/okirnap/charNL/trained_models/README altinda bu
+	yapidaki modeller icin bir readme olusturdum. Kelime embedingleri
+	chracter lstm i tarafindan cikariliyor ve forward-backward
+	layerleri tarafindan okunuyor. Modelin kodunu buradan
+	bulabilirsiniz.
+
+2017-04-08  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* Kuncoro2016a: What Do Recurrent Neural Network Grammars Learn About Syntax?
+	- Generative model, phrase structured, based on Dyer 2016.
+	- Composition function important, we should use one! (TODO)
+
+	* Kuncoro2016b: Dependency parsing with LSTMs: An Empirical Evaluation.
+	- Based on Chen&Manning 2014, extend it with LSTM instead of MLP.
+	- Uses ArcStandard (why don't we have this?)
+	- Too many features compared to kuparser, also no global normalization or beam!
+	- Uses LSTM that makes decisions, we should try this after MLP. (TODO)
+
+2017-04-07  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* blstm: Hocam turkce datasi uzerinde egitilmis modeli balinada
+	`/mnt/kufs/scratch/okirnap/lexsub/models/turkish_20kmodel.jld`
+	ayni modelin readmesini de
+	`/mnt/kufs/scratch/okirnap/lexsub/models/README` directorysi
+	altinda bulabilirsiniz.
+
+2017-04-05  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* src/bparser.jl: bparser is written for static features trained
+	in batch style, i.e. we construct x and y matrices for training
+	where x has input features for a particular sentence/state and y
+	has the correct move. test/testbparser.jl has some sample
+	calls. test/train.jl is the main script that does training.
+
+	This assumes word and context vectors are static and features()
+	always gives the same output for the same state. If we allow
+	fine-tuning of the blstm this will no longer be true.
+
+	(1) how to integrate the current features() with dynamic word and context vectors?
+	(2) Then we need to figure out a good feature set.
+	(3) Figure out how to do minibatching.
+	(4) how to integrate blstm and the beam parser.
+
+2017-03-24  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* conll17/languages.txt: columns: $1,$2,$3,$4
+	/mnt/ai/data/nlp/conll17/ud-treebanks-conll2017/UD_$1/$2-ud-{train,dev}.{conllu,txt}
+	/mnt/ai/data/nlp/conll17/UDPipe/udpipe-ud-2.0-conll17-170315/models/$3-ud-2.0-conll17-170315.udpipe
+	/mnt/ai/data/nlp/conll17/word-embeddings-conll17/$4/$5.vectors.xz
 
 2017-03-21  dyuret  <dyuret@ku.edu.tr>
 
