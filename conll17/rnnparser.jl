@@ -28,11 +28,17 @@ typealias Word String           # represent words with strings instead of finite
 # typealias DepRel UInt8          # 37 universal dependency relations
 # typealias Position Int16        # sentence position
 
-# immutable Vocab
-#     postags::Vector{String}
-#     deprels::Vector{String}
-#     chars::Vector{Char}
-# end
+immutable Vocab
+    cdict::Dict{Char,Int}       # character dictionary (input)
+    idict::Dict{String,Int}     # word dictionary (input, filled in by maptoint)
+    odict::Dict{String,Int}     # word dictionary (output)
+    sosword::String             # start-of-sentence word (input)
+    eosword::String             # end-of-sentence word (input)
+    unkword::String             # unknown word (output, input does not have unk)
+    sowchar::Char               # start-of-word char
+    eowchar::Char               # end-of-word char
+    unkchar::Char               # unknown char
+end
 
 ;                               # CONLLU FORMAT
 immutable Sentence		# 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
@@ -54,32 +60,47 @@ end
 Base.length(s::Sentence)=length(s.word)
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
+function parseloss(model, sentences, vocab, parsertype, beamsize)
+    global wembed,forw,back,cdata,cmask,wdata,wmask
+    words,sents,wordlen,sentlen = maptoint(sentences, vocab)
+    # Get word embeddings
+    sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
+    cdata,cmask = tokenbatch(words,wordlen,sow,eow) # cdata/cmask[W+2][V] where W: longest word (140), V: input word vocab (19674)
+    wembed = charlstm(model,cdata,cmask)            # wembed[V,C] where V: input word vocab, C: char embedding (350)
+    # Get context embeddings
+    sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
+    wdata,wmask = tokenbatch(sents,sentlen,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
+    forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][B,H] where T: longest sentence, B: batch size, H: hidden size (300)
+    nothing
+end
+
 # function loss(model, sentences, parsertype, beamsize)
-function loss(model, sentences, cdict, wdict,
-              sosword, eosword, unkwid,
-              sowcid, eowcid, unkcid; result=nothing)
+function lmloss(model, sentences, vocab::Vocab; result=nothing)
     # map words and chars to Ints
     # words and sents contain Int (char/word id) arrays without sos/eos tokens
     # TODO: optionally construct cdict here as well
-    sdict,words,sents,wordlen,sentlen = maptoint(sentences, cdict, unkcid, sosword, eosword)
-    soswid,eoswid = sdict[sosword],sdict[eosword]
+    words,sents,wordlen,sentlen = maptoint(sentences, vocab)
 
     # Find word vectors for a batch of sentences using character lstm or cnn model
     # note that tokenbatch adds sos/eos tokens and padding to each sequence
-    cdata,cmask = tokenbatch(words,wordlen,sowcid,eowcid)
+    sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
+    cdata,cmask = tokenbatch(words,wordlen,sow,eow)
     wembed = charlstm(model,cdata,cmask)
 
     # Find context vectors using word blstm
-    wdata,wmask = tokenbatch(sents,sentlen,soswid,eoswid)
+    sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
+    wdata,wmask = tokenbatch(sents,sentlen,sos,eos)
     forw,back = wordlstm(model,wdata,wmask,wembed)
 
     # Test predictions
-    odata,omask = goldbatch(sentences,sentlen,wdict,unkwid) # odata[t][b]::Int gives the correct word at sentence b, position t
-    total = lmloss(model,odata,omask,forw,back; result=result)
+    unk = vocab.odict[vocab.unkword]
+    odata,omask = goldbatch(sentences,sentlen,vocab.odict,unk)
+    total = lmloss1(model,odata,omask,forw,back; result=result)
     return -total/length(sentences)
 end
 
-function lmloss(model,data,mask,forw,back; result=nothing)
+function lmloss1(model,data,mask,forw,back; result=nothing)
+    # data[t][b]::Int gives the correct word at sentence b, position t
     T = length(data); if !(T == length(forw) == length(back) == length(mask)); error(); end
     B = length(data[1])
     weight,bias = wsoft(model),bsoft(model)
@@ -104,14 +125,17 @@ end
 
 # Find all unique words, assign an id to each, and lookup their characters in cdict
 # TODO: construct/add-to cdict here as well?
-function maptoint(sentences, cdict, unkcid, sosword, eosword)
-    global sdict = Dict{String,Int}()
-    global words = Vector{Int}[]
+# in vocab: reads sosword, eosword, unkchar, cdict; writes idict
+function maptoint(sentences, v::Vocab)
+    wdict = empty!(v.idict)
+    cdict = v.cdict
+    unkcid = cdict[v.unkchar]
+    words = Vector{Int}[]
     sents = Vector{Int}[]
     wordlen = 0
     sentlen = 0
-    @inbounds for w in (sosword,eosword)
-        wid = get!(sdict, w, 1+length(sdict))
+    @inbounds for w in (v.sosword,v.eosword)
+        wid = get!(wdict, w, 1+length(wdict))
         word = Array(Int, length(w))
         wordi = 0
         for c in w
@@ -121,13 +145,12 @@ function maptoint(sentences, cdict, unkcid, sosword, eosword)
         if wordi > wordlen; wordlen = wordi; end
         push!(words, word)
     end
-    if length(sdict) != length(words); error("sdict=$(length(sdict)) words=$(length(words))"); end
     @inbounds for s in sentences
         sent = Array(Int, length(s.word))
         senti = 0
         for w in s.word
-            ndict = length(sdict)
-            wid = get!(sdict, w, 1+ndict)
+            ndict = length(wdict)
+            wid = get!(wdict, w, 1+ndict)
             sent[senti+=1] = wid
             if wid == 1+ndict
                 word = Array(Int, length(w))
@@ -140,13 +163,12 @@ function maptoint(sentences, cdict, unkcid, sosword, eosword)
                 push!(words, word)
             end
         end
-        if length(sdict) != length(words); error("sdict=$(length(sdict)) words=$(length(words))"); end
         if senti != length(s.word); error(); end
         if senti > sentlen; sentlen = senti; end
         push!(sents, sent)
     end
-    if length(sdict) != length(words); error("sdict=$(length(sdict)) words=$(length(words))"); end
-    return sdict,words,sents,wordlen,sentlen
+    if length(wdict) != length(words); error("wdict=$(length(wdict)) words=$(length(words))"); end
+    return words,sents,wordlen,sentlen
 end
     
 # Create token batches, adding start/end tokens and masks, pad at the beginning
@@ -260,20 +282,7 @@ end
 
 function loadvocab()
     a = load("english_vocabs.jld")
-    global _cdict = a["char_vocab"]
-    global _wdict = a["word_vocab"]
-    global _sosword="<s>"
-    global _eosword="</s>"
-    global _unkword="<unk>"
-    global _soswid=1
-    global _eoswid=2
-    global _unkwid=3
-    global _sowchar='↥'
-    global _eowchar='Ϟ'
-    global _unkchar='⋮'
-    global _sowcid=2
-    global _eowcid=3
-    global _unkcid=1
+    global _vocab = Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],"<s>","</s>","<unk>",'↥','Ϟ','⋮')
     nothing
 end
 
@@ -338,23 +347,23 @@ function minibatch1(corpus, batchsize)
     return data
 end
 
-function main(;batch=2000)
+function main(;batch=3000,nsent=0,result=zeros(2))
     loadmodel()
     loadvocab()
     loadcorpus()
-    global _data = minibatch(_corpus, batch)
+    c = (nsent == 0 ? _corpus : _corpus[1:nsent])
+    global _data = minibatch(c, batch)
     # global _data = [ _corpus[i:min(i+999,length(_corpus))] for i=1:1000:length(_corpus) ]
     # global _data = [ _corpus[1:1] ]
-    result = zeros(2)
     for d in _data
-        loss(_model, d, _cdict, _wdict, _sosword, _eosword, _unkwid, _sowcid, _eowcid, _unkcid; result=result)
+        lmloss(_model, d, _vocab; result=result)
     end
     println(exp(-result[1]/result[2]))
     return result
 end
 
 function getloss(d; result=zeros(2))
-    loss(_model, d, _cdict, _wdict, _sosword, _eosword, _unkwid, _sowcid, _eowcid, _unkcid; result=result)
+    lmloss(_model, d, _vocab; result=result)
     println(exp(-result[1]/result[2]))
     return result
 end
