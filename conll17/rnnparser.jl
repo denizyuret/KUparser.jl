@@ -99,7 +99,31 @@ function lmloss(model, sentences, vocab::Vocab; result=nothing)
     return -total/length(sentences)
 end
 
-function lmloss1(model,data,mask,forw,back; result=nothing)
+function lmloss1(model,data,mask,forw,back; result=nothing) # col-major
+    # data[t][b]::Int gives the correct word at sentence b, position t
+    T = length(data); if !(T == length(forw) == length(back) == length(mask)); error(); end
+    B = length(data[1])
+    weight,bias = wsoft(model),bsoft(model)
+    total = count = 0
+    @inbounds for t=1:T
+        ypred = weight * vcat(forw[t],back[t]) .+ bias # ypred[b][w] is the score for word w for sentence b at time t
+        nrows,ncols = size(ypred)
+        index = Int[]
+        for b=1:B
+            if mask[t][b]==1
+                # push!(index, b + (data[t][b]-1)*nrows)
+                push!(index, data[t][b] + (b-1)*nrows)
+            end
+        end
+        o1 = logp(ypred,2)
+        o2 = o1[index]
+        total += sum(o2)
+        count += length(o2)
+    end
+    if result != nothing; result[1]+=AutoGrad.getval(total); result[2]+=count; end
+    return total
+end
+function lmloss1a(model,data,mask,forw,back; result=nothing) # row-major
     # data[t][b]::Int gives the correct word at sentence b, position t
     T = length(data); if !(T == length(forw) == length(back) == length(mask)); error(); end
     B = length(data[1])
@@ -223,7 +247,20 @@ function goldbatch(sentences, maxlen, wdict, unkwid, pad=unkwid)
 end
 
 # Run charid arrays through the LSTM, collect last hidden state as word embedding
-function charlstm(model,data,mask)
+function charlstm(model,data,mask) # col major
+    weight,bias,embed = wchar(model),bchar(model),echar(model)
+    T = length(data)
+    B = length(data[1])
+    H = div(length(bias),4)
+    hidden = cell = fill!(similar(bias, H, B), 0) # TODO: cache this
+    mask = map(KnetArray, mask)           # TODO: dont hardcode atype
+    @inbounds for t in 1:T
+        input = embed[:,data[t]]
+        (hidden,cell) = lstm(weight,bias,hidden,cell,input;mask=mask[t])
+    end
+    return hidden
+end
+function charlstm1(model,data,mask) # row major
     weight,bias,embed = wchar(model),bchar(model),echar(model)
     T = length(data)
     B = length(data[1])
@@ -237,7 +274,32 @@ function charlstm(model,data,mask)
     return hidden
 end
 
-function wordlstm(model,data,mask,embed)
+function wordlstm(model,data,mask,embed) # col-major
+    T = length(data)
+    B = length(data[1])
+    weight,bias = wforw(model),bforw(model)
+    mask = map(KnetArray, mask)           # TODO: dont hardcode atype
+    H = div(length(bias),4)
+    Z = fill!(similar(bias, H, B), 0)
+    hidden = cell = Z
+    forw = Array(Any,T-2)       # exclude sos/eos
+    @inbounds for t in 1:T-2
+        input = embed[:,data[t]]
+        (hidden,cell) = lstm(weight,bias,hidden,cell,input; mask=mask[t])
+        forw[t] = hidden
+    end
+    weight,bias = wback(model),bback(model)
+    if H != div(length(bias),4); error(); end
+    hidden = cell = Z
+    back = Array(Any,T-2)
+    @inbounds for t in T:-1:3
+        input = embed[:,data[t]]
+        (hidden,cell) = lstm(weight,bias,hidden,cell,input; mask=mask[t])
+        back[t-2] = hidden
+    end
+    return forw,back
+end
+function wordlstm1(model,data,mask,embed) # row-major
     T = length(data)
     B = length(data[1])
     weight,bias = wforw(model),bforw(model)
@@ -264,7 +326,7 @@ function wordlstm(model,data,mask,embed)
 end
 
 # Generic row-major lstm
-function lstm(weight,bias,hidden,cell,input; mask=nothing)
+function lstm1(weight,bias,hidden,cell,input; mask=nothing)
     gates   = hcat(input,hidden) * weight .+ bias
     H       = size(hidden,2)
     forget  = sigm(gates[:,1:H])
@@ -276,6 +338,24 @@ function lstm(weight,bias,hidden,cell,input; mask=nothing)
     if mask != nothing
         hidden = hidden .* mask
         cell = cell .* mask
+    end
+    return (hidden,cell)
+end
+
+# Generic col-major lstm
+function lstm(weight,bias,hidden,cell,input; mask=nothing)
+    gates   = weight * vcat(input,hidden) .+ bias
+    H       = size(hidden,1)
+    forget  = sigm(gates[1:H,:])
+    ingate  = sigm(gates[1+H:2H,:])
+    outgate = sigm(gates[1+2H:3H,:])
+    change  = tanh(gates[1+3H:4H,:])
+    cell    = cell .* forget + ingate .* change
+    hidden  = outgate .* tanh(cell)
+    if mask != nothing
+        maskT = reshape(mask,1,length(mask))
+        hidden = hidden .* maskT
+        cell = cell .* maskT
     end
     return (hidden,cell)
 end
@@ -299,11 +379,18 @@ function loadcorpus()
     end
 end
 
-function loadmodel()
+function loadmodel1() # row major
     global _model = Dict()
     m = load("english_ch12kmodel_2.jld")["model"]
     for k in (:cembed,); _model[k] = KnetArray(m[k]); end
     for k in (:forw,:soft,:back,:char); _model[k] = map(KnetArray, m[k]); end
+end
+
+function loadmodel() # col major
+    global _model = Dict()
+    m = load("english_ch12kmodel_2.jld")["model"]
+    for k in (:cembed,); _model[k] = KnetArray(m[k]'); end
+    for k in (:forw,:soft,:back,:char); _model[k] = map(KnetArray, m[k]'); end
 end
 
 wsoft(model)=model[:soft][1]
