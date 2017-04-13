@@ -60,7 +60,7 @@ function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, 
 end
 
 # Life cycle of a Beam:
-# 1. bp_resize: beam[] (one element, no fidx), cand[] empty
+# 1. bp_resize: beam[] (one element, no fidx), cand[] empty # TODO: what is this? bp_init?
 # 2. bp_features: beam[i] gets fidx
 # 3. predict: score matrix filled
 # 4. bp_update_cand: cand (no parser/fidx) filled with children of beam, sorted

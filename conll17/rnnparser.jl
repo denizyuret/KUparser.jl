@@ -1,10 +1,29 @@
 using JLD, Knet
-ORDER=1 # 1:column-major 2:row-major
+MAJOR=1 # 1:column-major 2:row-major
 
 typealias Word String           # represent words with strings instead of finite vocab, we will process chars
-# typealias PosTag UInt8          # 17 universal part-of-speech tags
-# typealias DepRel UInt8          # 37 universal dependency relations
-# typealias Position Int16        # sentence position
+typealias PosTag UInt8          # 17 universal part-of-speech tags
+typealias DepRel UInt8          # 37 universal dependency relations
+typealias Position Int16        # sentence position
+typealias Cost Position         # [0:nword]
+typealias Move Int              # [1:nmove]
+include("../src/parser.jl")
+
+;                               # CONLLU FORMAT
+immutable Sentence		# 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
+    word::Vector{Word}          # 2. FORM: Word form or punctuation symbol.
+    #stem::Vector{Stem}         # 3. LEMMA: Lemma or stem of word form.
+    postag::Vector{PosTag}      # 4. UPOSTAG: Universal part-of-speech tag.
+    #xpostag::Vector{Xpostag}   # 5. XPOSTAG: Language-specific part-of-speech tag; underscore if not available.
+    #feats::Vector{Feats}       # 6. FEATS: List of morphological features from the universal feature inventory or from a defined language-specific extension; underscore if not available.
+    head::Vector{Position}      # 7. HEAD: Head of the current word, which is either a value of ID or zero (0).
+    deprel::Vector{DepRel}      # 8. DEPREL: Universal dependency relation to the HEAD (root iff HEAD = 0) or a defined language-specific subtype of one.
+    #deps::Vector{Deps}         # 9. DEPS: Enhanced dependency graph in the form of a list of head-deprel pairs.
+    #misc::Vector{Misc}         # 10. MISC: Any other annotation.
+    #vocab::Vocab               # Common repository of symbols for upostag, deprel etc.
+end
+Sentence()=Sentence([],[],[],[])
+Base.length(s::Sentence)=length(s.word)
 
 immutable Vocab
     cdict::Dict{Char,Int}       # character dictionary (input)
@@ -16,26 +35,40 @@ immutable Vocab
     sowchar::Char               # start-of-word char
     eowchar::Char               # end-of-word char
     unkchar::Char               # unknown char
+    postags::Dict{String,PosTag}
+    deprels::Dict{String,DepRel}
 end
 
-;                               # CONLLU FORMAT
-immutable Sentence		# 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
-    word::Vector{Word}          # 2. FORM: Word form or punctuation symbol.
-    #stem::Vector{Stem}         # 3. LEMMA: Lemma or stem of word form.
-    #postag::Vector{PosTag}      # 4. UPOSTAG: Universal part-of-speech tag.
-    #xpostag::Vector{Xpostag}   # 5. XPOSTAG: Language-specific part-of-speech tag; underscore if not available.
-    #feats::Vector{Feats}       # 6. FEATS: List of morphological features from the universal feature inventory or from a defined language-specific extension; underscore if not available.
-    #head::Vector{Position}      # 7. HEAD: Head of the current word, which is either a value of ID or zero (0).
-    #deprel::Vector{DepRel}      # 8. DEPREL: Universal dependency relation to the HEAD (root iff HEAD = 0) or a defined language-specific subtype of one.
-    #deps::Vector{Deps}         # 9. DEPS: Enhanced dependency graph in the form of a list of head-deprel pairs.
-    #misc::Vector{Misc}         # 10. MISC: Any other annotation.
-    #vocab::Vocab                # Common repository of symbols for upostag, deprel etc.
+type BeamState 
+    parent::BeamState   # previous state
+    move::Move          # move executed to get to this state
+    score::Float64      # cumulative score (logp) TODO: should be unnormalized logp!
+    cost::Cost          # cumulative cost (gold arcs that have become impossible)
+    fidx::Int           # column in feature matrix representing current parser state # TODO: what is this?
+    parser::Parser 	# current parser state
+    BeamState()=new()
+    BeamState(p::Parser)=new(NullBeamState,0,0,0,0,p)
+    BeamState(b::BeamState,m::Integer,s::Number,c::Integer)=
+        new(b,convert(Move,m),convert(Float64,s),convert(Cost,c))
 end
 
-# just the words:
-#Sentence(w::Vector{Word})=Sentence(w,[],[],[],Vocab([],[],[]))
+const NullBeamState = BeamState()
+Base.isless(a::BeamState,b::BeamState)=(a.score < b.score)
 
-Base.length(s::Sentence)=length(s.word)
+type Beam 
+    beam::Vector{BeamState}
+    cand::Vector{BeamState}
+    sent::Sentence
+    stop::Bool                  # TODO: what is this?
+    function Beam{T<:Parser}(pt::Type{T}, s::Sentence)
+        p = pt(s)
+        b = BeamState(p)
+        new(BeamState[b], BeamState[], s, !anyvalidmoves(p))
+    end
+end
+
+typealias Batch Vector{Beam}
+
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
 function parseloss(model, sentences, vocab, parsertype, beamsize)
@@ -43,12 +76,12 @@ function parseloss(model, sentences, vocab, parsertype, beamsize)
     words,sents,wordlen,sentlen = maptoint(sentences, vocab)
     # Get word embeddings
     sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
-    cdata,cmask = tokenbatch(words,wordlen,sow,eow) # cdata/cmask[W+2][V] where W: longest word (140), V: input word vocab (19674)
-    wembed = charlstm(model,cdata,cmask)            # wembed[V,C] where V: input word vocab, C: char embedding (350)
+    cdata,cmask = tokenbatch(words,wordlen,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
+    wembed = charlstm(model,cdata,cmask)            # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
     # Get context embeddings
     sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
     wdata,wmask = tokenbatch(sents,sentlen,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
-    forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][B,H] where T: longest sentence, B: batch size, H: hidden size (300)
+    forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
     nothing
 end
 
@@ -82,8 +115,8 @@ function lmloss1(model,data,mask,forw,back; result=nothing)
     T = length(data); if !(T == length(forw) == length(back) == length(mask)); error(); end
     B = length(data[1])
     weight,bias = wsoft(model),bsoft(model)
-    prd(t) = (if ORDER==1; weight * vcat(forw[t],back[t]) .+ bias; else; hcat(forw[t],back[t]) * weight .+ bias; end)
-    idx(t,b,n) = (if ORDER==1; data[t][b] + (b-1)*n; else; b + (data[t][b]-1)*n; end)
+    prd(t) = (if MAJOR==1; weight * vcat(forw[t],back[t]) .+ bias; else; hcat(forw[t],back[t]) * weight .+ bias; end)
+    idx(t,b,n) = (if MAJOR==1; data[t][b] + (b-1)*n; else; b + (data[t][b]-1)*n; end)
     total = count = 0
     @inbounds for t=1:T
         ypred = prd(t)
@@ -94,7 +127,7 @@ function lmloss1(model,data,mask,forw,back; result=nothing)
                 push!(index, idx(t,b,nrows))
             end
         end
-        o1 = logp(ypred,ORDER)
+        o1 = logp(ypred,MAJOR)
         o2 = o1[index]
         total += sum(o2)
         count += length(o2)
@@ -208,8 +241,8 @@ function charlstm(model,data,mask)
     T = length(data)
     B = length(data[1])
     H = div(length(bias),4)
-    cembed(t)=(if ORDER==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
-    czero=(if ORDER==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
+    cembed(t)=(if MAJOR==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
+    czero=(if MAJOR==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
     hidden = cell = czero       # TODO: cache this
     mask = map(KnetArray, mask) # TODO: dont hardcode atype
     @inbounds for t in 1:T
@@ -223,8 +256,8 @@ function wordlstm(model,data,mask,embeddings) # col-major
     T = length(data)
     B = length(data[1])
     H = div(length(bias),4)
-    wembed(t)=(if ORDER==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
-    wzero=(if ORDER==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
+    wembed(t)=(if MAJOR==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
+    wzero=(if MAJOR==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
     hidden = cell = wzero
     mask = map(KnetArray, mask)           # TODO: dont hardcode atype
     forw = Array(Any,T-2)       # exclude sos/eos
@@ -244,7 +277,7 @@ function wordlstm(model,data,mask,embeddings) # col-major
 end
 
 function lstm(weight,bias,hidden,cell,input; mask=nothing)
-    if ORDER==1
+    if MAJOR==1
         gates   = weight * vcat(input,hidden) .+ bias
         H       = size(hidden,1)
         forget  = sigm(gates[1:H,:])
@@ -271,19 +304,24 @@ end
 
 function loadvocab()
     a = load("english_vocabs.jld")
-    global _vocab = Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],"<s>","</s>","<unk>",'↥','Ϟ','⋮')
-    nothing
+    global _vocab = Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],
+                          "<s>","</s>","<unk>",'↥','Ϟ','⋮',
+                          UPOSTAG, UDEPREL)
 end
 
-function loadcorpus()
+function loadcorpus(v::Vocab)
     global _corpus = Any[]
-    s = Sentence([])
+    s = Sentence()
     for line in eachline("en-ud-train.conllu")
         if line == "\n"
             push!(_corpus, s)
-            s = Sentence([])
-        elseif (m = match(r"^\d+\t(.+?)\t", line)) != nothing
+            s = Sentence()
+        elseif (m = match(r"^\d+\t(.+?)\t.+?\t(.+?)\t.+?\t.+?\t(.+?)\t(.+?)\t", line)) != nothing
+            #                id   word   lem  upos   xpos feat head   deprel
             push!(s.word, m.captures[1])
+            push!(s.postag, v.postags[m.captures[2]])
+            push!(s.head, parse(Position,m.captures[3]))
+            push!(s.deprel, v.deprels[m.captures[4]])
         end
     end
 end
@@ -291,7 +329,7 @@ end
 function loadmodel()
     global _model = Dict()
     m = load("english_ch12kmodel_2.jld")["model"]
-    if ORDER==1
+    if MAJOR==1
         for k in (:cembed,); _model[k] = KnetArray(m[k]'); end
         for k in (:forw,:soft,:back,:char); _model[k] = map(KnetArray, m[k]'); end
     else
@@ -344,7 +382,7 @@ end
 function main(;batch=3000,nsent=0,result=zeros(2))
     loadmodel()
     loadvocab()
-    loadcorpus()
+    loadcorpus(_vocab)
     c = (nsent == 0 ? _corpus : _corpus[1:nsent])
     global _data = minibatch(c, batch)
     # global _data = [ _corpus[i:min(i+999,length(_corpus))] for i=1:1000:length(_corpus) ]
@@ -361,6 +399,68 @@ function getloss(d; result=zeros(2))
     println(exp(-result[1]/result[2]))
     return result
 end
+
+# Universal POS tags (17)
+const UPOSTAG = Dict{String,PosTag}(
+"ADJ"   => 1, # adjective
+"ADP"   => 2, # adposition
+"ADV"   => 3, # adverb
+"AUX"   => 4, # auxiliary
+"CCONJ" => 5, # coordinating conjunction
+"DET"   => 6, # determiner
+"INTJ"  => 7, # interjection
+"NOUN"  => 8, # noun
+"NUM"   => 9, # numeral
+"PART"  => 10, # particle
+"PRON"  => 11, # pronoun
+"PROPN" => 12, # proper noun
+"PUNCT" => 13, # punctuation
+"SCONJ" => 14, # subordinating conjunction
+"SYM"   => 15, # symbol
+"VERB"  => 16, # verb
+"X"     => 17, # other
+]
+
+# Universal Dependency Relations (37)
+const UDEPREL = Dict{String,DepRel}(
+"root"       => 1,  # root
+"acl"        => 2,  # clausal modifier of noun (adjectival clause)
+"advcl"      => 3,  # adverbial clause modifier
+"advmod"     => 4,  # adverbial modifier
+"amod"       => 5,  # adjectival modifier
+"appos"      => 6,  # appositional modifier
+"aux"        => 7,  # auxiliary
+"case"       => 8,  # case marking
+"cc"         => 9,  # coordinating conjunction
+"ccomp"      => 10, # clausal complement
+"clf"        => 11, # classifier
+"compound"   => 12, # compound
+"conj"       => 13, # conjunct
+"cop"        => 14, # copula
+"csubj"      => 15, # clausal subject
+"dep"        => 16, # unspecified dependency
+"det"        => 17, # determiner
+"discourse"  => 18, # discourse element
+"dislocated" => 19, # dislocated elements
+"expl"       => 20, # expletive
+"fixed"      => 21, # fixed multiword expression
+"flat"       => 22, # flat multiword expression
+"goeswith"   => 23, # goes with
+"iobj"       => 24, # indirect object
+"list"       => 25, # list
+"mark"       => 26, # marker
+"nmod"       => 27, # nominal modifier
+"nsubj"      => 28, # nominal subject
+"nummod"     => 29, # numeric modifier
+"obj"        => 30, # object
+"obl"        => 31, # oblique nominal
+"orphan"     => 32, # orphan
+"parataxis"  => 33, # parataxis
+"punct"      => 34, # punctuation
+"reparandum" => 35, # overridden disfluency
+"vocative"   => 36, # vocative
+"xcomp"      => 37, # open clausal complement
+]
 
 # """
 # The input is minibatched and processed character based.
