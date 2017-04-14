@@ -277,6 +277,35 @@ function getdeps{T<:Parser}(p::T)
     return (ldep,rdep,lset,rset)
 end    
 
+function getdeps2{T<:Parser}(p::T)
+    nw = p.nword
+    nd = p.ndeps
+    dr = p.deprel
+    ldep = Array(Any,nw)
+    rdep = Array(Any,nw)
+    @inbounds for d=1:nw
+        h=Int(p.head[d])
+        if h==0
+            continue
+        elseif d<h
+            if !isassigned(ldep,h)
+                ldep[h]=[d]
+            else
+                push!(ldep[h],d)
+            end
+        elseif d>h
+            if !isassigned(rdep,h)
+                rdep[h]=[d]
+            else
+                unshift!(rdep[h],d)
+            end
+        else
+            error("h==d")
+        end
+    end
+    return (ldep,rdep)
+end    
+
 function getanchor(f::String, p::Parser, ldep, rdep)
     f1 = f[1]; f2 = f[2]; flen = length(f)
     if isdigit(f2)
@@ -341,7 +370,7 @@ function getanchor(f::String, p::Parser, ldep, rdep)
 end    
 
 function getrdist(f::AbstractString, p::Parser, a::Integer)
-    if f[1]=='s'
+    if f[1]=='s' && a > 0
         if isdigit(f[2])
             i=f[2]-'0'
         else
@@ -359,3 +388,48 @@ function getrdist(f::AbstractString, p::Parser, a::Integer)
     end
 end
 
+### batch feature extractor for beamparser
+
+function bp_fmatrix(parsers, feats, model)
+    pvecs,dvecs,lvecs,rvecs,xvecs = postagv(model),deprelv(model),leftv(model),rightv(model),distv(model)
+    fmatrix = []
+    for p in parsers
+        s = p.sentence
+        ldep,rdep = getdeps2(p)
+        for f in feats                   #48
+            a = getanchor(f,p,ldep,rdep) #1402
+            fn = f[end]                  #642
+            if fn == 'v'                 #234
+                push!(fmatrix, a>0 ? s.wvec[a] : zeros(s.wvec[1]))
+            elseif fn == 'c'        #200
+                push!(fmatrix, a>0 ? s.cvec[a] : zeros(s.cvec[1]))
+            elseif fn == 'p'        #114
+                push!(fmatrix, a>0 ? pvecs[s.postag[a]] : zeros(pvecs[1]))
+            elseif fn == 'L'
+                push!(fmatrix, a>0 ? dvecs[p.deprel[a]] : zeros(dvecs[1]))
+            elseif fn == 'A'
+                push!(fmatrix, a>0 && isassigned(ldep,a) ? +(dvecs[p.deprel[ldep[a]]]...) : zeros(dvecs[1]))
+            elseif fn == 'B'
+                push!(fmatrix, a>0 && isassigned(rdep,a) ? +(dvecs[p.deprel[rdep[a]]]...) : zeros(dvecs[1]))
+            elseif fn == 'd'
+                d = getrdist(f,p,a)
+                push!(fmatrix, d>0 ? xvecs[min(d,10)] : zeros(rvecs[1]))
+            elseif fn == 'a'
+                d = (a>0 && isassigned(ldep,a) ? length(ldep[a]) : 0)
+                push!(fmatrix, a>0 ? lvecs[min(d+1,10)] : zeros(lvecs[1]))
+            elseif fn == 'b'
+                d = (a>0 && isassigned(rdep,a) ? length(rdep[a]) : 0)
+                push!(fmatrix, a>0 ? rvecs[min(d+1,10)] : zeros(rvecs[1]))
+            elseif fn == 'w'
+                error("Dense features do not support 'w'")
+            else
+                error("Unknown feature $(fn)") # 3
+            end
+        end
+    end
+    fmatrix = vcat(fmatrix...)
+    ncols = length(parsers)
+    nrows = div(length(fmatrix), ncols)
+    reshape(fmatrix, nrows, ncols)
+end
+        
