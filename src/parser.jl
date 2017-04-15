@@ -13,6 +13,9 @@
 # julia-users members Toivo Henningsson and Simon Danisch for suggesting
 # this design.
 
+# TODO: remove unnecessary fields from Parser, Sentence etc. (do we need to keep ndeps?)
+# TODO: add back type info to fields like sentence and vocab.
+
 type Parser{T,V}
     nword::Int            # number of words in sentence
     ndeps::Int            # number of dependency labels (ROOT=1)
@@ -22,6 +25,7 @@ type Parser{T,V}
     stack::Pvec           # nword vector for stack of indices
     head::Pvec            # nword vector of heads
     deprel::Dvec          # nword vector of dependency labels
+    sentence
     
     function Parser(nword::Int,ndeps::Int)
         init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword)))
@@ -30,10 +34,16 @@ type Parser{T,V}
     function Parser(s::Sentence)
         nword = length(s.word)
         ndeps = length(s.vocab.deprels)
-        init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword)))
+        init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword),sentence))
     end
 
 end # Parser
+
+# TODO: do we need these?
+# TODO: use zero deprel instead of root?
+Pzeros(n::Integer...)=zeros(Position, n...)
+Dzeros(n::Integer...)=zeros(DepRel, n...)
+Droots(n::Integer...)=ones(DepRel, n...)
 
 # A parser provides four functions: 
 #

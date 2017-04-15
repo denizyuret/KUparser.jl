@@ -5,43 +5,43 @@
 # Both arrays consist of BeamStates sorted by cumulative score.
 # We also track the mincost for training and early stop.
 
-# Say we have a n sentence corpus.
-# On return we give back n parsers.
-# If training we give back x and y.  The size of x and y are uncertain.
-# During processing we need a beam for each sentence of size nbeam.
-# The beam stores BeamState's.  We allocate BeamState's dynamically.
-# Internally we process sentences in batches of size nbatch.
-# We need to keep whole of f, no reusing, and copy part of it to return x.
-# We could use KUdense or KUsparse for f and use resize... that supports sparse as well.
-# that would mean modifying features.jl and sfeatures.jl to use that too.
-# calling convention for sparse and dense features.jl are not the same now.
-# we could have both append a column at the end of a given array?
-# or just have them return the feats vector and we do the appending here using ccat.
+# Loss function for beam search:
 
-# beam: nbeam, beam, sent, mcs, cand, beam2; do we need?
-# prealloc parsers but no prealloc of beamstates? parsers dynamic too.
+# Globally normalized probability for a sequence ending in BeamState s:
+# Let score(s) be the cumulative score of the sequence up to s.
+# prob(s) = exp(score(s)) - Z
+# J(s) = -score(s) + log(Z)
+# Z = exp(score(s)) summed over all paths
+
+# Beam loss with early updates:
+# wait until gold path falls out of the beam at step j, say s=gold[j]
+# B is the beam at step j, together with gold state s
+# J(s) = -score(s) + log(Z)
+# Z = exp(score(b)) summed over all b in B
 
 type BeamState 
-    parent::BeamState   # previous state
-    move::Move          # move executed to get to this state
-    score::Float64      # cumulative score (logp) TODO: should be unnormalized logp!
-    cost::Cost          # cumulative cost (gold arcs that have become impossible)
-    fidx::Int           # column in feature matrix representing current parser state # TODO: what is this?
     parser::Parser 	# current parser state
-    BeamState()=new()
-    BeamState(p::Parser)=new(NullBeamState,0,0,0,0,p)
-    BeamState(b::BeamState,m::Integer,s::Number,c::Integer)=
-        new(b,convert(Move,m),convert(Float64,s),convert(Cost,c))
+    parent::BeamState   # previous state
+    move::Move          # move executed to get to current state
+    cost::Cost          # cumulative cost (gold arcs that have become impossible)
+    score               # cumulative score (dropped type so it can be boxed)
+    BeamState()=new()   # for NullBeamState
+    BeamState(p::Parser)=new(p,NullBeamState,0,0,0.0) # for initial states
+    BeamState(parent::BeamState,move,cost,score)=new(NullParser,parent,move,cost+parent.cost,score+parent.score) # for candidates
 end
 
+const NullParser = ArcHybridR1(1,0)
 const NullBeamState = BeamState()
 Base.isless(a::BeamState,b::BeamState)=(a.score < b.score)
+
+# TODO: we should keep track of the gold path for early stop!? make sure we follow one extra move on gold path.
+# TODO: for non-projective sentences we should take gold path to be the mincost path?
 
 type Beam 
     beam::Vector{BeamState}
     cand::Vector{BeamState}
     sent::Sentence
-    stop::Bool                  # TODO: what is this?
+    stop::Bool
     function Beam{T<:Parser}(pt::Type{T}, s::Sentence)
         p = pt(s)
         b = BeamState(p)
@@ -51,25 +51,25 @@ end
 
 typealias Batch Vector{Beam}
 
+typealias DFvec Void # TODO: fix this
+typealias Net Void 
 
-function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int;
-                           nbatch::Int=1, returnxy::Bool=false, usepmap::Bool=false)
-    usepmap ? 
-    bp_pmap(pt, corpus, feats, net, nbeam, nbatch, returnxy) : # TODO: test pmap
-    bp_main(pt, corpus, feats, net, nbeam, nbatch, returnxy)
-end
+# TODO: we need to vectorize score calculation
+# compute a feature matrix [nfeat, nbeam*nbatch]
+# predict a score matrix [nmove=ncand, nbeam*nbatch]
+# add the parent scores [1,nbeam*nbatch]
+# sortperm each beam (only place where beam/batch diff is important)
+# use these indices to compute new parent scores and new states
+# this may change nbeam - no problem
+# we may not need candidates
+# dont need exact cost, just when non-zero (for non-projective do we start at zero?)
+# dont need to keep moves, scores are global, beamstate may not be necessary just parsers?
+# no need for beam either? just have an array of parsers with start/end indices for each sentence (or always have nbeam)
+# figure out early stop, regular stop, different length sentences, have a stop bit for each sentence
+# push features into array, then vcat and reshape in one step
+# sentences may need word ids
 
-# Life cycle of a Beam:
-# 1. bp_resize: beam[] (one element, no fidx), cand[] empty # TODO: what is this? bp_init?
-# 2. bp_features: beam[i] gets fidx
-# 3. predict: score matrix filled
-# 4. bp_update_cand: cand (no parser/fidx) filled with children of beam, sorted
-# 5. bp_earlystop: cand[1:nbeam] does not have a 0-cost element stop here
-# 6. bp_update_beam: beam filled with top nbeam cand, parsers added
-# 7. anyvalidmoves: if beam[1] has no valid moves stop here
-# 8. goto step 2
-
-function bp_main{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
+function bp_main{T<:Parser}(model, corpus::Corpus, pt::Type{T}, nbeam::Int)
     #@date "bp_main Starting"
     if (nbatch < 1 || nbatch > length(corpus)); nbatch = length(corpus); end # TODO: sentences of different length?
     (parses, batch, fmatrix, score) = bp_init(pt, corpus, feats, returnxy) # TODO: replace net with predict::Function
@@ -122,7 +122,7 @@ end
 
 function bp_features(batch::Batch, feats::DFvec, fmatrix::Matrix, nf::Int)
     for s in batch
-        s.stop && continue
+        if s.stop continue end
         for bs in s.beam
             size(fmatrix,2) > nf || error("Out of bounds")
             f = features(bs.parser, s.sent, feats, fmatrix, (nf+=1)) # :35029
@@ -134,7 +134,7 @@ end
 
 function bp_update(batch::Batch, score::Matrix, nbeam::Int, returnxy::Bool)
     for s in batch
-        s.stop && continue
+        if s.stop continue end
         bp_update_cand(s, score) # :5128
         returnxy && (s.stop = bp_earlystop(s,nbeam)) && continue
         bp_update_beam(s, nbeam) # :5604
@@ -148,8 +148,8 @@ function bp_update_cand(s::Beam, score::Matrix)
     for bs in s.beam
         movecosts(bs.parser, s.sent.head, s.sent.deprel, cost) # 162
         for j=1:length(cost)
-            cost[j] == typemax(Cost) && continue
-            push!(s.cand, BeamState(bs, j, bs.score + score[j,bs.fidx], bs.cost + cost[j])) # :4119
+            if cost[j] == typemax(Cost); continue; end
+            push!(s.cand, BeamState(bs, j, cost[j], score[j,bs.fidx])) # :4119
         end
     end
     (length(s.cand) > 0) || error("No candidates found")
@@ -173,44 +173,6 @@ function bp_update_beam(s::Beam, nbeam::Int)
         move!(bc.parser, bc.move)              # 20
         push!(s.beam, bc)                      # 3
     end
-end
-
-function bp_append(parses, batch::Batch, fmatrix::Matrix, score::Matrix, returnxy::Bool)
-    returnxy ?
-    bp_append(parses, batch, fmatrix, score) :
-    bp_append(parses, batch)
-end
-
-function bp_append(parses, batch::Batch)
-    for s in batch 
-        push!(parses, s.beam[1].parser)
-    end
-end
-
-function bp_append(parses, batch::Batch, fmatrix::Matrix, score::Matrix)
-    (p,x,y) = parses
-    grad = zeros(Float64,0)
-    mark = falses(size(fmatrix,2))
-    for s in batch
-        push!(p, s.beam[1].parser)
-        bp_softmax(s, grad)     # grad <- softmax probabilities from s.cand
-        foundgold = false       # in case there is more than one, only treat the highest scoring zero cost answer as gold
-        for i=1:length(s.cand)
-            bs = s.cand[i]
-            bs.cost == 0 && !foundgold && (foundgold=true; grad[i] -= 1) # grad[gold]=p-1, grad[other]=p
-            while bs.parent != NullBeamState
-                fidx = bs.parent.fidx
-                if !mark[fidx]
-                    mark[fidx] = true
-                    score[:,fidx] = zero(eltype(score))
-                end
-                score[bs.move,fidx] += grad[i]
-                bs = bs.parent
-            end
-        end
-    end
-    push!(x, fmatrix[:,mark])
-    push!(y, score[:,mark])
 end
 
 function bp_softmax(s::Beam, prob::Vector{Float64})
@@ -244,17 +206,6 @@ function print_beam(s::Beam, y::Matrix, f2x::Vector{Int})
         end
         println()
     end
-end
-
-function bp_pmap{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
-    d = distribute(corpus)
-    net = testnet(net)
-    #@date "pmap Starting"
-    p = pmap(procs(d)) do x
-        bp_main(pt, localpart(d), feats, gpucopy(net), nbeam, nbatch, returnxy)
-    end
-    #@date "pmap Finished"
-    return pcat(p)
 end
 
 
@@ -351,4 +302,86 @@ end
 #     resize!(x, (size(x,1), nx))
 #     resize!(y, (size(y,1), nx))
 # end
+
+# Say we have a n sentence corpus.
+# On return we give back n parsers.
+# If training we give back x and y.  The size of x and y are uncertain.
+# During processing we need a beam for each sentence of size nbeam.
+# The beam stores BeamState's.  We allocate BeamState's dynamically.
+# Internally we process sentences in batches of size nbatch.
+# We need to keep whole of f, no reusing, and copy part of it to return x.
+# We could use KUdense or KUsparse for f and use resize... that supports sparse as well.
+# that would mean modifying features.jl and sfeatures.jl to use that too.
+# calling convention for sparse and dense features.jl are not the same now.
+# we could have both append a column at the end of a given array?
+# or just have them return the feats vector and we do the appending here using ccat.
+
+# beam: nbeam, beam, sent, mcs, cand, beam2; do we need?
+# prealloc parsers but no prealloc of beamstates? parsers dynamic too.
+
+# function bp_append(parses, batch::Batch, fmatrix::Matrix, score::Matrix, returnxy::Bool)
+#     returnxy ?
+#     bp_append(parses, batch, fmatrix, score) :
+#     bp_append(parses, batch)
+# end
+
+# function bp_append(parses, batch::Batch)
+#     for s in batch 
+#         push!(parses, s.beam[1].parser)
+#     end
+# end
+
+# function bp_append(parses, batch::Batch, fmatrix::Matrix, score::Matrix)
+#     (p,x,y) = parses
+#     grad = zeros(Float64,0)
+#     mark = falses(size(fmatrix,2))
+#     for s in batch
+#         push!(p, s.beam[1].parser)
+#         bp_softmax(s, grad)     # grad <- softmax probabilities from s.cand
+#         foundgold = false       # in case there is more than one, only treat the highest scoring zero cost answer as gold
+#         for i=1:length(s.cand)
+#             bs = s.cand[i]
+#             bs.cost == 0 && !foundgold && (foundgold=true; grad[i] -= 1) # grad[gold]=p-1, grad[other]=p
+#             while bs.parent != NullBeamState
+#                 fidx = bs.parent.fidx
+#                 if !mark[fidx]
+#                     mark[fidx] = true
+#                     score[:,fidx] = zero(eltype(score))
+#                 end
+#                 score[bs.move,fidx] += grad[i]
+#                 bs = bs.parent
+#             end
+#         end
+#     end
+#     push!(x, fmatrix[:,mark])
+#     push!(y, score[:,mark])
+# end
+
+# function bparse{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int;
+#                            nbatch::Int=1, returnxy::Bool=false, usepmap::Bool=false)
+#     usepmap ? 
+#     bp_pmap(pt, corpus, feats, net, nbeam, nbatch, returnxy) : # TODO: test pmap
+#     bp_main(pt, corpus, feats, net, nbeam, nbatch, returnxy)
+# end
+
+# function bp_pmap{T<:Parser}(pt::Type{T}, corpus::Corpus, feats::DFvec, net::Net, nbeam::Int, nbatch::Int, returnxy::Bool)
+#     d = distribute(corpus)
+#     net = testnet(net)
+#     #@date "pmap Starting"
+#     p = pmap(procs(d)) do x
+#         bp_main(pt, localpart(d), feats, gpucopy(net), nbeam, nbatch, returnxy)
+#     end
+#     #@date "pmap Finished"
+#     return pcat(p)
+# end
+
+# Life cycle of a Beam:
+# 1. bp_resize: beam[] (one element, no fidx), cand[] empty # TODO: what is this? bp_init?
+# 2. bp_features: beam[i] gets fidx
+# 3. predict: score matrix filled
+# 4. bp_update_cand: cand (no parser/fidx) filled with children of beam, sorted
+# 5. bp_earlystop: cand[1:nbeam] does not have a 0-cost element stop here
+# 6. bp_update_beam: beam filled with top nbeam cand, parsers added
+# 7. anyvalidmoves: if beam[1] has no valid moves stop here
+# 8. goto step 2
 

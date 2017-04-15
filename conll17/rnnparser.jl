@@ -1,78 +1,9 @@
-using JLD, Knet
+using JLD, Knet, KUparser
 MAJOR=1 # 1:column-major 2:row-major
-
-typealias Word String           # represent words with strings instead of finite vocab, we will process chars
-typealias PosTag UInt8          # 17 universal part-of-speech tags
-typealias DepRel UInt8          # 37 universal dependency relations
-typealias Position Int16        # sentence position
-typealias Cost Position         # [0:nword]
-typealias Move Int              # [1:nmove]
-include("../src/parser.jl")
-
-;                               # CONLLU FORMAT
-immutable Sentence		# 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
-    word::Vector{Word}          # 2. FORM: Word form or punctuation symbol.
-    #stem::Vector{Stem}         # 3. LEMMA: Lemma or stem of word form.
-    postag::Vector{PosTag}      # 4. UPOSTAG: Universal part-of-speech tag.
-    #xpostag::Vector{Xpostag}   # 5. XPOSTAG: Language-specific part-of-speech tag; underscore if not available.
-    #feats::Vector{Feats}       # 6. FEATS: List of morphological features from the universal feature inventory or from a defined language-specific extension; underscore if not available.
-    head::Vector{Position}      # 7. HEAD: Head of the current word, which is either a value of ID or zero (0).
-    deprel::Vector{DepRel}      # 8. DEPREL: Universal dependency relation to the HEAD (root iff HEAD = 0) or a defined language-specific subtype of one.
-    #deps::Vector{Deps}         # 9. DEPS: Enhanced dependency graph in the form of a list of head-deprel pairs.
-    #misc::Vector{Misc}         # 10. MISC: Any other annotation.
-    #vocab::Vocab               # Common repository of symbols for upostag, deprel etc.
-end
-Sentence()=Sentence([],[],[],[])
-Base.length(s::Sentence)=length(s.word)
-
-immutable Vocab
-    cdict::Dict{Char,Int}       # character dictionary (input)
-    idict::Dict{String,Int}     # word dictionary (input, filled in by maptoint)
-    odict::Dict{String,Int}     # word dictionary (output)
-    sosword::String             # start-of-sentence word (input)
-    eosword::String             # end-of-sentence word (input)
-    unkword::String             # unknown word (output, input does not have unk)
-    sowchar::Char               # start-of-word char
-    eowchar::Char               # end-of-word char
-    unkchar::Char               # unknown char
-    postags::Dict{String,PosTag}
-    deprels::Dict{String,DepRel}
-end
-
-type BeamState 
-    parent::BeamState   # previous state
-    move::Move          # move executed to get to this state
-    score::Float64      # cumulative score (logp) TODO: should be unnormalized logp!
-    cost::Cost          # cumulative cost (gold arcs that have become impossible)
-    fidx::Int           # column in feature matrix representing current parser state # TODO: what is this?
-    parser::Parser 	# current parser state
-    BeamState()=new()
-    BeamState(p::Parser)=new(NullBeamState,0,0,0,0,p)
-    BeamState(b::BeamState,m::Integer,s::Number,c::Integer)=
-        new(b,convert(Move,m),convert(Float64,s),convert(Cost,c))
-end
-
-const NullBeamState = BeamState()
-Base.isless(a::BeamState,b::BeamState)=(a.score < b.score)
-
-type Beam 
-    beam::Vector{BeamState}
-    cand::Vector{BeamState}
-    sent::Sentence
-    stop::Bool                  # TODO: what is this?
-    function Beam{T<:Parser}(pt::Type{T}, s::Sentence)
-        p = pt(s)
-        b = BeamState(p)
-        new(BeamState[b], BeamState[], s, !anyvalidmoves(p))
-    end
-end
-
-typealias Batch Vector{Beam}
-
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
 function parseloss(model, sentences, vocab, parsertype, beamsize)
-    # global wembed,forw,back,cdata,cmask,wdata,wmask
+    # global words,sents,wordlen,sentlen,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
     words,sents,wordlen,sentlen = maptoint(sentences, vocab)
     # Get word embeddings
     sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
@@ -82,6 +13,26 @@ function parseloss(model, sentences, vocab, parsertype, beamsize)
     sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
     wdata,wmask = tokenbatch(sents,sentlen,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
     forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
+
+    # Get embeddings into sentences
+    if MAJOR != 1; error(); end # not impl yet
+    @inbounds for (s,wids) in zip(sentences,sents)
+        empty!(s.wvec)
+        for w in wids
+            push!(s.wvec, wembed[:,w])
+        end
+    end
+    T = length(forw)
+    @inbounds for i in 1:length(sentences)
+        s = sentences[i]
+        empty!(s.fvec); empty!(s.bvec)
+        N = length(s)
+        for n in 1:N
+            t = T-N+n
+            push!(s.fvec, forw[t][:,i])
+            push!(s.bvec, back[t][:,i])
+        end
+    end
     nothing
 end
 
@@ -90,6 +41,9 @@ function lmloss(model, sentences, vocab::Vocab; result=nothing)
     # map words and chars to Ints
     # words and sents contain Int (char/word id) arrays without sos/eos tokens
     # TODO: optionally construct cdict here as well
+    # words are the char ids for each unique word
+    # sents are the word ids for each sentence
+    # wordlen and sentlen are the maxlen word and sentence
     words,sents,wordlen,sentlen = maptoint(sentences, vocab)
 
     # Find word vectors for a batch of sentences using character lstm or cnn model
@@ -311,12 +265,12 @@ end
 
 function loadcorpus(v::Vocab)
     global _corpus = Any[]
-    s = Sentence()
+    s = Sentence(v)
     for line in eachline("en-ud-train.conllu")
         if line == "\n"
             push!(_corpus, s)
-            s = Sentence()
-        elseif (m = match(r"^\d+\t(.+?)\t.+?\t(.+?)\t.+?\t.+?\t(.+?)\t(.+?)\t", line)) != nothing
+            s = Sentence(v)
+        elseif (m = match(r"^\d+\t(.+?)\t.+?\t(.+?)\t.+?\t.+?\t(.+?)\t(.+?)(:.+)?\t", line)) != nothing
             #                id   word   lem  upos   xpos feat head   deprel
             push!(s.word, m.captures[1])
             push!(s.postag, v.postags[m.captures[2]])
@@ -419,7 +373,7 @@ const UPOSTAG = Dict{String,PosTag}(
 "SYM"   => 15, # symbol
 "VERB"  => 16, # verb
 "X"     => 17, # other
-]
+)
 
 # Universal Dependency Relations (37)
 const UDEPREL = Dict{String,DepRel}(
@@ -460,7 +414,7 @@ const UDEPREL = Dict{String,DepRel}(
 "reparandum" => 35, # overridden disfluency
 "vocative"   => 36, # vocative
 "xcomp"      => 37, # open clausal complement
-]
+)
 
 # """
 # The input is minibatched and processed character based.
@@ -484,3 +438,5 @@ const UDEPREL = Dict{String,DepRel}(
 # process an array of sentences, doing the grouping inside.
 # """
 # foo3
+
+nothing
