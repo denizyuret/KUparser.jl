@@ -1,31 +1,92 @@
 using JLD, Knet, KUparser
 MAJOR=1 # 1:column-major 2:row-major
+logging=1
+macro msg(_x) :(if logging>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
+macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
+
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
-function parseloss(model, sentences, vocab, parsertype, beamsize)
-    # global words,sents,wordlen,sentlen,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
-    words,sents,wordlen,sentlen = maptoint(sentences, vocab)
+# parseloss(_model, _corpus, _vocab, ArcHybridR1, Flist.hybrid25, 10)
+function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
+    global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
+    @log cids,wids,maxword,maxsent = maptoint(sentences, vocab)
     # Get word embeddings
-    sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
-    cdata,cmask = tokenbatch(words,wordlen,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
-    wembed = charlstm(model,cdata,cmask)            # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
+    @log sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
+    @log cdata,cmask = tokenbatch(cids,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
+    @log wembed = charlstm(model,cdata,cmask)            # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
     # Get context embeddings
-    sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
-    wdata,wmask = tokenbatch(sents,sentlen,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
-    forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
-
+    @log sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
+    @log wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
+    @log forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
     # Get embeddings into sentences
+    @log fillwvecs!(sentences, wids, wembed)
+    @log fillcvecs!(sentences, forw, back)
+    # Initialize parsers
+    global parsers,fmatrix,beamend,cscores,pscores,parsers2,beamend2
+    @log parsers = map(parsertype, sentences)
+    @log fmatrix = features(parsers, feats, model)
+    @log beamend = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
+    # Predict scores
+    # no need: @log pscores = fill!(similar(fmatrix,1,size(fmatrix,2)),0) # parent cumulative scores, initially 0
+    @log cscores = Array(mlp(model[:parser], fmatrix))     # candidate cumulative scores
+    # Sort scores get next beam
+    @log parsers2,pscores,beamend2 = nextbeam(parsers, cscores, beamend, beamsize)
+end
+
+function nextbeam(parsers, scores, beamend, beamsize)
+    newparsers, newscores, newbeamend = Any[], Float32[], Int[]
+    nrows,ncols = nmoves,nparsers = size(scores)
+    @assert nparsers == length(parsers)
+    @assert nmoves == parsers[1].nmove
+    global cost = Array(Any, nparsers)
+    p0 = 1; n1 = 0
+    for p1 in beamend                                   # parsers[p0:p1], scores[:,p0:p1] is the next beam
+        #n0 = n1 + 1                                    # newparsers[n0:n1],newscores[n0:n1] is going to be the next beam, n0 not used
+        s0,s1 = 1 + nrows*(p0-1), nrows*p1              # scores[s0:s1] are the linear indices for scores[:,p0:p1]
+        sorted = sortperm(view(scores,s0:s1), rev=true)	
+        for isorted in sorted
+            i = isorted + s0 - 1                        # linear index of the next best score
+            (move,parser) = ind2sub(scores, i)
+            parent = parsers[parser]
+            if !moveok(parent,move); continue; end
+            p = copy(parent)
+            move!(p, move)
+            # TODO: update cost, check early stop, regular stop
+            push!(newparsers,p)
+            push!(newscores,scores[i])
+            if length(newparsers) == n1 + beamsize; break; end
+        end
+        p0 = p1+1
+        n1 = length(newparsers)
+        push!(newbeamend, n1)
+    end
+    return newparsers, newscores, newbeamend
+end
+
+function mlp(w,x)
+    for i=1:2:length(w)-2
+        x = relu(w[i]*x .+ w[i+1])
+    end
+    return w[end-1]*x .+ w[end]
+end
+
+function fillwvecs!(sentences, wids, wembed)
     if MAJOR != 1; error(); end # not impl yet
-    @inbounds for (s,wids) in zip(sentences,sents)
+    @inbounds for (s,wids) in zip(sentences,wids)
         empty!(s.wvec)
         for w in wids
             push!(s.wvec, wembed[:,w])
         end
     end
+end
+
+function fillcvecs!(sentences, forw, back)
+    if MAJOR != 1; error(); end # not impl yet
     T = length(forw)
     @inbounds for i in 1:length(sentences)
         s = sentences[i]
-        empty!(s.fvec); empty!(s.bvec)
+        empty!(s.fvec)
+        empty!(s.bvec)
         N = length(s)
         for n in 1:N
             t = T-N+n
@@ -33,7 +94,6 @@ function parseloss(model, sentences, vocab, parsertype, beamsize)
             push!(s.bvec, back[t][:,i])
         end
     end
-    nothing
 end
 
 # function loss(model, sentences, parsertype, beamsize)
@@ -258,17 +318,16 @@ end
 
 function loadvocab()
     a = load("english_vocabs.jld")
-    global _vocab = Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],
-                          "<s>","</s>","<unk>",'↥','Ϟ','⋮',
-                          UPOSTAG, UDEPREL)
+    Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],
+          "<s>","</s>","<unk>",'↥','Ϟ','⋮', UPOSTAG, UDEPREL)
 end
 
 function loadcorpus(v::Vocab)
-    global _corpus = Any[]
+    corpus = Any[]
     s = Sentence(v)
     for line in eachline("en-ud-train.conllu")
         if line == "\n"
-            push!(_corpus, s)
+            push!(corpus, s)
             s = Sentence(v)
         elseif (m = match(r"^\d+\t(.+?)\t.+?\t(.+?)\t.+?\t.+?\t(.+?)\t(.+?)(:.+)?\t", line)) != nothing
             #                id   word   lem  upos   xpos feat head   deprel
@@ -278,18 +337,30 @@ function loadcorpus(v::Vocab)
             push!(s.deprel, v.deprels[m.captures[4]])
         end
     end
+    return corpus
 end
 
-function loadmodel()
-    global _model = Dict()
+function loadmodel(v::Vocab)
+    model = Dict()
     m = load("english_ch12kmodel_2.jld")["model"]
     if MAJOR==1
-        for k in (:cembed,); _model[k] = KnetArray(m[k]'); end
-        for k in (:forw,:soft,:back,:char); _model[k] = map(KnetArray, m[k]'); end
+        for k in (:cembed,); model[k] = KnetArray(m[k]'); end
+        for k in (:forw,:soft,:back,:char); model[k] = map(KnetArray, m[k]'); end
     else
-        for k in (:cembed,); _model[k] = KnetArray(m[k]); end
-        for k in (:forw,:soft,:back,:char); _model[k] = map(KnetArray, m[k]); end
+        for k in (:cembed,); model[k] = KnetArray(m[k]); end
+        for k in (:forw,:soft,:back,:char); model[k] = map(KnetArray, m[k]); end
     end
+    initv(d...) = KnetArray{Float32}(xavier(d...))
+    for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
+        model[k] = [ initv(d) for i=1:n ]
+    end
+    parsedims = (5796,256,73)
+    model[:parser] = Any[]
+    for i=2:length(parsedims)
+        push!(model[:parser], initv(parsedims[i],parsedims[i-1]))
+        push!(model[:parser], initv(parsedims[i],1))
+    end
+    return model
 end
 
 wsoft(model)=model[:soft][1]
@@ -301,6 +372,11 @@ wforw(model)=model[:forw][1]
 bforw(model)=model[:forw][2]
 wback(model)=model[:back][1]
 bback(model)=model[:back][2]
+postagv(model)=model[:postag]   # 17 postags
+deprelv(model)=model[:deprel]   # 37 deprels
+lcountv(model)=model[:lcount]   # 10 lcount
+rcountv(model)=model[:rcount]   # 10 rcount
+distancev(model)=model[:distance] # 10 distance
 
 function minibatch(corpus, batchsize)
     data = Any[]
@@ -334,9 +410,9 @@ function minibatch1(corpus, batchsize)
 end
 
 function main(;batch=3000,nsent=0,result=zeros(2))
-    loadmodel()
-    loadvocab()
-    loadcorpus(_vocab)
+    global _vocab = loadvocab()
+    global _model = loadmodel(_vocab)
+    global _corpus = loadcorpus(_vocab)
     c = (nsent == 0 ? _corpus : _corpus[1:nsent])
     global _data = minibatch(c, batch)
     # global _data = [ _corpus[i:min(i+999,length(_corpus))] for i=1:1000:length(_corpus) ]
@@ -439,4 +515,5 @@ const UDEPREL = Dict{String,DepRel}(
 # """
 # foo3
 
+main(nsent=1)
 nothing

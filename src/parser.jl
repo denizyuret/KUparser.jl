@@ -34,7 +34,7 @@ type Parser{T,V}
     function Parser(s::Sentence)
         nword = length(s.word)
         ndeps = length(s.vocab.deprels)
-        init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword),sentence))
+        init!(new(nword,ndeps,0,1,0,Pzeros(nword),Pzeros(nword),Droots(nword),s))
     end
 
 end # Parser
@@ -74,6 +74,14 @@ function move!(p::Parser, m::Move)
     elseif (m == reducemove(p)); if reduceok(p); reduce(p);           else; error("Bad move"); end
     else error("Move $m is not supported")
     end
+end
+
+function moveok(p::Parser, m::Move)
+    ((1 <= m <= p.nmove) &&
+     ((m == shiftmove(p) && shiftok(p)) ||
+      (m == reducemove(p) && reduceok(p)) ||
+      (in(m, rightmoves(p)) && rightok(p)) ||
+      (in(m, leftmoves(p)) && leftok(p))))
 end
 
 function movecosts(p::Parser, head::Pvec, deprel::Dvec, 

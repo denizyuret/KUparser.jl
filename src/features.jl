@@ -1,3 +1,60 @@
+function features(parsers, feats, model)
+    pvecs,dvecs,lvecs,rvecs,xvecs = postagv(model),deprelv(model),lcountv(model),rcountv(model),distancev(model)
+    pvec0,dvec0,lvec0,rvec0,xvec0 = zeros(pvecs[1]),zeros(dvecs[1]),zeros(lvecs[1]),zeros(rvecs[1]),zeros(xvecs[1])
+    s = parsers[1].sentence
+    wvec0,fvec0,bvec0 = zeros(s.wvec[1]),zeros(s.fvec[1]),zeros(s.bvec[1])
+    fmatrix = []
+    for p in parsers
+        s = p.sentence
+        ldep,rdep = getdeps2(p)
+        for f in feats
+            a = getanchor(f,p,ldep,rdep)
+            fn = f[end]
+            if fn == 'v'
+                push!(fmatrix, a>0 ? s.wvec[a] : wvec0)
+            elseif fn == 'c'
+                push!(fmatrix, a>0 ? s.fvec[a] : fvec0)
+                push!(fmatrix, a>0 ? s.bvec[a] : bvec0)
+            elseif fn == 'p'
+                push!(fmatrix, a>0 ? pvecs[s.postag[a]] : pvec0)
+            elseif fn == 'L'
+                push!(fmatrix, a>0 ? dvecs[p.deprel[a]] : dvec0)
+            elseif fn == 'A'
+                push!(fmatrix, a>0 && isassigned(ldep,a) ? +(dvecs[p.deprel[ldep[a]]]...) : dvec0)
+            elseif fn == 'B'
+                push!(fmatrix, a>0 && isassigned(rdep,a) ? +(dvecs[p.deprel[rdep[a]]]...) : dvec0)
+            elseif fn == 'd'
+                d = getrdist(f,p,a)
+                push!(fmatrix, d>0 ? xvecs[min(d,10)] : xvec0)
+            elseif fn == 'a'
+                d = (a>0 && isassigned(ldep,a) ? length(ldep[a]) : 0)
+                push!(fmatrix, a>0 ? lvecs[min(d+1,10)] : lvec0)
+            elseif fn == 'b'
+                d = (a>0 && isassigned(rdep,a) ? length(rdep[a]) : 0)
+                push!(fmatrix, a>0 ? rvecs[min(d+1,10)] : rvec0)
+            elseif fn == 'w'
+                error("Dense features do not support 'w'")
+            else
+                error("Unknown feature $(fn)")
+            end
+        end
+    end
+    fmatrix = vcat(fmatrix...)
+    ncols = length(parsers)
+    nrows = div(length(fmatrix), ncols)
+    reshape(fmatrix, nrows, ncols)
+end
+        
+
+#DBG: temp solution:
+postagv(model)=model[:postag]   # 17 postags
+deprelv(model)=model[:deprel]   # 37 deprels
+lcountv(model)=model[:lcount]   # 10 lcount
+rcountv(model)=model[:rcount]   # 10 rcount
+distancev(model)=model[:distance] # 10 distance
+
+
+# Old version
 # Feature specifications:
 
 # Individual dense features are represented with strings like "s1w".
@@ -306,7 +363,7 @@ function getdeps2{T<:Parser}(p::T)
     return (ldep,rdep)
 end    
 
-function getanchor(f::String, p::Parser, ldep, rdep)
+function getanchor(f::AbstractString, p::Parser, ldep, rdep)
     f1 = f[1]; f2 = f[2]; flen = length(f)
     if isdigit(f2)
         i = f2 - '0'            # index
@@ -388,52 +445,3 @@ function getrdist(f::AbstractString, p::Parser, a::Integer)
     end
 end
 
-### batch feature extractor for beamparser
-
-function bp_fmatrix(parsers, feats, model)
-    pvecs,dvecs,lvecs,rvecs,xvecs = postagv(model),deprelv(model),lcountv(model),rcountv(model),distancev(model)
-    pvec0,dvec0,lvec0,rvec0,xvec0 = zeros(pvecs[1]),zeros(dvecs[1]),zeros(lvecs[1]),zeros(rvecs[1]),zeros(xvecs[1])
-    s = parsers[1].sentence
-    wvec0,fvec0,bvec0 = zeros(s.wvec[1]),zeros(s.fvec[1]),zeros(s.bvec[1])
-    fmatrix = []
-    for p in parsers
-        s = p.sentence
-        ldep,rdep = getdeps2(p)
-        for f in feats
-            a = getanchor(f,p,ldep,rdep)
-            fn = f[end]
-            if fn == 'v'
-                push!(fmatrix, a>0 ? s.wvec[a] : wvec0)
-            elseif fn == 'c'
-                push!(fmatrix, a>0 ? s.fvec[a] : fvec0)
-                push!(fmatrix, a>0 ? s.bvec[a] : bvec0)
-            elseif fn == 'p'
-                push!(fmatrix, a>0 ? pvecs[s.postag[a]] : pvec0)
-            elseif fn == 'L'
-                push!(fmatrix, a>0 ? dvecs[p.deprel[a]] : dvec0)
-            elseif fn == 'A'
-                push!(fmatrix, a>0 && isassigned(ldep,a) ? +(dvecs[p.deprel[ldep[a]]]...) : dvec0)
-            elseif fn == 'B'
-                push!(fmatrix, a>0 && isassigned(rdep,a) ? +(dvecs[p.deprel[rdep[a]]]...) : dvec0)
-            elseif fn == 'd'
-                d = getrdist(f,p,a)
-                push!(fmatrix, d>0 ? xvecs[min(d,10)] : xvec0)
-            elseif fn == 'a'
-                d = (a>0 && isassigned(ldep,a) ? length(ldep[a]) : 0)
-                push!(fmatrix, a>0 ? lvecs[min(d+1,10)] : lvec0)
-            elseif fn == 'b'
-                d = (a>0 && isassigned(rdep,a) ? length(rdep[a]) : 0)
-                push!(fmatrix, a>0 ? rvecs[min(d+1,10)] : rvec0)
-            elseif fn == 'w'
-                error("Dense features do not support 'w'")
-            else
-                error("Unknown feature $(fn)")
-            end
-        end
-    end
-    fmatrix = vcat(fmatrix...)
-    ncols = length(parsers)
-    nrows = div(length(fmatrix), ncols)
-    reshape(fmatrix, nrows, ncols)
-end
-        

@@ -51,13 +51,12 @@ end
 
 typealias Batch Vector{Beam}
 
-typealias DFvec Void # TODO: fix this
-typealias Net Void 
+typealias Net Void  # TODO: fix this
 
 # TODO: we need to vectorize score calculation
 # compute a feature matrix [nfeat, nbeam*nbatch]
 # predict a score matrix [nmove=ncand, nbeam*nbatch]
-# add the parent scores [1,nbeam*nbatch]
+# add the parent scores [1,nbeam*nbatch]: need to have these as a row vector
 # sortperm each beam (only place where beam/batch diff is important)
 # use these indices to compute new parent scores and new states
 # this may change nbeam - no problem
