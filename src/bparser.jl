@@ -5,19 +5,6 @@
 # Both arrays consist of BeamStates sorted by cumulative score.
 # We also track the mincost for training and early stop.
 
-# Loss function for beam search:
-
-# Globally normalized probability for a sequence ending in BeamState s:
-# Let score(s) be the cumulative score of the sequence up to s.
-# prob(s) = exp(score(s)) - Z
-# J(s) = -score(s) + log(Z)
-# Z = exp(score(s)) summed over all paths
-
-# Beam loss with early updates:
-# wait until gold path falls out of the beam at step j, say s=gold[j]
-# B is the beam at step j, together with gold state s
-# J(s) = -score(s) + log(Z)
-# Z = exp(score(b)) summed over all b in B
 
 type BeamState 
     parser::Parser 	# current parser state

@@ -404,6 +404,7 @@ function Base.copy!(dst::Parser, src::Parser)
     copy!(dst.stack, src.stack)
     copy!(dst.head, src.head)
     copy!(dst.deprel, src.deprel)
+    dst.sentence = src.sentence
     dst
 end # copy!
 

@@ -1,4 +1,5 @@
 using JLD, Knet, KUparser
+using KUparser: movecosts
 MAJOR=1 # 1:column-major 2:row-major
 logging=1
 macro msg(_x) :(if logging>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
@@ -22,46 +23,103 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     @log fillwvecs!(sentences, wids, wembed)
     @log fillcvecs!(sentences, forw, back)
     # Initialize parsers
-    global parsers,fmatrix,beamend,cscores,pscores,parsers2,beamend2
-    @log parsers = map(parsertype, sentences)
-    @log fmatrix = features(parsers, feats, model)
-    @log beamend = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
-    # Predict scores
-    # no need: @log pscores = fill!(similar(fmatrix,1,size(fmatrix,2)),0) # parent cumulative scores, initially 0
-    @log cscores = Array(mlp(model[:parser], fmatrix))     # candidate cumulative scores
-    # Sort scores get next beam
-    @log parsers2,pscores,beamend2 = nextbeam(parsers, cscores, beamend, beamsize)
+    global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
+    @log parsers = parsers0 = map(parsertype, sentences)
+    @log beamends = beamends0 = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
+    @log pcosts  = pcosts0  = zeros(Int, length(sentences))
+    @log pscores = pscores0 = zeros(Float32, length(sentences))
+    @log totalloss = 0
+    while length(beamends) > 0
+        @log fmatrix = features(parsers, feats, model)
+        @log cscores = Array(mlp(model[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
+        @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize)
+        @show totalloss += loss
+        @show beamends
+    end
+    return totalloss / length(sentences)
 end
 
-function nextbeam(parsers, scores, beamend, beamsize)
-    newparsers, newscores, newbeamend = Any[], Float32[], Int[]
-    nrows,ncols = nmoves,nparsers = size(scores)
-    @assert nparsers == length(parsers)
-    @assert nmoves == parsers[1].nmove
-    global cost = Array(Any, nparsers)
-    p0 = 1; n1 = 0
-    for p1 in beamend                                   # parsers[p0:p1], scores[:,p0:p1] is the next beam
-        #n0 = n1 + 1                                    # newparsers[n0:n1],newscores[n0:n1] is going to be the next beam, n0 not used
-        s0,s1 = 1 + nrows*(p0-1), nrows*p1              # scores[s0:s1] are the linear indices for scores[:,p0:p1]
-        sorted = sortperm(view(scores,s0:s1), rev=true)	
+function nextbeam(parsers, mscores, pcosts, beamends, beamsize)
+    n = beamsize * length(beamends) + 1
+    newparsers, newscores, newcosts, newbeamends, loss = Array(Any,n),Array(Any,n),Array(Int,n),Int[],0.0
+    nmoves,nparsers = size(mscores)                     # mscores[m,p] is the score of move m for parser p
+    global mcosts = Array(Any, nparsers)                # mcosts[p][m] will be the cost vector for parser[p],move[m] if needed
+    n = p0 = 0
+    for p1 in beamends                                  # parsers[p0+1:p1], mscores[:,p0+1:p1] is the current beam belonging to a common sentence
+        s0,s1 = 1 + nmoves*p0, nmoves*p1                # mscores[s0:s1] are the linear indices for mscores[:,p0:p1]
+        nsave = n                                       # newparsers,newscores,newcosts[nsave+1:n] will the new beam for this sentence
+        ngold = 0                                       # ngold, if nonzero, will be the index of the gold path in beam
+        sorted = sortperm(mscores[s0:s1], rev=true)	
         for isorted in sorted
-            i = isorted + s0 - 1                        # linear index of the next best score
-            (move,parser) = ind2sub(scores, i)
-            parent = parsers[parser]
-            if !moveok(parent,move); continue; end
-            p = copy(parent)
-            move!(p, move)
-            # TODO: update cost, check early stop, regular stop
-            push!(newparsers,p)
-            push!(newscores,scores[i])
-            if length(newparsers) == n1 + beamsize; break; end
+            (move,parent) = ind2sub(mscores, isorted + s0 - 1) # find cartesian index of the next best score
+            parser = parsers[parent]
+            if !isassigned(mcosts, parent)              # not every parent may have children, avoid unnecessary movecosts
+                mcosts[parent] = movecosts(parser, parser.sentence.head, parser.sentence.deprel)
+            end
+            if mcosts[parent][move] == typemax(Cost); continue; end # skip illegal move
+            n += 1
+            newparsers[n] = copy(parser); move!(newparsers[n], move)
+            newscores[n] = mscores[move,parent]
+            newcosts[n] = pcosts[parent] + mcosts[parent][move]
+            if newcosts[n] == 0
+                if ngold==0
+                    ngold=n
+                else
+                    warn("multiple gold moves for $parent")
+                end
+            end
+            if n-nsave == beamsize; break; end
         end
-        p0 = p1+1
-        n1 = length(newparsers)
-        push!(newbeamend, n1)
+        if n == nsave
+            if parsers[p1].nword != 1                   # single word sentences give us no moves
+                error("No legal moves?")
+            end
+        elseif ngold == 0                               # gold path fell out of beam, early stop
+            gs = goldscore(parsers,mscores,pcosts,mcosts,(p0+1):p1)
+            if !isnan(gs)                               # could be nan for non-projective sentences
+                newscores[n+1] = gs
+                loss = loss - newscores[n+1] + logsumexp2(newscores,nsave+1:n+1)
+            end
+            n = nsave
+        elseif endofparse(newparsers[n])                # all parsers in beam have finished, gold among them
+            loss = loss - newscores[ngold] + logsumexp2(newscores,nsave+1:n)
+            n = nsave                                   # do not add finished parsers to new beam
+        else                                            # all good keep going
+            push!(newbeamends, n)
+        end
+        p0 = p1
     end
-    return newparsers, newscores, newbeamend
+    return newparsers[1:n], newscores[1:n], newcosts[1:n], newbeamends, loss
 end
+
+function logsumexp2(a,r)
+    z = 0; amax = a[r[1]]
+    for i in r; z += exp(a[i]-amax); end
+    return log(z) + amax
+end
+
+function goldscore(parsers,mscores,pcosts,mcosts,beamrange)
+    parent = findfirst(view(pcosts,beamrange),0)
+    if parent == 0; error("cannot find gold parent in $beamrange"); end
+    parent += first(beamrange) - 1
+    if !isassigned(mcosts, parent)
+        parser = parsers[parent]
+        mcosts[parent] = movecosts(parser, parser.sentence.head, parser.sentence.deprel)
+    end
+    move = findfirst(mcosts[parent],0)
+    if move == 0
+        warn("cannot find gold move for $parent")
+        return NaN
+    end
+    return mscores[move,parent]
+end
+
+endofparse(p)=(p.sptr == 1 && p.wptr > p.nword)
+
+using AutoGrad
+import Base: sortperm, ind2sub
+@zerograd sortperm(a;o...)
+@zerograd ind2sub(a,i...)
 
 function mlp(w,x)
     for i=1:2:length(w)-2
@@ -514,6 +572,51 @@ const UDEPREL = Dict{String,DepRel}(
 # process an array of sentences, doing the grouping inside.
 # """
 # foo3
+
+        # Need to check costs
+        # Need to detect when beam is done and add its loss
+        # Need to figure out what happens with nonprojective sentences, detect and skip? start parse?
+        # Need to track the zero-cost parse(s)
+        # Always have left=odd, right=even or vice-versa so it is easy to check
+        # Exact cost not important, only whether nonzero
+            # TODO: update cost, check early stop, regular stop
+            # when do we check for anyvalidmoves?
+            # we don't need to do costs if parent cost already > 0; only to check for illegal moves!
+            # how do we check if we have gold path in beam (set flag in this for loop)
+            # where do we find the gold path if not in beam (have to search outside)
+
+# Loss function for beam search:
+
+# Globally normalized probability for a sequence ending in BeamState s:
+# Let score(s) be the cumulative score of the sequence up to s.
+# prob(s) = exp(score(s)) - Z
+# J(s) = -score(s) + log(Z)
+# Z = exp(score(s)) summed over all paths
+
+# Beam loss with early updates:
+# wait until gold path falls out of the beam at step j, say s=gold[j]
+# B is the beam at step j, together with gold state s
+# J(s) = -score(s) + log(Z)
+# Z = exp(score(b)) summed over all b in B
+
+        # if endofparse(parsers[p1])
+        #     igold = findfirst(pcosts,0)
+        #     if igold == 0; error("cannot find gold path at end of parse"); end
+        #     loss += -pscores(igold)+logsumexp(pscores)
+        #     # This doesn't work because we dont have pscores, we have unnecessary mscores
+        #     # This should be detected before we add these to the beam
+        # end
+
+        # There are two ways this should end
+        # 1. End of parse: we will get no valid moves
+        # should check for that, all parsers in beam have the same sentence, should end at the same time
+        # in that case we need to calculate a loss based on the beam
+        # needs tracking where the gold path is
+        # if #2 works, we should have the gold path in the beam!, we still need to find it though.
+        # 2. Early stop
+        # needs tracking where the gold path is
+        # if it doesn't make it to the beam, we should just return loss and not add anything to newparsers
+        # we still need the scores on the beam to calculate Z
 
 main(nsent=1)
 nothing
