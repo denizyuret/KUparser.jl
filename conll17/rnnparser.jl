@@ -1,18 +1,26 @@
+# train(batchsize=32) => ERROR: MethodError: no method matching *(::Knet.KnetArray{Float32,2}, ::Array{Any,2}) in mlp(::AutoGrad.Rec{Array{Any,1}}, ::Array{Any,2}) at /Users/dyuret/kuparser/master/conll17/rnnparser.jl:142
+# when fmatrix has mixed Rec and KnetArray, vcat does not do the right thing!  AutoGrad only looks at the first 2-3 elements!
+# train() => ERROR: Out of gpu memory
+
 using JLD, Knet, KUparser
 using KUparser: movecosts
+using AutoGrad: getval
 MAJOR=1 # 1:column-major 2:row-major
 logging=0
 macro msg(_x) :(if logging>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 
-function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10)
+function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=16, otype="Adagrad()")
     global grads, optim
-    optim=initoptim(model,"Adagrad()")
-    sentbatches = minibatch(corpus,10)
+    optim=initoptim(model,otype)
+    sentbatches = minibatch(corpus,batchsize)
     for sentences in sentbatches
+        # ploss = parseloss(model, sentences, vocab, parsertype, feats, beamsize)
         grads = parsegrad(model, sentences, vocab, parsertype, feats, beamsize)
         update!(model, grads, optim)
+        print('.')
     end
+    println()
 end
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
@@ -32,7 +40,7 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     @log fillwvecs!(sentences, wids, wembed)
     @log fillcvecs!(sentences, forw, back)
     # Initialize parsers
-    #global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
+    global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
     @log parsers = parsers0 = map(parsertype, sentences)
     @log beamends = beamends0 = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
     @log pcosts  = pcosts0  = zeros(Int, length(sentences))
@@ -40,6 +48,7 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     @log totalloss = 0
     while length(beamends) > 0
         @log fmatrix = features(parsers, feats, model)
+        @assert isa(getval(fmatrix),KnetArray)
         @log cscores = Array(mlp(model[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
         @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize)
         totalloss += loss
@@ -78,7 +87,7 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize)
                 if ngold==0
                     ngold=n
                 else
-                    warn("multiple gold moves for $parent")
+                    @msg("multiple gold moves for $(parser.sentence)")
                 end
             end
             if n-nsave == beamsize; break; end
@@ -121,7 +130,7 @@ function goldscore(parsers,mscores,pcosts,mcosts,beamrange)
     end
     move = findfirst(mcosts[parent],0)
     if move == 0
-        warn("cannot find gold move for $parent")
+        @msg("cannot find gold move for $(parsers[parent].sentence)")
         return NaN
     end
     return mscores[move,parent]
@@ -405,7 +414,7 @@ end
 function loadcorpus(v::Vocab)
     corpus = Any[]
     s = Sentence(v)
-    for line in eachline("en-ud-train.conllu")
+    for line in eachline("foo-en-ud-train.conllu")
         if line == "\n"
             push!(corpus, s)
             s = Sentence(v)
