@@ -1,15 +1,24 @@
 using JLD, Knet, KUparser
 using KUparser: movecosts
 MAJOR=1 # 1:column-major 2:row-major
-logging=1
+logging=0
 macro msg(_x) :(if logging>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 
+function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10)
+    global grads, optim
+    optim=initoptim(model,"Adagrad()")
+    sentbatches = minibatch(corpus,10)
+    for sentences in sentbatches
+        grads = parsegrad(model, sentences, vocab, parsertype, feats, beamsize)
+        update!(model, grads, optim)
+    end
+end
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
 # parseloss(_model, _corpus, _vocab, ArcHybridR1, Flist.hybrid25, 10)
 function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
-    global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
+    #global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
     @log cids,wids,maxword,maxsent = maptoint(sentences, vocab)
     # Get word embeddings
     @log sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
@@ -23,7 +32,7 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     @log fillwvecs!(sentences, wids, wembed)
     @log fillcvecs!(sentences, forw, back)
     # Initialize parsers
-    global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
+    #global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
     @log parsers = parsers0 = map(parsertype, sentences)
     @log beamends = beamends0 = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
     @log pcosts  = pcosts0  = zeros(Int, length(sentences))
@@ -33,17 +42,21 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
         @log fmatrix = features(parsers, feats, model)
         @log cscores = Array(mlp(model[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
         @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize)
-        @show totalloss += loss
-        @show beamends
+        totalloss += loss
+        #@show totalloss
+        #@show beamends
     end
     return totalloss / length(sentences)
 end
 
+parsegrad = grad(parseloss)
+
 function nextbeam(parsers, mscores, pcosts, beamends, beamsize)
+    #global mcosts
     n = beamsize * length(beamends) + 1
     newparsers, newscores, newcosts, newbeamends, loss = Array(Any,n),Array(Any,n),Array(Int,n),Int[],0.0
     nmoves,nparsers = size(mscores)                     # mscores[m,p] is the score of move m for parser p
-    global mcosts = Array(Any, nparsers)                # mcosts[p][m] will be the cost vector for parser[p],move[m] if needed
+    mcosts = Array(Any, nparsers)                # mcosts[p][m] will be the cost vector for parser[p],move[m] if needed
     n = p0 = 0
     for p1 in beamends                                  # parsers[p0+1:p1], mscores[:,p0+1:p1] is the current beam belonging to a common sentence
         s0,s1 = 1 + nmoves*p0, nmoves*p1                # mscores[s0:s1] are the linear indices for mscores[:,p0:p1]
@@ -153,6 +166,15 @@ function fillcvecs!(sentences, forw, back)
         end
     end
 end
+
+# initoptim creates optimization parameters for each numeric weight
+# array in the model.  This should work for a model consisting of any
+# combination of tuple/array/dict.
+initoptim{T<:Number}(::KnetArray{T},otype)=eval(parse(otype))
+initoptim{T<:Number}(::Array{T},otype)=eval(parse(otype))
+initoptim(a::Associative,otype)=Dict(k=>initoptim(v,otype) for (k,v) in a) 
+initoptim(a,otype)=map(x->initoptim(x,otype), a)
+
 
 # function loss(model, sentences, parsertype, beamsize)
 function lmloss(model, sentences, vocab::Vocab; result=nothing)
@@ -472,7 +494,7 @@ function main(;batch=3000,nsent=0,result=zeros(2))
     global _model = loadmodel(_vocab)
     global _corpus = loadcorpus(_vocab)
     c = (nsent == 0 ? _corpus : _corpus[1:nsent])
-    global _data = minibatch(c, batch)
+    _data = minibatch(c, batch)
     # global _data = [ _corpus[i:min(i+999,length(_corpus))] for i=1:1000:length(_corpus) ]
     # global _data = [ _corpus[1:1] ]
     for d in _data
