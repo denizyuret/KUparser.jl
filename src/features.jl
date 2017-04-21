@@ -47,6 +47,7 @@ end
         
 
 #DBG: temp solution to AutoGrad vcat issue:
+using AutoGrad
 let cat_r = recorder(cat); global vcatn
     function vcatn(a...)
         if any(x->isa(x,Rec), a)
