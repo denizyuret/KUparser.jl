@@ -39,12 +39,23 @@ function features(parsers, feats, model)
             end
         end
     end
-    fmatrix = vcat(fmatrix...)
+    fmatrix = vcatn(fmatrix...)
     ncols = length(parsers)
     nrows = div(length(fmatrix), ncols)
     reshape(fmatrix, nrows, ncols)
 end
         
+
+#DBG: temp solution to AutoGrad vcat issue:
+let cat_r = recorder(cat); global vcatn
+    function vcatn(a...)
+        if any(x->isa(x,Rec), a)
+            cat_r(1,a...)
+        else
+            vcat(a...)
+        end
+    end
+end
 
 #DBG: temp solution:
 postagv(model)=model[:postag]   # 17 postags
