@@ -1,24 +1,33 @@
-# train(batchsize=32) => ERROR: MethodError: no method matching *(::Knet.KnetArray{Float32,2}, ::Array{Any,2}) in mlp(::AutoGrad.Rec{Array{Any,1}}, ::Array{Any,2}) at /Users/dyuret/kuparser/master/conll17/rnnparser.jl:142
-# when fmatrix has mixed Rec and KnetArray, vcat does not do the right thing!  AutoGrad only looks at the first 2-3 elements!
-# train() => ERROR: Out of gpu memory
-
 using JLD, Knet, KUparser
 using KUparser: movecosts
 using AutoGrad: getval
-MAJOR=1 # 1:column-major 2:row-major
-logging=0
-macro msg(_x) :(if logging>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
+MAJOR=1                         # 1:column-major 2:row-major
+MAXWORD=32                      # truncate long words at this length. length("counterintelligence")=19
+MAXSENT=64                      # skip longer sentences during training
+LOGGING=0
+macro msg(_x) :(if LOGGING>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 
-function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=16, otype="Adagrad()")
-    global grads, optim
+Knet.gcdebug(true)              #DBG
+
+function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=64, otype="Adagrad()")
+    # global grads, optim, sentbatches, sentences
     optim=initoptim(model,otype)
-    sentbatches = minibatch(corpus,batchsize)
+    srand(1)
+    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT)
+    niter = 0
     for sentences in sentbatches
-        # ploss = parseloss(model, sentences, vocab, parsertype, feats, beamsize)
+        #DBG gc(); Knet.knetgc(); gc()
+        #DBG @show niter+=1
+        #DBG @show length(sentences[1])
+        #DBG ploss = parseloss(model, sentences, vocab, parsertype, feats, beamsize)
         grads = parsegrad(model, sentences, vocab, parsertype, feats, beamsize)
         update!(model, grads, optim)
         print('.')
+        #DBG gc()
+        #DBG Knet.memdbg()
+        #DBG Knet.gpuinfo(n=10)
+        #DBG readline()
     end
     println()
 end
@@ -28,33 +37,51 @@ end
 function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     #global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
     @log cids,wids,maxword,maxsent = maptoint(sentences, vocab)
-    # Get word embeddings
+    # Get word embeddings: do this in minibatches otherwise may run out of memory
     @log sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
-    @log cdata,cmask = tokenbatch(cids,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
-    @log wembed = charlstm(model,cdata,cmask)            # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
+
+    # @log cdata,cmask = tokenbatch(cids,maxword,sow,eow)
+    # @log wembed = charlstm(model,cdata,cmask)
+
+    # minibatch variant
+    wembed = Any[]; wbatch = 128 # TODO: configurable batchsize
+    for i=1:wbatch:length(cids)    
+        j=min(i+wbatch-1,length(cids))
+        cij = view(cids,i:j)
+        @log cdata,cmask = tokenbatch(cij,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
+        @log push!(wembed, charlstm(model,cdata,cmask))    # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
+    end
+    wembed = (MAJOR==1 ? hcatn(wembed...) : vcatn(wembed...))
+    #DBG @show (maxword,length(cids),size(wembed)); Knet.gpuinfo(n=10); readline()
+
     # Get context embeddings
     @log sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
     @log wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
     @log forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
-    # Get embeddings into sentences
+    # Get embeddings into sentences -- must empty later for gc!
     @log fillwvecs!(sentences, wids, wembed)
     @log fillcvecs!(sentences, forw, back)
     # Initialize parsers
-    global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
+    # global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
     @log parsers = parsers0 = map(parsertype, sentences)
     @log beamends = beamends0 = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
     @log pcosts  = pcosts0  = zeros(Int, length(sentences))
     @log pscores = pscores0 = zeros(Float32, length(sentences))
-    @log totalloss = 0
+    @log totalloss = stepcount = 0
     while length(beamends) > 0
         @log fmatrix = features(parsers, feats, model)
         @assert isa(getval(fmatrix),KnetArray)
         @log cscores = Array(mlp(model[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
         @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize)
         totalloss += loss
+        stepcount += 1
         #@show totalloss
         #@show beamends
     end
+    for s in sentences          # if we don't empty, gc cannot clear these vectors, and they will be different next time
+        empty!(s.wvec); empty!(s.fvec); empty!(s.bvec)
+    end
+    # @show (maxsent,stepcount)
     return totalloss / length(sentences)
 end
 
@@ -275,6 +302,8 @@ function maptoint(sentences, v::Vocab)
                     word[wordi+=1] = get(cdict, c, unkcid)
                 end
                 if wordi != length(w); error(); end
+                # Long words kill gpu memory
+                if wordi > MAXWORD; wordi=MAXWORD; word = word[1:wordi]; end
                 if wordi > wordlen; wordlen = wordi; end
                 push!(words, word)
             end
@@ -467,14 +496,16 @@ lcountv(model)=model[:lcount]   # 10 lcount
 rcountv(model)=model[:rcount]   # 10 rcount
 distancev(model)=model[:distance] # 10 distance
 
-function minibatch(corpus, batchsize)
+function minibatch(corpus, batchsize; maxlen=typemax(Int))
     data = Any[]
     sorted = sort(corpus, by=length)
     for i in 1:batchsize:length(corpus)
         j = min(length(corpus), i+batchsize-1)
+        if length(sorted[j]) > maxlen; break; end
         push!(data, sorted[i:j])
     end
     shuffle(data)
+    #DBG reverse(data) 
 end
 
 function minibatch1(corpus, batchsize)
@@ -517,6 +548,26 @@ function getloss(d; result=zeros(2))
     lmloss(_model, d, _vocab; result=result)
     println(exp(-result[1]/result[2]))
     return result
+end
+
+# when fmatrix has mixed Rec and KnetArray, vcat does not do the right thing!  AutoGrad only looks at the first 2-3 elements!
+#DBG: temp solution to AutoGrad vcat issue:
+using AutoGrad
+let cat_r = recorder(cat); global vcatn, hcatn
+    function vcatn(a...)
+        if any(x->isa(x,Rec), a)
+            cat_r(1,a...)
+        else
+            vcat(a...)
+        end
+    end
+    function hcatn(a...)
+        if any(x->isa(x,Rec), a)
+            cat_r(2,a...)
+        else
+            hcat(a...)
+        end
+    end
 end
 
 # Universal POS tags (17)
