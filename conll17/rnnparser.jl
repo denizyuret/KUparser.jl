@@ -1,27 +1,34 @@
+# TODO: build test parser
+# TODO: freeze LM model
+### optimization: precompute word vectors
+
 using JLD, Knet, KUparser
 using KUparser: movecosts
 using AutoGrad: getval
 MAJOR=1                         # 1:column-major 2:row-major
 MAXWORD=32                      # truncate long words at this length. length("counterintelligence")=19
 MAXSENT=64                      # skip longer sentences during training
+MINSENT=2                       # skip shorter sentences during training
 LOGGING=0
 macro msg(_x) :(if LOGGING>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 
 Knet.gcdebug(true)              #DBG
 
-function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=64, otype="Adagrad()")
-    # global grads, optim, sentbatches, sentences
+function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=128, otype="Adagrad()")
+    global grads, optim, sentbatches, sentences
     optim=initoptim(model,otype)
     srand(1)
-    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT)
+    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT)
+    @show nsent = sum(map(length,sentbatches))
+    @show nword = sum(map(length,vcat(sentbatches...)))
     niter = 0
     for sentences in sentbatches
         #DBG gc(); Knet.knetgc(); gc()
         #DBG @show niter+=1
         #DBG @show length(sentences[1])
         #DBG ploss = parseloss(model, sentences, vocab, parsertype, feats, beamsize)
-        grads = parsegrad(model, sentences, vocab, parsertype, feats, beamsize)
+        grads = parsegrad(model, model, sentences, vocab, parsertype, feats, beamsize)
         update!(model, grads, optim)
         print('.')
         #DBG gc()
@@ -34,22 +41,23 @@ end
 
 # parse a minibatch of sentences using beam search, global normalization, early updates and report loss.
 # parseloss(_model, _corpus, _vocab, ArcHybridR1, Flist.hybrid25, 10)
-function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
+function parseloss(pmodel, cmodel, sentences, vocab, parsertype, feats, beamsize)
     #global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
     @log cids,wids,maxword,maxsent = maptoint(sentences, vocab)
     # Get word embeddings: do this in minibatches otherwise may run out of memory
     @log sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
 
+    # this blows up gpu memory:
     # @log cdata,cmask = tokenbatch(cids,maxword,sow,eow)
     # @log wembed = charlstm(model,cdata,cmask)
 
-    # minibatch variant
+    # minibatch variant is easier on memory:
     wembed = Any[]; wbatch = 128 # TODO: configurable batchsize
     for i=1:wbatch:length(cids)    
         j=min(i+wbatch-1,length(cids))
         cij = view(cids,i:j)
         @log cdata,cmask = tokenbatch(cij,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
-        @log push!(wembed, charlstm(model,cdata,cmask))    # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
+        @log push!(wembed, charlstm(cmodel,cdata,cmask))    # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
     end
     wembed = (MAJOR==1 ? hcatn(wembed...) : vcatn(wembed...))
     #DBG @show (maxword,length(cids),size(wembed)); Knet.gpuinfo(n=10); readline()
@@ -57,7 +65,7 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     # Get context embeddings
     @log sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
     @log wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
-    @log forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
+    @log forw,back = wordlstm(cmodel,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
     # Get embeddings into sentences -- must empty later for gc!
     @log fillwvecs!(sentences, wids, wembed)
     @log fillcvecs!(sentences, forw, back)
@@ -69,9 +77,9 @@ function parseloss(model, sentences, vocab, parsertype, feats, beamsize)
     @log pscores = pscores0 = zeros(Float32, length(sentences))
     @log totalloss = stepcount = 0
     while length(beamends) > 0
-        @log fmatrix = features(parsers, feats, model)
+        @log fmatrix = features(parsers, feats, pmodel)
         @assert isa(getval(fmatrix),KnetArray)
-        @log cscores = Array(mlp(model[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
+        @log cscores = Array(mlp(pmodel[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
         @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize)
         totalloss += loss
         stepcount += 1
@@ -496,12 +504,15 @@ lcountv(model)=model[:lcount]   # 10 lcount
 rcountv(model)=model[:rcount]   # 10 rcount
 distancev(model)=model[:distance] # 10 distance
 
-function minibatch(corpus, batchsize; maxlen=typemax(Int))
+function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1)
     data = Any[]
     sorted = sort(corpus, by=length)
-    for i in 1:batchsize:length(corpus)
-        j = min(length(corpus), i+batchsize-1)
-        if length(sorted[j]) > maxlen; break; end
+    i1 = findfirst(x->(length(x) >= minlen), sorted)
+    if i1==0; error("No sentences >= $minlen"); end
+    i2 = findfirst(x->(length(x) > maxlen), sorted)
+    if i2==0; i2=length(corpus); else; i2=i2-1; end
+    for i in i1:batchsize:i2
+        j = min(i2, i+batchsize-1)
         push!(data, sorted[i:j])
     end
     shuffle(data)
