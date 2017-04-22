@@ -1,6 +1,8 @@
 # TODO: build test parser
-# TODO: freeze LM model
-### optimization: precompute word vectors
+## no costs? find another way to handle valid moves!
+## do we return loss vs LAS?
+# DONE: freeze LM model
+# TODO: precompute word vectors
 
 using JLD, Knet, KUparser
 using KUparser: movecosts
@@ -20,8 +22,9 @@ function train(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybrid
     optim=initoptim(model,otype)
     srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT)
-    @show nsent = sum(map(length,sentbatches))
-    @show nword = sum(map(length,vcat(sentbatches...)))
+    nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
+    nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
+    println("nsent=$nsent/$nsent0 nword=$nword/$nword0")
     niter = 0
     for sentences in sentbatches
         #DBG gc(); Knet.knetgc(); gc()
@@ -80,7 +83,7 @@ function parseloss(pmodel, cmodel, sentences, vocab, parsertype, feats, beamsize
         @log fmatrix = features(parsers, feats, pmodel)
         @assert isa(getval(fmatrix),KnetArray)
         @log cscores = Array(mlp(pmodel[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
-        @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize)
+        @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize; earlystop=true)
         totalloss += loss
         stepcount += 1
         #@show totalloss
@@ -95,51 +98,61 @@ end
 
 parsegrad = grad(parseloss)
 
-function nextbeam(parsers, mscores, pcosts, beamends, beamsize)
+function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
     #global mcosts
     n = beamsize * length(beamends) + 1
     newparsers, newscores, newcosts, newbeamends, loss = Array(Any,n),Array(Any,n),Array(Int,n),Int[],0.0
     nmoves,nparsers = size(mscores)                     # mscores[m,p] is the score of move m for parser p
-    mcosts = Array(Any, nparsers)                # mcosts[p][m] will be the cost vector for parser[p],move[m] if needed
+    #TEST: will not have mcosts
+    mcosts = Array(Any, nparsers)                       # mcosts[p][m] will be the cost vector for parser[p],move[m] if needed
     n = p0 = 0
     for p1 in beamends                                  # parsers[p0+1:p1], mscores[:,p0+1:p1] is the current beam belonging to a common sentence
         s0,s1 = 1 + nmoves*p0, nmoves*p1                # mscores[s0:s1] are the linear indices for mscores[:,p0:p1]
         nsave = n                                       # newparsers,newscores,newcosts[nsave+1:n] will the new beam for this sentence
+        #TEST: will not have ngold
         ngold = 0                                       # ngold, if nonzero, will be the index of the gold path in beam
         sorted = sortperm(mscores[s0:s1], rev=true)	
         for isorted in sorted
             (move,parent) = ind2sub(mscores, isorted + s0 - 1) # find cartesian index of the next best score
             parser = parsers[parent]
-            if !isassigned(mcosts, parent)              # not every parent may have children, avoid unnecessary movecosts
+            if !moveok(parser,move); continue; end  # skip illegal move
+            #TEST: will not have mcosts
+            if earlystop && !isassigned(mcosts, parent) # not every parent may have children, avoid unnecessary movecosts
                 mcosts[parent] = movecosts(parser, parser.sentence.head, parser.sentence.deprel)
             end
-            if mcosts[parent][move] == typemax(Cost); continue; end # skip illegal move
             n += 1
             newparsers[n] = copy(parser); move!(newparsers[n], move)
             newscores[n] = mscores[move,parent]
-            newcosts[n] = pcosts[parent] + mcosts[parent][move]
-            if newcosts[n] == 0
-                if ngold==0
-                    ngold=n
-                else
-                    @msg("multiple gold moves for $(parser.sentence)")
+            #TEST: no newcosts during test
+            if earlystop
+                newcosts[n] = pcosts[parent] + mcosts[parent][move]
+                if newcosts[n] == 0
+                    if ngold==0
+                        ngold=n
+                    else
+                        @msg("multiple gold moves for $(parser.sentence)")
+                    end
                 end
             end
             if n-nsave == beamsize; break; end
         end
         if n == nsave
             if parsers[p1].nword != 1                   # single word sentences give us no moves
-                error("No legal moves?")
+                error("No legal moves?")                # otherwise this is suspicious
             end
-        elseif ngold == 0                               # gold path fell out of beam, early stop
+        #TEST: there will be no ngold during test
+        elseif earlystop && ngold == 0                  # gold path fell out of beam, early stop
             gs = goldscore(parsers,mscores,pcosts,mcosts,(p0+1):p1)
             if !isnan(gs)                               # could be nan for non-projective sentences
                 newscores[n+1] = gs
                 loss = loss - newscores[n+1] + logsumexp2(newscores,nsave+1:n+1)
             end
             n = nsave
-        elseif endofparse(newparsers[n])                # all parsers in beam have finished, gold among them
-            loss = loss - newscores[ngold] + logsumexp2(newscores,nsave+1:n)
+        elseif endofparse(newparsers[n])                # all parsers in beam have finished, gold among them if earlystop
+            #TEST: there will be no ngold during test, cannot return beamloss, just return the highest scoring parse, no need for normalization
+            if earlystop
+                loss = loss - newscores[ngold] + logsumexp2(newscores,nsave+1:n)
+            end
             n = nsave                                   # do not add finished parsers to new beam
         else                                            # all good keep going
             push!(newbeamends, n)
