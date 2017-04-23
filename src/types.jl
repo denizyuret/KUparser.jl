@@ -23,7 +23,7 @@ immutable Vocab
 end
 
 ;                               # CONLLU FORMAT
-immutable Sentence              # 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
+type Sentence                   # 1. ID: Word index, integer starting at 1 for each new sentence; may be a range for multiword tokens; may be a decimal number for empty nodes.
     word::Vector{Word}          # 2. FORM: Word form or punctuation symbol.
     #stem::Vector{Stem}         # 3. LEMMA: Lemma or stem of word form.
     postag::Vector{PosTag}      # 4. UPOSTAG: Universal part-of-speech tag.
@@ -38,8 +38,9 @@ immutable Sentence              # 1. ID: Word index, integer starting at 1 for e
     fvec::Vector                # forw context vectors
     bvec::Vector                # back context vectors
     vocab::Vocab                # Common repository of symbols for upostag, deprel etc.
+    parse
 
-    Sentence(v::Vocab)=new([],[],[],[],[],[],[],v)
+    Sentence(v::Vocab)=new([],[],[],[],[],[],[],v,nothing)
 end
 Base.length(s::Sentence)=length(s.word)
 typealias Corpus AbstractVector{Sentence}
