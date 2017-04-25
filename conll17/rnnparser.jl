@@ -1,8 +1,9 @@
-# DONE: build test parser
-## no costs? find another way to handle valid moves!
-## do we return loss vs LAS?
-# DONE: freeze LM model
-# DONE: precompute word vectors
+# oracle1epoch.jld: 0.724 LAS on _corpus[1:128] beamsize=1, 0.5759 with beamsize=10!
+# oracle2epoch.jld: 0.759 LAS on _corpus[1:128] beamsize=1, 0.5957 with beamsize=10.
+# beam1epoch.jld: 0.5129 beamsize=1, 0.4457 beamsize=10 (starting with fresh optim=Adam after oracle2epoch)
+# beam2epoch.jld: 0.4762 beamsize=1, 0.4171 beamsize=10
+# beam3epoch.jld: 0.4190 beamsize=1, 0.4147 beamsize=10
+# more epochs?  Adam bad? Bug?
 
 using JLD, Knet, KUparser
 using KUparser: movecosts
@@ -11,52 +12,67 @@ MAJOR=1                         # 1:column-major 2:row-major
 MAXWORD=32                      # truncate long words at this length. length("counterintelligence")=19
 MAXSENT=64                      # skip longer sentences during training
 MINSENT=2                       # skip shorter sentences during training
-LOGGING=0
-macro msg(_x) :(if LOGGING>0; join(STDERR,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
+FTYPE=Float32
+macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
+macro sho(_x) :(if LOGGING>0; @show $(esc(_x)); else; $(esc(_x)); end) end
 
 Knet.gcdebug(true)              #DBG
 
-function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, batchsize=128)
+function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, batchsize=16)
     # global grads, optim, sentbatches, sentences
     srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
     nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
     nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
-    println("nsent=$nsent/$nsent0 nword=$nword/$nword0")
-    niter = 0
+    @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
+    nsents = [0,1]
     @time for sentences in sentbatches
         grads = oraclegrad(model, sentences, vocab, parsertype, feats)
         update!(model, grads, optim)
-        print('.')
+        if (nsents[1] += length(sentences)) >= nsents[2]; print("$(nsents[1])."); nsents[2]*=2; end
+        # print('.')
     end
     println()
 end
 
 # function oracleloss(pmodel, cmodel, sentences, vocab, parsertype, feats)
 function oracleloss(pmodel, sentences, vocab, parsertype, feats)
-    # global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
+    # global parsers,mcosts,parserdone,fmatrix,scores,logprob,totalloss
     # fillvecs!(cmodel, sentences, vocab)
     parsers = map(parsertype, sentences)
     mcosts = Array(Cost, parsers[1].nmove)
-    done = falses(length(parsers))
+    parserdone = falses(length(parsers))
     totalloss = 0
-    while !all(done)
-        fmatrix = features(parsers, feats, pmodel)
+
+    # optimization: do all getindex operations outside, otherwise each getindex creates a new node
+    # TODO: fix this in general
+    mlpmodel = Any[]
+    for i=1:length(pmodel[:parser]); push!(mlpmodel, pmodel[:parser][i]); end
+    featmodel = Dict()
+    for k in (:postag,:deprel,:lcount,:rcount,:distance)
+        featmodel[k] = Any[]
+        for i in 1:length(pmodel[k])
+            push!(featmodel[k], pmodel[k][i])
+        end
+    end
+
+    while !all(parserdone)
+        fmatrix = features(parsers, feats, featmodel)
         if true #GPU
-            @assert isa(getval(fmatrix),KnetArray{Float32,2})
+            # @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
         else #CPU
-            @assert isa(getval(fmatrix),Array{Float32,2})
+            @assert isa(getval(fmatrix),Array{FTYPE,2})
             fmatrix = KnetArray(fmatrix)
         end
-        scores = mlp(pmodel[:parser], fmatrix)
+        scores = mlp(mlpmodel, fmatrix)
         logprob = logp(scores,MAJOR)
         for (i,p) in enumerate(parsers)
-            if done[i]; continue; end
+            if parserdone[i]; continue; end
             movecosts(p, p.sentence.head, p.sentence.deprel, mcosts)
             goldmove = indmin(mcosts)
             if mcosts[goldmove] == typemax(Cost)
-                done[i] = true
+                parserdone[i] = true
                 p.sentence.parse = p
             else
                 totalloss -= logprob[goldmove,i]
@@ -69,22 +85,28 @@ end
 
 oraclegrad = grad(oracleloss)
 
-function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=128)
+date(x)=join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' ')
+
+function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=16, batchsize=1) # larger batchsizes slow down beamtrain considerably
     # global grads, optim, sentbatches, sentences
     srand(1)
-    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
-    nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
-    nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
-    println("nsent=$nsent/$nsent0 nword=$nword/$nword0")
-    niter = 0
+    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=false)
+    if LOGGING > 0
+        nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
+        nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
+        @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
+    end
+    nsents = [0,1]
+    # niter = 0
     for sentences in sentbatches
         #DBG gc(); Knet.knetgc(); gc()
-        #DBG @show niter+=1
-        #DBG @show length(sentences[1])
+        #DBG @sho niter+=1
+        #DBG @sho length(sentences[1])
         #DBG ploss = beamloss(model, sentences, vocab, parsertype, feats, beamsize)
         grads = beamgrad(model, sentences, vocab, parsertype, feats, beamsize; earlystop=true)
         update!(model, grads, optim)
-        print('.')
+        if (nsents[1] += length(sentences)) >= nsents[2]; date(nsents[1]); nsents[2]*=2; end
+        #print('.')
         #DBG gc()
         #DBG Knet.memdbg()
         #DBG Knet.gpuinfo(n=10)
@@ -93,7 +115,8 @@ function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, pa
     println()
 end
 
-function beamtest(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=10, batchsize=128)
+function beamtest(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=16, batchsize=128) # large batchsize does not slow down beamtest
+    for s in corpus; s.parse = nothing; end
     sentbatches = minibatch(corpus,batchsize)
     for sentences in sentbatches
         beamloss(model, sentences, vocab, parsertype, feats, beamsize; earlystop=false)
@@ -117,39 +140,57 @@ end
 # leave the results in sentences[i].parse, return per sentence loss
 # beamloss(_model, _model, _corpus, _vocab, ArcHybridR1, Flist.hybrid25, 10)
 # function beamloss(pmodel, cmodel, sentences, vocab, parsertype, feats, beamsize; earlystop=false)
-function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlystop=false)
+function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlystop=true)
     # global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
     # fillvecs!(cmodel, sentences, vocab)
-    @log parsers = parsers0 = map(parsertype, sentences)
-    @log beamends = beamends0 = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
-    @log pcosts  = pcosts0  = zeros(Int, length(sentences))
-    @log pscores = pscores0 = zeros(Float32, length(sentences))
-    @log totalloss = stepcount = 0
+    parsers = parsers0 = map(parsertype, sentences)
+    beamends = beamends0 = collect(1:length(parsers)) # marks end column of each beam, initially one parser per beam
+    pcosts  = pcosts0  = zeros(Int, length(sentences))
+    pscores = pscores0 = zeros(FTYPE, length(sentences))
+    totalloss = stepcount = 0
+
+    # optimization: do all getindex operations outside, otherwise each getindex creates a new node
+    # TODO: fix this in general
+    mlpmodel = Any[]
+    mlptemp = pmodel[:parser]
+    for i=1:length(mlptemp); push!(mlpmodel, mlptemp[i]); end
+    featmodel = Dict()
+    for k in (:postag,:deprel,:lcount,:rcount,:distance)
+        featmodel[k] = Any[]
+        pmodel_k = pmodel[k]
+        for i in 1:length(pmodel_k)
+            push!(featmodel[k], pmodel_k[i])
+        end
+    end
+    # end of optimization
+
     while length(beamends) > 0
         # features (vcat) are faster on cpu, mlp is faster on gpu
-        @log fmatrix = features(parsers, feats, pmodel)
+        @log fmatrix = features(parsers, feats, featmodel) # nfeat x nparser
         if true #GPU
-            @assert isa(getval(fmatrix),KnetArray{Float32,2})
+            # @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
         else #CPU
-            @assert isa(getval(fmatrix),Array{Float32,2})
+            @assert isa(getval(fmatrix),Array{FTYPE,2})
             fmatrix = KnetArray(fmatrix)
         end
-        @log cscores = Array(mlp(pmodel[:parser], fmatrix)) .+ pscores' # candidate cumulative scores
-        @log parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize; earlystop=earlystop)
+        @sho pscores
+        @log cscores = Array(mlp(mlpmodel, fmatrix)) # candidate scores: nmove x nparser
+        @log cscores = cscores .+ pscores' # candidate cumulative scores
+        parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize; earlystop=earlystop)
         totalloss += loss
         stepcount += 1
     end
     # emptyvecs!(sentences)       # if we don't empty, gc cannot clear these vectors; empty if finetuning wvecs
-    if earlystop; @show (maximum(map(length,sentences)),stepcount); end
+    if earlystop; @sho (maximum(map(length,sentences)),stepcount); end
     return totalloss / length(sentences)
 end
 
 beamgrad = grad(beamloss)
 
-function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
+function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=true)
     #global mcosts
     n = beamsize * length(beamends) + 1
-    newparsers, newscores, newcosts, newbeamends, loss = Array(Any,n),Array(Any,n),Array(Int,n),Int[],0.0
+    newparsers, newscores, newcosts, newbeamends, loss = Array(Any,n),Array(Int,n),Array(Int,n),Int[],0.0
     nmoves,nparsers = size(mscores)                     # mscores[m,p] is the score of move m for parser p
     #TEST: will not have mcosts
     mcosts = Array(Any, nparsers)                       # mcosts[p][m] will be the cost vector for parser[p],move[m] if needed
@@ -159,9 +200,10 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
         nsave = n                                       # newparsers,newscores,newcosts[nsave+1:n] will the new beam for this sentence
         #TEST: will not have ngold
         ngold = 0                                       # ngold, if nonzero, will be the index of the gold path in beam
-        sorted = sortperm(mscores[s0:s1], rev=true)	
+        @log sorted = sortperm(getval(mscores)[s0:s1], rev=true)	
         for isorted in sorted
-            (move,parent) = ind2sub(mscores, isorted + s0 - 1) # find cartesian index of the next best score
+            linidx = isorted + s0 - 1
+            (move,parent) = ind2sub(size(mscores), linidx) # find cartesian index of the next best score
             parser = parsers[parent]
             if !moveok(parser,move); continue; end  # skip illegal move
             #TEST: will not have mcosts
@@ -170,7 +212,7 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
             end
             n += 1
             newparsers[n] = copy(parser); move!(newparsers[n], move)
-            newscores[n] = mscores[move,parent]
+            newscores[n] = linidx
             #TEST: no newcosts during test
             if earlystop
                 newcosts[n] = pcosts[parent] + mcosts[parent][move]
@@ -178,11 +220,16 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
                     if ngold==0
                         ngold=n
                     else
-                        @msg("multiple gold moves for $(parser.sentence)")
+                        # @msg("multiple gold moves for $(parser.sentence)")
                     end
                 end
             end
             if n-nsave == beamsize; break; end
+        end
+        if false # earlystop #DBG
+            mvmax = newscores[nsave+1]; mvgold = goldindex(parsers,pcosts,mcosts,(p0+1):p1)
+            mvmaxscore = mscores[mvmax]; mvmaxcost = newcosts[nsave+1]
+            @sho (mvgold,mvmax,mvmaxcost,mvmaxscore)
         end
         if n == nsave
             if parsers[p1].nword == 1                   # single word sentences give us no moves
@@ -193,20 +240,21 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
             end
         #TEST: there will be no ngold during test
         elseif earlystop && ngold == 0                  # gold path fell out of beam, early stop
-            gs = goldscore(parsers,mscores,pcosts,mcosts,(p0+1):p1)
-            if !isnan(gs)                               # could be nan for non-projective sentences
-                newscores[n+1] = gs
-                loss = loss - newscores[n+1] + logsumexp2(newscores,nsave+1:n+1)
+            gindex = goldindex(parsers,pcosts,mcosts,(p0+1):p1)
+            if gindex != 0
+                newscores[n+1] = gindex
+                @log loss = loss - mscores[gindex] + logsumexp2(mscores, newscores[nsave+1:n+1])
             end
             n = nsave
         elseif endofparse(newparsers[n])                # all parsers in beam have finished, gold among them if earlystop
             #TEST: there will be no ngold during test, cannot return beamloss, just return the highest scoring parse, no need for normalization
             if earlystop
-                loss = loss - newscores[ngold] + logsumexp2(newscores,nsave+1:n)
+                gindex = newscores[ngold]
+                @log loss = loss - mscores[gindex] + logsumexp2(mscores, newscores[nsave+1:n])
             end
             s = newparsers[n].sentence
-            @assert s == newparsers[nsave+1].sentence
-            @assert newscores[nsave+1] >= newscores[n]
+            # @assert s == newparsers[nsave+1].sentence
+            # @assert mscores[newscores[nsave+1]] >= mscores[newscores[n]] "s[$(1+nsave)]=$(mscores[newscores[nsave+1]]) s[$n]=$(mscores[newscores[n]])"
             s.parse = newparsers[nsave+1]
             n = nsave                                   # do not add finished parsers to new beam
         else                                            # all good keep going
@@ -214,29 +262,33 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=false)
         end
         p0 = p1
     end
-    return newparsers[1:n], newscores[1:n], newcosts[1:n], newbeamends, loss
+    return newparsers[1:n], mscores[newscores[1:n]], newcosts[1:n], newbeamends, loss
 end
 
 function logsumexp2(a,r)
-    z = 0; amax = a[r[1]]
-    for i in r; z += exp(a[i]-amax); end
-    return log(z) + amax
+    # z = 0; amax = a[r[1]]
+    # for i in r; z += exp(a[i]-amax); end
+    # return log(z) + amax
+    amax = getval(a)[r[1]]
+    log(sum(exp(a[r] - amax))) + amax
 end
 
-function goldscore(parsers,mscores,pcosts,mcosts,beamrange)
+function goldindex(parsers,pcosts,mcosts,beamrange)
     parent = findfirst(view(pcosts,beamrange),0)
     if parent == 0; error("cannot find gold parent in $beamrange"); end
     parent += first(beamrange) - 1
     if !isassigned(mcosts, parent)
-        parser = parsers[parent]
-        mcosts[parent] = movecosts(parser, parser.sentence.head, parser.sentence.deprel)
+        p = parsers[parent]
+        mcosts[parent] = movecosts(p, p.sentence.head, p.sentence.deprel)
     end
     move = findfirst(mcosts[parent],0)
     if move == 0
         @msg("cannot find gold move for $(parsers[parent].sentence)")
-        return NaN
+        return 0
+    else
+        msize = (parsers[1].nmove,length(parsers))
+        return sub2ind(msize,move,parent)
     end
-    return mscores[move,parent]
 end
 
 endofparse(p)=(p.sptr == 1 && p.wptr > p.nword)
@@ -255,32 +307,32 @@ end
 
 function fillvecs!(model, sentences, vocab)
     #global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
-    @log cids,wids,maxword,maxsent = maptoint(sentences, vocab)
+    cids,wids,maxword,maxsent = maptoint(sentences, vocab)
     # Get word embeddings: do this in minibatches otherwise may run out of memory
-    @log sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
+    sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
 
     # this blows up gpu memory:
-    # @log cdata,cmask = tokenbatch(cids,maxword,sow,eow)
-    # @log wembed = charlstm(model,cdata,cmask)
+    # cdata,cmask = tokenbatch(cids,maxword,sow,eow)
+    # wembed = charlstm(model,cdata,cmask)
 
     # minibatch variant is easier on memory:
     wembed = Any[]; wbatch = 128 # TODO: configurable batchsize
     for i=1:wbatch:length(cids)    
         j=min(i+wbatch-1,length(cids))
         cij = view(cids,i:j)
-        @log cdata,cmask = tokenbatch(cij,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
-        @log push!(wembed, charlstm(model,cdata,cmask))    # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
+        cdata,cmask = tokenbatch(cij,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
+        push!(wembed, charlstm(model,cdata,cmask))    # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
     end
     wembed = (MAJOR==1 ? hcatn(wembed...) : vcatn(wembed...))
-    #DBG @show (maxword,length(cids),size(wembed)); Knet.gpuinfo(n=10); readline()
+    #DBG @sho (maxword,length(cids),size(wembed)); Knet.gpuinfo(n=10); readline()
 
     # Get context embeddings
-    @log sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
-    @log wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
-    @log forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
+    sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
+    wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
+    forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
     # Get embeddings into sentences -- must empty later for gc!
-    @log fillwvecs!(sentences, wids, wembed)
-    @log fillcvecs!(sentences, forw, back)
+    fillwvecs!(sentences, wids, wembed)
+    fillcvecs!(sentences, forw, back)
 end
 
 function emptyvecs!(sentences)
@@ -337,7 +389,7 @@ treemap{T<:Number}(f,x::KnetArray{T})=f(x)
 treemap{T<:Number}(f,x::Array{T})=f(x)
 treemap(f,a::Associative)=Dict(k=>treemap(f,v) for (k,v) in a)
 treemap(f,a)=map(x->treemap(f,x), a)
-
+treemap(f,::Void)=nothing
 
 # function loss(model, sentences, parsertype, beamsize)
 function lmloss(model, sentences, vocab::Vocab; result=nothing)
@@ -389,7 +441,7 @@ function lmloss1(model,data,mask,forw,back; result=nothing)
         total += sum(o2)
         count += length(o2)
     end
-    if result != nothing; result[1]+=AutoGrad.getval(total); result[2]+=count; end
+    if result != nothing; result[1]+=getval(total); result[2]+=count; end
     return total
 end
 
@@ -448,7 +500,7 @@ function tokenbatch(sequences,maxlen,sos,eos,pad=eos)
     B = length(sequences)
     T = maxlen + 2
     data = [ Array(Int,B) for t in 1:T ]
-    mask = [ Array(Float32,B) for t in 1:T ]
+    mask = [ Array(FTYPE,B) for t in 1:T ]
     @inbounds for t in 1:T
         for b in 1:B
             N = length(sequences[b])
@@ -477,7 +529,7 @@ function goldbatch(sentences, maxlen, wdict, unkwid, pad=unkwid)
     B = length(sentences)
     T = maxlen # no need for sos/eos for gold
     data = [ Array(Int,B) for t in 1:T ]
-    mask = [ Array(Float32,B) for t in 1:T ]
+    mask = [ Array(FTYPE,B) for t in 1:T ]
     @inbounds for t in 1:T
         for b in 1:B
             N = length(sentences[b])
@@ -585,18 +637,18 @@ function loadcorpus(v::Vocab)
     return corpus
 end
 
-function loadmodel(v::Vocab; hidden=1024)
+function loadmodel(v::Vocab, hidden...)
     model = Dict()
     m = load("english_ch12kmodel_2.jld")["model"]
     if MAJOR==1
-        for k in (:cembed,); model[k] = KnetArray(m[k]'); end
-        for k in (:forw,:soft,:back,:char); model[k] = map(KnetArray, m[k]'); end
+        for k in (:cembed,); model[k] = KnetArray{FTYPE}(m[k]'); end
+        for k in (:forw,:soft,:back,:char); model[k] = map(KnetArray{FTYPE}, m[k]'); end
     else
-        for k in (:cembed,); model[k] = KnetArray(m[k]); end
-        for k in (:forw,:soft,:back,:char); model[k] = map(KnetArray, m[k]); end
+        for k in (:cembed,); model[k] = KnetArray{FTYPE}(m[k]); end
+        for k in (:forw,:soft,:back,:char); model[k] = map(KnetArray{FTYPE}, m[k]); end
     end
-    initk(d...) = KnetArray{Float32}(xavier(d...))
-    inita(d...) = Array{Float32}(xavier(d...))
+    initk(d...) = KnetArray{FTYPE}(xavier(d...))
+    inita(d...) = Array{FTYPE}(xavier(d...))
     for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
         if true #GPU
             model[k] = [ initk(d) for i=1:n ]
@@ -604,7 +656,7 @@ function loadmodel(v::Vocab; hidden=1024)
             model[k] = [ inita(d) for i=1:n ]
         end
     end
-    parsedims = (5796,hidden,73)
+    parsedims = (5796,hidden...,73)
     model[:parser] = Any[]
     for i=2:length(parsedims)
         push!(model[:parser], initk(parsedims[i],parsedims[i-1]))
@@ -643,10 +695,11 @@ function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     return data
 end
 
-function main(;batch=3000,nsent=0,result=zeros(2))
+function init(;batch=3000,nsent=1,result=zeros(2))
+    global LOGGING = 0
     global _vocab = loadvocab()
-    global _model = loadmodel(_vocab)
-    global _optim = initoptim(_model,"Adam()") # "Sgd(lr=.1)")
+    global _model = loadmodel(_vocab,4096)
+    global _optim = initoptim(_model,"Adam()") # "Sgd(lr=.1)") # 
     global _corpus = loadcorpus(_vocab)
     @time fillvecs!(_model, _corpus, _vocab)
     c = (nsent == 0 ? _corpus : _corpus[1:nsent])
@@ -660,12 +713,10 @@ function main(;batch=3000,nsent=0,result=zeros(2))
     return result
 end
 
-# TODO: out-of-memory with hidden=4096?
-
-function hiddenoptim(hidden,optim;epochs=1)
+function hiddenoptim(optim,hidden...;epochs=1)
     srand(1)
     global _model, _optim
-    _model = loadmodel(_vocab, hidden=hidden)
+    _model = loadmodel(_vocab, hidden...)
     _optim = initoptim(_model, optim)
     c = _corpus[1:128]
     for i=1:epochs; oracletrain(corpus=c); end
@@ -849,5 +900,5 @@ const UDEPREL = Dict{String,DepRel}(
 #     return data
 # end
 
-main(nsent=1)
+# init()
 nothing
