@@ -20,9 +20,9 @@ function features(parsers, feats, model)
             elseif fn == 'L'
                 push!(fmatrix, a>0 ? dvecs[p.deprel[a]] : dvec0)
             elseif fn == 'A'
-                push!(fmatrix, a==0 ? dvec0 : !isassigned(ldep,a) ? dvec0 : length(ldep[a])==1 ? dvecs[p.deprel[ldep[a][1]]] : +(dvecs[p.deprel[ldep[a]]]...))
+                push!(fmatrix, a==0 ? dvec0 : !isassigned(ldep,a) ? dvec0 : length(ldep[a])==1 ? dvecs[p.deprel[ldep[a][1]]] : sum(dvecs[p.deprel[ldep[a]]]))
             elseif fn == 'B'
-                push!(fmatrix, a==0 ? dvec0 : !isassigned(rdep,a) ? dvec0 : length(rdep[a])==1 ? dvecs[p.deprel[rdep[a][1]]] : +(dvecs[p.deprel[rdep[a]]]...))
+                push!(fmatrix, a==0 ? dvec0 : !isassigned(rdep,a) ? dvec0 : length(rdep[a])==1 ? dvecs[p.deprel[rdep[a][1]]] : sum(dvecs[p.deprel[rdep[a]]]))
             elseif fn == 'd'
                 d = getrdist(f,p,a)
                 push!(fmatrix, d>0 ? xvecs[min(d,10)] : xvec0)
