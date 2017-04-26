@@ -5,7 +5,7 @@
 # beam3epoch.jld: 0.4190 beamsize=1, 0.4147 beamsize=10
 # more epochs?  Adam bad? Bug?
 
-using JLD, Knet, KUparser
+using JLD, Knet, KUparser, BenchmarkTools
 using KUparser: movecosts
 using AutoGrad: getval
 MAJOR=1                         # 1:column-major 2:row-major
@@ -13,109 +13,53 @@ MAXWORD=32                      # truncate long words at this length. length("co
 MAXSENT=64                      # skip longer sentences during training
 MINSENT=2                       # skip shorter sentences during training
 FTYPE=Float32
+GPUFEATURES=false
 macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 macro sho(_x) :(if LOGGING>0; @show $(esc(_x)); else; $(esc(_x)); end) end
 
 Knet.gcdebug(true)              #DBG
 
-function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, batchsize=16)
-    # global grads, optim, sentbatches, sentences
-    srand(1)
-    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
-    nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
-    nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
-    @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
-    nsents = [0,1]
-    @time for sentences in sentbatches
-        grads = oraclegrad(model, sentences, vocab, parsertype, feats)
-        update!(model, grads, optim)
-        if (nsents[1] += length(sentences)) >= nsents[2]; print("$(nsents[1])."); nsents[2]*=2; end
-        # print('.')
-    end
-    println()
-end
-
-# function oracleloss(pmodel, cmodel, sentences, vocab, parsertype, feats)
-function oracleloss(pmodel, sentences, vocab, parsertype, feats)
-    # global parsers,mcosts,parserdone,fmatrix,scores,logprob,totalloss
-    # fillvecs!(cmodel, sentences, vocab)
-    parsers = map(parsertype, sentences)
-    mcosts = Array(Cost, parsers[1].nmove)
-    parserdone = falses(length(parsers))
-    totalloss = 0
-
-    # optimization: do all getindex operations outside, otherwise each getindex creates a new node
-    # TODO: fix this in general
-    mlpmodel = Any[]
-    for i=1:length(pmodel[:parser]); push!(mlpmodel, pmodel[:parser][i]); end
-    featmodel = Dict()
-    for k in (:postag,:deprel,:lcount,:rcount,:distance)
-        featmodel[k] = Any[]
-        for i in 1:length(pmodel[k])
-            push!(featmodel[k], pmodel[k][i])
-        end
-    end
-
-    while !all(parserdone)
-        fmatrix = features(parsers, feats, featmodel)
-        if true #GPU
-            # @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
-        else #CPU
-            @assert isa(getval(fmatrix),Array{FTYPE,2})
-            fmatrix = KnetArray(fmatrix)
-        end
-        scores = mlp(mlpmodel, fmatrix)
-        logprob = logp(scores,MAJOR)
-        for (i,p) in enumerate(parsers)
-            if parserdone[i]; continue; end
-            movecosts(p, p.sentence.head, p.sentence.deprel, mcosts)
-            goldmove = indmin(mcosts)
-            if mcosts[goldmove] == typemax(Cost)
-                parserdone[i] = true
-                p.sentence.parse = p
-            else
-                totalloss -= logprob[goldmove,i]
-                move!(p, goldmove)
-            end
-        end
-    end
-    return totalloss / length(sentences)
-end
-
-oraclegrad = grad(oracleloss)
-
 date(x)=join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' ')
 
-function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=16, batchsize=1) # larger batchsizes slow down beamtrain considerably
+function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=4, batchsize=1) # larger batchsizes slow down beamtrain considerably
     # global grads, optim, sentbatches, sentences
-    srand(1)
-    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=false)
+    # srand(1)
+    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
     if LOGGING > 0
         nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
         nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
         @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
     end
-    nsents = [0,1]
+    nwords = Any[0,1000,time()]
+    nsteps = Any[0,0]
     # niter = 0
     for sentences in sentbatches
         #DBG gc(); Knet.knetgc(); gc()
         #DBG @sho niter+=1
         #DBG @sho length(sentences[1])
         #DBG ploss = beamloss(model, sentences, vocab, parsertype, feats, beamsize)
-        grads = beamgrad(model, sentences, vocab, parsertype, feats, beamsize; earlystop=true)
+        grads = beamgrad(model, sentences, vocab, parsertype, feats, beamsize; earlystop=true, steps=nsteps)
         update!(model, grads, optim)
-        if (nsents[1] += length(sentences)) >= nsents[2]; date(nsents[1]); nsents[2]*=2; end
         #print('.')
         #DBG gc()
         #DBG Knet.memdbg()
         #DBG Knet.gpuinfo(n=10)
         #DBG readline()
+        nw = sum(map(length,sentences))
+        nwords[1] += nw
+        if nwords[1] >= nwords[2]
+            nwords[2] += 1000
+            dt = time() - nwords[3]
+            date("$(nwords[1]) words $(round(Int,nwords[1]/dt)) wps $(round(Int,100*nsteps[1]/nsteps[2]))% steps")
+            nsteps = Any[0,0]
+            gc(); Knet.knetgc(); gc()
+        end
     end
     println()
 end
 
-function beamtest(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=16, batchsize=128) # large batchsize does not slow down beamtest
+function beamtest(;model=_model, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=4, batchsize=128) # large batchsize does not slow down beamtest
     for s in corpus; s.parse = nothing; end
     sentbatches = minibatch(corpus,batchsize)
     for sentences in sentbatches
@@ -140,7 +84,7 @@ end
 # leave the results in sentences[i].parse, return per sentence loss
 # beamloss(_model, _model, _corpus, _vocab, ArcHybridR1, Flist.hybrid25, 10)
 # function beamloss(pmodel, cmodel, sentences, vocab, parsertype, feats, beamsize; earlystop=false)
-function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlystop=true)
+function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlystop=true, steps=nothing)
     # global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
     # fillvecs!(cmodel, sentences, vocab)
     parsers = parsers0 = map(parsertype, sentences)
@@ -167,8 +111,8 @@ function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlyst
     while length(beamends) > 0
         # features (vcat) are faster on cpu, mlp is faster on gpu
         @log fmatrix = features(parsers, feats, featmodel) # nfeat x nparser
-        if true #GPU
-            # @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
+        if GPUFEATURES #GPU
+            @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
         else #CPU
             @assert isa(getval(fmatrix),Array{FTYPE,2})
             fmatrix = KnetArray(fmatrix)
@@ -181,7 +125,12 @@ function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlyst
         stepcount += 1
     end
     # emptyvecs!(sentences)       # if we don't empty, gc cannot clear these vectors; empty if finetuning wvecs
-    if earlystop; @sho (maximum(map(length,sentences)),stepcount); end
+    if earlystop; @msg ((maximum(map(length,sentences)),stepcount)); end
+    if steps != nothing
+        steps[1] += stepcount
+        steps[2] += length(sentences[1])*2-2
+    end
+    # println(stepcount)
     return totalloss / length(sentences)
 end
 
@@ -293,6 +242,89 @@ end
 
 endofparse(p)=(p.sptr == 1 && p.wptr > p.nword)
 
+function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, batchsize=16)
+    # global grads, optim, sentbatches, sentences
+    # srand(1)
+    sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
+    nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
+    nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
+    @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
+    nwords = Any[0,1000,time()]
+    losses = Any[0,0,0]
+    @time for sentences in sentbatches
+        grads = oraclegrad(model, sentences, vocab, parsertype, feats; losses=losses)
+        update!(model, grads, optim)
+        nw = sum(map(length,sentences))
+        nwords[1] += nw
+        if nwords[1] >= nwords[2]
+            nwords[2] += 1000
+            dt = time() - nwords[3]
+            date("$(nwords[1]) words $(round(Int,nwords[1]/dt)) wps $(losses[3]) avgloss")
+            gc(); Knet.knetgc(); gc()
+        end
+    end
+    println()
+end
+
+# function oracleloss(pmodel, cmodel, sentences, vocab, parsertype, feats)
+function oracleloss(pmodel, sentences, vocab, parsertype, feats; losses=nothing)
+    # global parsers,mcosts,parserdone,fmatrix,scores,logprob,totalloss
+    # fillvecs!(cmodel, sentences, vocab)
+    parsers = map(parsertype, sentences)
+    mcosts = Array(Cost, parsers[1].nmove)
+    parserdone = falses(length(parsers))
+    totalloss = 0
+
+    # optimization: do all getindex operations outside, otherwise each getindex creates a new node
+    # TODO: fix this in general
+    mlpmodel = Any[]
+    for i=1:length(pmodel[:parser]); push!(mlpmodel, pmodel[:parser][i]); end
+    featmodel = Dict()
+    for k in (:postag,:deprel,:lcount,:rcount,:distance)
+        featmodel[k] = Any[]
+        for i in 1:length(pmodel[k])
+            push!(featmodel[k], pmodel[k][i])
+        end
+    end
+
+    while !all(parserdone)
+        fmatrix = features(parsers, feats, featmodel)
+        if GPUFEATURES #GPU
+            @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
+        else #CPU
+            @assert isa(getval(fmatrix),Array{FTYPE,2})
+            fmatrix = KnetArray(fmatrix)
+        end
+        scores = mlp(mlpmodel, fmatrix)
+        logprob = logp(scores,MAJOR)
+        for (i,p) in enumerate(parsers)
+            if parserdone[i]; continue; end
+            movecosts(p, p.sentence.head, p.sentence.deprel, mcosts)
+            goldmove = indmin(mcosts)
+            if mcosts[goldmove] == typemax(Cost)
+                parserdone[i] = true
+                p.sentence.parse = p
+            else
+                totalloss -= logprob[goldmove,i]
+                move!(p, goldmove)
+                if losses != nothing
+                    loss1 = -getval(logprob)[goldmove,i]
+                    losses[1] += loss1
+                    losses[2] += 1
+                    if losses[2] < 1000
+                        losses[3] = losses[1]/losses[2]
+                    else
+                        losses[3] = 0.999 * losses[3] + 0.001 * loss1
+                    end
+                end
+            end
+        end
+    end
+    return totalloss / length(sentences)
+end
+
+oraclegrad = grad(oracleloss)
+
 using AutoGrad
 import Base: sortperm, ind2sub
 @zerograd sortperm(a;o...)
@@ -346,7 +378,7 @@ function fillwvecs!(sentences, wids, wembed)
     @inbounds for (s,wids) in zip(sentences,wids)
         empty!(s.wvec)
         for w in wids
-            if true #GPU
+            if GPUFEATURES #GPU
                 push!(s.wvec, wembed[:,w])
             else #CPU
                 push!(s.wvec, Array(wembed[:,w]))
@@ -365,7 +397,7 @@ function fillcvecs!(sentences, forw, back)
         N = length(s)
         for n in 1:N
             t = T-N+n
-            if true #GPU
+            if GPUFEATURES #GPU
                 push!(s.fvec, forw[t][:,i])
                 push!(s.bvec, back[t][:,i])
             else #CPU
@@ -650,7 +682,7 @@ function loadmodel(v::Vocab, hidden...)
     initk(d...) = KnetArray{FTYPE}(xavier(d...))
     inita(d...) = Array{FTYPE}(xavier(d...))
     for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
-        if true #GPU
+        if GPUFEATURES #GPU
             model[k] = [ initk(d) for i=1:n ]
         else #CPU
             model[k] = [ inita(d) for i=1:n ]
@@ -685,8 +717,8 @@ function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     sorted = sort(corpus, by=length)
     i1 = findfirst(x->(length(x) >= minlen), sorted)
     if i1==0; error("No sentences >= $minlen"); end
-    i2 = findfirst(x->(length(x) > maxlen), sorted)
-    if i2==0; i2=length(corpus); else; i2=i2-1; end
+    i2 = findlast(x->(length(x) <= maxlen), sorted)
+    if i2==0; error("No sentences <= $maxlen"); end
     for i in i1:batchsize:i2
         j = min(i2, i+batchsize-1)
         push!(data, sorted[i:j])
