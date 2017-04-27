@@ -59,11 +59,12 @@ let cat_r = recorder(cat); global vcatn
 end
 
 #DBG: temp solution:
-postagv(model)=model[:postag]   # 17 postags
-deprelv(model)=model[:deprel]   # 37 deprels
-lcountv(model)=model[:lcount]   # 10 lcount
-rcountv(model)=model[:rcount]   # 10 rcount
-distancev(model)=model[:distance] # 10 distance
+postagv(m)=m[1]; deprelv(m)=m[2]; lcountv(m)=m[3]; rcountv(m)=m[4]; distancev(m)=m[5]
+# postagv(model)=model[:postag]   # 17 postags
+# deprelv(model)=model[:deprel]   # 37 deprels
+# lcountv(model)=model[:lcount]   # 10 lcount
+# rcountv(model)=model[:rcount]   # 10 rcount
+# distancev(model)=model[:distance] # 10 distance
 
 
 # Old version
