@@ -1,26 +1,125 @@
-# oracle1epoch.jld: 0.724 LAS on _corpus[1:128] beamsize=1, 0.5759 with beamsize=10!
-# oracle2epoch.jld: 0.759 LAS on _corpus[1:128] beamsize=1, 0.5957 with beamsize=10.
-# beam1epoch.jld: 0.5129 beamsize=1, 0.4457 beamsize=10 (starting with fresh optim=Adam after oracle2epoch)
-# beam2epoch.jld: 0.4762 beamsize=1, 0.4171 beamsize=10
-# beam3epoch.jld: 0.4190 beamsize=1, 0.4147 beamsize=10
-# more epochs?  Adam bad? Bug?
-
-using JLD, Knet, KUparser, BenchmarkTools
+using JLD, Knet, KUparser, BenchmarkTools, ArgParse
 using KUparser: movecosts
 using AutoGrad: getval
+
+Knet.gcdebug(true)              #DBG
+LOGGING=1                       # lots of debug output if nonzero
 MAJOR=1                         # 1:column-major 2:row-major
 MAXWORD=32                      # truncate long words at this length. length("counterintelligence")=19
 MAXSENT=64                      # skip longer sentences during training
 MINSENT=2                       # skip shorter sentences during training
-FTYPE=Float32
-GPUFEATURES=false
+FTYPE=Float32                   # floating point type
+GPUFEATURES=false               # whether to compute features on gpu (vcat on gpu is too slow)
 macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 macro sho(_x) :(if LOGGING>0; @show $(esc(_x)); else; $(esc(_x)); end) end
-
-Knet.gcdebug(true)              #DBG
-
 date(x)=join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' ')
+
+# omer's: model file format:
+# d = load("model.jld"); m=d["model"]; m[:cembed]=Array; wv=d["word_vocab"]; wv::Dict{String,Int}
+# cembed: Array
+# forw,back,soft,char: [ Array, Array ]
+# char_vocab: Dict{Char,Int}
+# word_vocab: Dict{String,Int}
+
+# proposed changes: use a flat structure for everything (so there is no model, "cembed" etc become direct keys)
+# combine vocab and model fields in the same file
+# write a converter that converts omer's format to this new format
+# in addition to the fields above, the following fields will be added if not found:
+# sosword,eosword,unkword: String (default: <s>,</s>,<unk>)
+# sowchar,eowchar,unkchar: Char (default: PAD=0x11, SOW=0x12, EOW=0x13)
+# postags, deprels: (default:UPOSTAG(17),UDEPREL(37))
+# postagv(17), deprelv(37), lcountv(10), rcountv(10), distancev(10): (default: rand init embeddings)
+# parser: Array(n) (default: rand init mlp weights)
+
+# load these as separate models for now, we could change this in the future
+makewmodel(d,atype)=map(atype,[d["cembed"],d["char"][1],d["char"][2],d["forw"][1],d["forw"][2],d["back"][1],d["back"][2],d["soft"][1],d["soft"][2]])
+cembed(m)=m[1]; wchar(m)=m[2]; bchar(m)=m[3];wforw(m)=m[4]; bforw(m)=m[5]; wback(m)=m[6]; bback(m)=m[7]; wsoft(m)=m[8]; bsoft(m)=m[9]
+makepmodel(d,atype)=map(atype,[d["postagv"],d["deprelv"],d["lcountv"],d["rcountv"],d["distancev"],d["parser"]])
+postagv(m)=m[1]; deprelv(m)=m[2]; lcountv(m)=m[3]; rcountv(m)=m[4]; distancev(m)=m[5]; parser(m)=m[6]
+makevocab(d)=Vocab(d["char_vocab"],Dict{String,Int}(),d["word_vocab"],d["sosword"],d["eosword"],d["unkword"],d["sowchar"],d["eowchar"],d["unkchar"],get(d,"postags",UPOSTAG),get(d,"deprels",UDEPREL))
+
+# convert omer's format to new format
+function convertfile(infile, outfile)
+    atr(x)=transpose(Array(x)) # omer stores in row-major, we transpose
+    d = load(infile); m = d["model"]
+    save(outfile, "cembed", atr(m[:cembed]), "forw", map(atr,m[:forw]),
+         "back",map(atr,m[:back]), "soft",map(atr,m[:soft]), "char",map(atr,m[:char]),
+         "char_vocab",d["char_vocab"], "word_vocab",d["word_vocab"], 
+         "sosword","<s>","eosword","</s>","unkword","<unk>",
+         "sowchar",'\x12',"eowchar",'\x13',"unkchar",'\x11')
+end
+
+# save file in new format
+function savefile(file, vocab, wmodel, pmodel)
+    save(file,  "cembed", Array(cembed(wmodel)),
+         "char", map(Array,[wchar(wmodel),bchar(wmodel)]),
+         "forw", map(Array,[wforw(wmodel),bforw(wmodel)]),
+         "back", map(Array,[wback(wmodel),bback(wmodel)]),
+         "soft", map(Array,[wsoft(wmodel),bsoft(wmodel)]),
+         "char_vocab",vocab.cdict, "word_vocab",vocab.odict,
+         "sosword",vocab.sosword,"eosword",vocab.eosword,"unkword",vocab.unkword,
+         "sowchar",vocab.sowchar,"eowchar",vocab.eowchar,"unkchar",vocab.unkchar,
+         "postags",vocab.postags,"deprels",vocab.deprels,
+         "postagv",map(Array,postagv(pmodel)),"deprelv",map(Array,deprelv(pmodel)),
+         "lcountv",map(Array,lcountv(pmodel)),"rcountv",map(Array,rcountv(pmodel)),
+         "distancev",map(Array,distancev(pmodel)),"parser",map(Array,parser(pmodel)))
+end
+
+function main(args=ARGS)
+    # global model, text, data, tok2int, o
+    s = ArgParseSettings()
+    s.description="rnnparser.jl"
+    s.exc_handler=ArgParse.debug_handler
+    @add_arg_table s begin
+        ("--datafiles"; nargs='+'; help="If provided, use first file for training, second for dev, others for test.")
+        ("--loadfile"; help="Initialize model from file")
+        ("--savefile"; help="Save final model to file")
+        ("--bestfile"; help="Save best model to file")
+        ("--epochs"; arg_type=Int; default=1; help="Number of epochs for training.")
+        ("--hidden"; nargs='+'; arg_type=Int; default=[4096]; help="Sizes of parser mlp hidden layers.")
+        ("--optimization"; default="Adam()"; help="Optimization algorithm and parameters.")
+        ("--seed"; arg_type=Int; default=-1; help="Random number seed.")
+        # ("--generate"; arg_type=Int; default=0; help="If non-zero generate given number of characters.")
+        # ("--embed"; arg_type=Int; default=168; help="Size of the embedding vector.")
+        # ("--batchsize"; arg_type=Int; default=256; help="Number of sequences to train on in parallel.")
+        # ("--seqlength"; arg_type=Int; default=100; help="Maximum number of steps to unroll the network for bptt. Initial epochs will use the epoch number as bptt length for faster convergence.")
+        # ("--gcheck"; arg_type=Int; default=0; help="Check N random gradients.")
+        # ("--atype"; default=(gpu()>=0 ? "KnetArray{Float32}" : "Array{Float32}"); help="array type: Array for cpu, KnetArray for gpu")
+        # ("--fast"; action=:store_true; help="skip loss printing for faster run")
+        # ("--dropout"; arg_type=Float64; default=0.0; help="Dropout probability.")
+    end
+    isa(args, AbstractString) && (args=split(args))
+    o = parse_args(args, s; as_symbols=true)
+    println(s.description)
+    println("opts=",[(k,v) for (k,v) in o]...)
+    if o[:seed] > 0; srand(o[:seed]); end
+    # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
+
+    global vocab, corpora, wmodel, pmodel
+    @msg o[:loadfile]
+    d = load(o[:loadfile])
+    vocab = makevocab(d)
+    wmodel = makewmodel(d,KnetArray{Float32})
+    corpora = []
+    for f in o[:datafiles]; @msg f
+        c = loadcorpus(f,vocab)
+        ppl = fillvecs!(wmodel,c,vocab); @msg ppl
+        push!(corpora,c)
+    end
+    @msg :ok
+
+    # initmodel
+    #pmodel = makepmodel(d,Array{Float32})
+    #pmodel[6] = map(KnetArray{Float32},pmodel[6]) # only put the parser on gpu, features (vcatn) faster on cpu
+
+    # train
+    # savemodel
+
+    # find better default features
+end
+
+
 
 function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, parsertype=ArcHybridR1, feats=Flist.hybrid25, beamsize=4, batchsize=1) # larger batchsizes slow down beamtrain considerably
     # global grads, optim, sentbatches, sentences
@@ -110,16 +209,15 @@ function beamloss(pmodel, sentences, vocab, parsertype, feats, beamsize; earlyst
 
     while length(beamends) > 0
         # features (vcat) are faster on cpu, mlp is faster on gpu
-        @log fmatrix = features(parsers, feats, featmodel) # nfeat x nparser
+        fmatrix = features(parsers, feats, featmodel) # nfeat x nparser
         if GPUFEATURES #GPU
             @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
         else #CPU
             @assert isa(getval(fmatrix),Array{FTYPE,2})
             fmatrix = KnetArray(fmatrix)
         end
-        @sho pscores
-        @log cscores = Array(mlp(mlpmodel, fmatrix)) # candidate scores: nmove x nparser
-        @log cscores = cscores .+ pscores' # candidate cumulative scores
+        cscores = Array(mlp(mlpmodel, fmatrix)) # candidate scores: nmove x nparser
+        cscores = cscores .+ pscores' # candidate cumulative scores
         parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize; earlystop=earlystop)
         totalloss += loss
         stepcount += 1
@@ -149,7 +247,7 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=true)
         nsave = n                                       # newparsers,newscores,newcosts[nsave+1:n] will the new beam for this sentence
         #TEST: will not have ngold
         ngold = 0                                       # ngold, if nonzero, will be the index of the gold path in beam
-        @log sorted = sortperm(getval(mscores)[s0:s1], rev=true)	
+        sorted = sortperm(getval(mscores)[s0:s1], rev=true)	
         for isorted in sorted
             linidx = isorted + s0 - 1
             (move,parent) = ind2sub(size(mscores), linidx) # find cartesian index of the next best score
@@ -192,14 +290,14 @@ function nextbeam(parsers, mscores, pcosts, beamends, beamsize; earlystop=true)
             gindex = goldindex(parsers,pcosts,mcosts,(p0+1):p1)
             if gindex != 0
                 newscores[n+1] = gindex
-                @log loss = loss - mscores[gindex] + logsumexp2(mscores, newscores[nsave+1:n+1])
+                loss = loss - mscores[gindex] + logsumexp2(mscores, newscores[nsave+1:n+1])
             end
             n = nsave
         elseif endofparse(newparsers[n])                # all parsers in beam have finished, gold among them if earlystop
             #TEST: there will be no ngold during test, cannot return beamloss, just return the highest scoring parse, no need for normalization
             if earlystop
                 gindex = newscores[ngold]
-                @log loss = loss - mscores[gindex] + logsumexp2(mscores, newscores[nsave+1:n])
+                loss = loss - mscores[gindex] + logsumexp2(mscores, newscores[nsave+1:n])
             end
             s = newparsers[n].sentence
             # @assert s == newparsers[nsave+1].sentence
@@ -340,6 +438,7 @@ end
 function fillvecs!(model, sentences, vocab)
     #global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
     cids,wids,maxword,maxsent = maptoint(sentences, vocab)
+    @msg :wordembeddings
     # Get word embeddings: do this in minibatches otherwise may run out of memory
     sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
 
@@ -348,6 +447,7 @@ function fillvecs!(model, sentences, vocab)
     # wembed = charlstm(model,cdata,cmask)
 
     # minibatch variant is easier on memory:
+    gc();Knet.knetgc();gc()
     wembed = Any[]; wbatch = 128 # TODO: configurable batchsize
     for i=1:wbatch:length(cids)    
         j=min(i+wbatch-1,length(cids))
@@ -359,12 +459,26 @@ function fillvecs!(model, sentences, vocab)
     #DBG @sho (maxword,length(cids),size(wembed)); Knet.gpuinfo(n=10); readline()
 
     # Get context embeddings
+    gc();Knet.knetgc();gc()
+    @msg :contextembeddings
     sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
     wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
     forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
-    # Get embeddings into sentences -- must empty later for gc!
+
+    # Get embeddings into sentences -- must empty later for gc if we are finetuning!
+    gc();Knet.knetgc();gc()
+    @msg :fillvecs
     fillwvecs!(sentences, wids, wembed)
     fillcvecs!(sentences, forw, back)
+
+    # Test predictions
+    gc();Knet.knetgc();gc()
+    @msg :losscalc
+    result = zeros(2)
+    unk = vocab.odict[vocab.unkword]
+    odata,omask = goldbatch(sentences,maxsent,vocab.odict,unk)
+    total = lmloss1(model,odata,omask,forw,back; result=result)
+    return exp(-result[1]/result[2])
 end
 
 function emptyvecs!(sentences)
@@ -422,34 +536,6 @@ treemap{T<:Number}(f,x::Array{T})=f(x)
 treemap(f,a::Associative)=Dict(k=>treemap(f,v) for (k,v) in a)
 treemap(f,a)=map(x->treemap(f,x), a)
 treemap(f,::Void)=nothing
-
-# function loss(model, sentences, parsertype, beamsize)
-function lmloss(model, sentences, vocab::Vocab; result=nothing)
-    # map words and chars to Ints
-    # words and sents contain Int (char/word id) arrays without sos/eos tokens
-    # TODO: optionally construct cdict here as well
-    # words are the char ids for each unique word
-    # sents are the word ids for each sentence
-    # wordlen and sentlen are the maxlen word and sentence
-    words,sents,wordlen,sentlen = maptoint(sentences, vocab)
-
-    # Find word vectors for a batch of sentences using character lstm or cnn model
-    # note that tokenbatch adds sos/eos tokens and padding to each sequence
-    sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
-    cdata,cmask = tokenbatch(words,wordlen,sow,eow)
-    wembed = charlstm(model,cdata,cmask)
-
-    # Find context vectors using word blstm
-    sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
-    wdata,wmask = tokenbatch(sents,sentlen,sos,eos)
-    forw,back = wordlstm(model,wdata,wmask,wembed)
-
-    # Test predictions
-    unk = vocab.odict[vocab.unkword]
-    odata,omask = goldbatch(sentences,sentlen,vocab.odict,unk)
-    total = lmloss1(model,odata,omask,forw,back; result=result)
-    return -total/length(sentences)
-end
 
 function lmloss1(model,data,mask,forw,back; result=nothing)
     # data[t][b]::Int gives the correct word at sentence b, position t
@@ -580,16 +666,16 @@ end
 
 # Run charid arrays through the LSTM, collect last hidden state as word embedding
 function charlstm(model,data,mask)
-    weight,bias,embeddings = wchar(model),bchar(model),echar(model)
+    weight,bias,embeddings = wchar(model),bchar(model),cembed(model)
     T = length(data)
     B = length(data[1])
     H = div(length(bias),4)
-    cembed(t)=(if MAJOR==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
+    cembed_t(t)=(if MAJOR==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
     czero=(if MAJOR==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
     hidden = cell = czero       # TODO: cache this
     mask = map(KnetArray, mask) # TODO: dont hardcode atype
     @inbounds for t in 1:T
-        (hidden,cell) = lstm(weight,bias,hidden,cell,cembed(t);mask=mask[t])
+        (hidden,cell) = lstm(weight,bias,hidden,cell,cembed_t(t);mask=mask[t])
     end
     return hidden
 end
@@ -645,16 +731,10 @@ function lstm(weight,bias,hidden,cell,input; mask=nothing)
     return (hidden,cell)
 end
 
-function loadvocab()
-    a = load("english_vocabs.jld")
-    Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],
-          "<s>","</s>","<unk>",'↥','Ϟ','⋮', UPOSTAG, UDEPREL)
-end
-
-function loadcorpus(v::Vocab)
+function loadcorpus(file,v::Vocab)
     corpus = Any[]
     s = Sentence(v)
-    for line in eachline("foo-en-ud-train.conllu")
+    for line in eachline(file)
         if line == "\n"
             push!(corpus, s)
             s = Sentence(v)
@@ -697,21 +777,6 @@ function loadmodel(v::Vocab, hidden...)
     return model
 end
 
-wsoft(model)=model[:soft][1]
-bsoft(model)=model[:soft][2]
-wchar(model)=model[:char][1]
-bchar(model)=model[:char][2]
-echar(model)=model[:cembed]
-wforw(model)=model[:forw][1]
-bforw(model)=model[:forw][2]
-wback(model)=model[:back][1]
-bback(model)=model[:back][2]
-postagv(model)=model[:postag]   # 17 postags
-deprelv(model)=model[:deprel]   # 37 deprels
-lcountv(model)=model[:lcount]   # 10 lcount
-rcountv(model)=model[:rcount]   # 10 rcount
-distancev(model)=model[:distance] # 10 distance
-
 function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     data = Any[]
     sorted = sort(corpus, by=length)
@@ -725,34 +790,6 @@ function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     end
     if shuf; data=shuffle(data); end
     return data
-end
-
-function init(;batch=3000,nsent=1,result=zeros(2))
-    global LOGGING = 0
-    global _vocab = loadvocab()
-    global _model = loadmodel(_vocab,4096)
-    global _optim = initoptim(_model,"Adam()") # "Sgd(lr=.1)") # 
-    global _corpus = loadcorpus(_vocab)
-    @time fillvecs!(_model, _corpus, _vocab)
-    c = (nsent == 0 ? _corpus : _corpus[1:nsent])
-    _data = minibatch(c, batch)
-    # global _data = [ _corpus[i:min(i+999,length(_corpus))] for i=1:1000:length(_corpus) ]
-    # global _data = [ _corpus[1:1] ]
-    for d in _data
-        lmloss(_model, d, _vocab; result=result)
-    end
-    println(exp(-result[1]/result[2]))
-    return result
-end
-
-function hiddenoptim(optim,hidden...;epochs=1)
-    srand(1)
-    global _model, _optim
-    _model = loadmodel(_vocab, hidden...)
-    _optim = initoptim(_model, optim)
-    c = _corpus[1:128]
-    for i=1:epochs; oracletrain(corpus=c); end
-    beamtest(corpus=c,beamsize=1)
 end
 
 function getloss(d; result=zeros(2))
@@ -933,4 +970,76 @@ const UDEPREL = Dict{String,DepRel}(
 # end
 
 # init()
+
+
+# oracle1epoch.jld: 0.724 LAS on _corpus[1:128] beamsize=1, 0.5759 with beamsize=10!
+# oracle2epoch.jld: 0.759 LAS on _corpus[1:128] beamsize=1, 0.5957 with beamsize=10.
+# beam1epoch.jld: 0.5129 beamsize=1, 0.4457 beamsize=10 (starting with fresh optim=Adam after oracle2epoch)
+# beam2epoch.jld: 0.4762 beamsize=1, 0.4171 beamsize=10
+# beam3epoch.jld: 0.4190 beamsize=1, 0.4147 beamsize=10
+# more epochs?  Adam bad? Bug?
+
+# function loadvocab()
+#     a = load("english_vocabs.jld")
+#     Vocab(a["char_vocab"],Dict{String,Int}(),a["word_vocab"],
+#           "<s>","</s>","<unk>",'↥','Ϟ','⋮', UPOSTAG, UDEPREL)
+# end
+
+# function init(;batch=3000,nsent=1,result=zeros(2))
+#     global LOGGING = 0
+#     global _vocab = loadvocab()
+#     global _model = loadmodel(_vocab,4096)
+#     global _optim = initoptim(_model,"Adam()") # "Sgd(lr=.1)") # 
+#     global _corpus = loadcorpus(_vocab)
+#     @time fillvecs!(_model, _corpus, _vocab)
+#     c = (nsent == 0 ? _corpus : _corpus[1:nsent])
+#     _data = minibatch(c, batch)
+#     # global _data = [ _corpus[i:min(i+999,length(_corpus))] for i=1:1000:length(_corpus) ]
+#     # global _data = [ _corpus[1:1] ]
+#     for d in _data
+#         lmloss(_model, d, _vocab; result=result)
+#     end
+#     println(exp(-result[1]/result[2]))
+#     return result
+# end
+
+# function hiddenoptim(optim,hidden...;epochs=1)
+#     srand(1)
+#     global _model, _optim
+#     _model = loadmodel(_vocab, hidden...)
+#     _optim = initoptim(_model, optim)
+#     c = _corpus[1:128]
+#     for i=1:epochs; oracletrain(corpus=c); end
+#     beamtest(corpus=c,beamsize=1)
+# end
+
+# # function loss(model, sentences, parsertype, beamsize)
+# function lmloss(model, sentences, vocab::Vocab; result=nothing)
+#     # map words and chars to Ints
+#     # words and sents contain Int (char/word id) arrays without sos/eos tokens
+#     # TODO: optionally construct cdict here as well
+#     # words are the char ids for each unique word
+#     # sents are the word ids for each sentence
+#     # wordlen and sentlen are the maxlen word and sentence
+#     words,sents,wordlen,sentlen = maptoint(sentences, vocab)
+
+#     # Find word vectors for a batch of sentences using character lstm or cnn model
+#     # note that tokenbatch adds sos/eos tokens and padding to each sequence
+#     sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
+#     cdata,cmask = tokenbatch(words,wordlen,sow,eow)
+#     wembed = charlstm(model,cdata,cmask)
+
+#     # Find context vectors using word blstm
+#     sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
+#     wdata,wmask = tokenbatch(sents,sentlen,sos,eos)
+#     forw,back = wordlstm(model,wdata,wmask,wembed)
+
+#     # Test predictions
+#     unk = vocab.odict[vocab.unkword]
+#     odata,omask = goldbatch(sentences,sentlen,vocab.odict,unk)
+#     total = lmloss1(model,odata,omask,forw,back; result=result)
+#     return -total/length(sentences)
+# end
+
 nothing
+
