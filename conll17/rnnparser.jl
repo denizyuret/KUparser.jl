@@ -14,6 +14,7 @@ macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 macro sho(_x) :(if LOGGING>0; @show $(esc(_x)); else; $(esc(_x)); end) end
 date(x)=join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' ')
+type StopWatch; tstart; nstart; ncurr; nnext; StopWatch()=new(time(),0,0,1000); end
 
 FEATS=["s1c","s1v","s1p","s1A","s1a","s1B","s1b",
        "s1rL", # "s1rc","s1rv","s1rp",
@@ -112,7 +113,7 @@ function savefile(file, vocab, wmodel, pmodel, optim, arctype, feats)
     )
 end
 
-function main(args=ARGS)
+function main(args="")
     # global model, text, data, tok2int, o
     s = ArgParseSettings()
     s.description="rnnparser.jl"
@@ -204,7 +205,7 @@ function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, ar
         nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
         @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
     end
-    nwords = Any[0,1000,time()]
+    nwords = StopWatch()
     nsteps = Any[0,0]
     # niter = 0
     for sentences in sentbatches
@@ -220,12 +221,10 @@ function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, ar
         #DBG Knet.gpuinfo(n=10)
         #DBG readline()
         nw = sum(map(length,sentences))
-        nwords[1] += nw
-        if nwords[1] >= nwords[2]
-            nwords[2] += 1000
-            dt = time() - nwords[3]
-            date("$(nwords[1]) words $(round(Int,nwords[1]/dt)) wps $(round(Int,100*nsteps[1]/nsteps[2]))% steps")
-            nsteps = Any[0,0]
+        speed = inc(nwords, nw)
+        if speed != nothing
+            date("$(nwords.ncurr) words $(round(Int,speed)) wps $(round(Int,100*nsteps[1]/nsteps[2]))% steps")
+            nsteps[:] = 0
             gc(); Knet.knetgc(); gc()
         end
     end
@@ -417,26 +416,25 @@ end
 
 endofparse(p)=(p.sptr == 1 && p.wptr > p.nword)
 
-function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=Flist.hybrid25, batchsize=16)
+function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=Flist.hybrid25, batchsize=16, maxiter=typemax(Int))
     # global grads, optim, sentbatches, sentences
     # srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
     nsent = sum(map(length,sentbatches)); nsent0 = length(corpus)
     nword = sum(map(length,vcat(sentbatches...))); nword0 = sum(map(length,corpus))
     @msg("nsent=$nsent/$nsent0 nword=$nword/$nword0")
-    nwords = Any[0,1000,time()]
+    nwords = StopWatch()
     losses = Any[0,0,0]
+    niter = 0
     @time for sentences in sentbatches
         grads = oraclegrad(model, sentences, vocab, arctype, feats; losses=losses)
         update!(model, grads, optim)
         nw = sum(map(length,sentences))
-        nwords[1] += nw
-        if nwords[1] >= nwords[2]
-            nwords[2] += 1000
-            dt = time() - nwords[3]
-            date("$(nwords[1]) words $(round(Int,nwords[1]/dt)) wps $(losses[3]) avgloss")
+        if (speed = inc(nwords, nw)) != nothing
+            date("$(nwords.ncurr) words $(round(Int,speed)) wps $(losses[3]) avgloss")
             gc(); Knet.knetgc(); gc()
         end
+        if (niter+=1) >= maxiter; break; end
     end
     println()
 end
@@ -501,49 +499,57 @@ function mlp(w,x)
     return w[end-1]*x .+ w[end]
 end
 
-function fillvecs!(model, sentences, vocab)
-    #global cids,wids,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
-    cids,wids,maxword,maxsent = maptoint(sentences, vocab)
-    @msg :wordembeddings
+function fillvecs!(model, sentences, vocab; batchsize=128)
+    global iwords,isents,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
+    iwords,isents,maxword,maxsent = maptoint(sentences, vocab)
+
     # Get word embeddings: do this in minibatches otherwise may run out of memory
+    @msg :wordembeddings
     sow,eow = vocab.cdict[vocab.sowchar],vocab.cdict[vocab.eowchar]
-
-    # this blows up gpu memory:
-    # cdata,cmask = tokenbatch(cids,maxword,sow,eow)
-    # wembed = charlstm(model,cdata,cmask)
-
-    # minibatch variant is easier on memory:
+    wembed = Any[]
     gc();Knet.knetgc();gc()
-    wembed = Any[]; wbatch = 128 # TODO: configurable batchsize
-    for i=1:wbatch:length(cids)    
-        j=min(i+wbatch-1,length(cids))
-        cij = view(cids,i:j)
-        cdata,cmask = tokenbatch(cij,maxword,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
+    for i=1:batchsize:length(iwords)    
+        j=min(i+batchsize-1,length(iwords))
+        wij = view(iwords,i:j)
+        maxij = maximum(map(length,wij))
+        cdata,cmask = tokenbatch(wij,maxij,sow,eow) # cdata/cmask[T+2][V] where T: longest word (140), V: input word vocab (19674)
         push!(wembed, charlstm(model,cdata,cmask))    # wembed[C,V] where V: input word vocab, C: charlstm hidden (350)
     end
     wembed = (MAJOR==1 ? hcatn(wembed...) : vcatn(wembed...))
-    #DBG @sho (maxword,length(cids),size(wembed)); Knet.gpuinfo(n=10); readline()
+    @msg :fillwvecs!
+    fillwvecs!(sentences, isents, wembed)
+    #DBG @sho (maxword,length(iwords),size(wembed)); Knet.gpuinfo(n=10); readline()
 
     # Get context embeddings
+    @msg "contextembeddings,fillcvecs!,lmloss"
+    sos,eos,unk = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword],vocab.odict[vocab.unkword]
+    result = zeros(2)
     gc();Knet.knetgc();gc()
-    @msg :contextembeddings
-    sos,eos = vocab.idict[vocab.sosword],vocab.idict[vocab.eosword]
-    wdata,wmask = tokenbatch(wids,maxsent,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
-    forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
+    for i=1:batchsize:length(isents)
+        j=min(i+batchsize-1,length(isents))
+        isentij = view(isents,i:j)
+        maxij = maximum(map(length,isentij))
+        wdata,wmask = tokenbatch(isentij,maxij,sos,eos) # wdata/wmask[T+2][B] where T: longest sentence (159), B: batch size (12543)
+        forw,back = wordlstm(model,wdata,wmask,wembed)  # forw/back[T][W,B] where T: longest sentence, B: batch size, W: wordlstm hidden (300)
+        sentij = view(sentences,i:j)
+        fillcvecs!(sentij,forw,back)
+        odata,omask = goldbatch(sentij,maxij,vocab.odict,unk)
+        lmloss1(model,odata,omask,forw,back; result=result)
+    end
 
     # Get embeddings into sentences -- must empty later for gc if we are finetuning!
-    gc();Knet.knetgc();gc()
-    @msg :fillvecs
-    fillwvecs!(sentences, wids, wembed)
-    fillcvecs!(sentences, forw, back)
+    # @msg :fillvecs
+    # gc();Knet.knetgc();gc()
+    # fillcvecs!(sentences, forw, back)
 
     # Test predictions
-    gc();Knet.knetgc();gc()
-    @msg :losscalc
-    result = zeros(2)
-    unk = vocab.odict[vocab.unkword]
-    odata,omask = goldbatch(sentences,maxsent,vocab.odict,unk)
-    total = lmloss1(model,odata,omask,forw,back; result=result)
+    # gc();Knet.knetgc();gc()
+    # @msg :losscalc
+    # result = zeros(2)
+    # unk = vocab.odict[vocab.unkword]
+    # odata,omask = goldbatch(sentences,maxsent,vocab.odict,unk)
+    # gc();Knet.knetgc();gc()
+    # total = lmloss1(model,odata,omask,forw,back; result=result)
     return exp(-result[1]/result[2])
 end
 
@@ -553,11 +559,11 @@ function emptyvecs!(sentences)
     end
 end    
 
-function fillwvecs!(sentences, wids, wembed)
+function fillwvecs!(sentences, isents, wembed)
     if MAJOR != 1; error(); end # not impl yet
-    @inbounds for (s,wids) in zip(sentences,wids)
+    @inbounds for (s,isents) in zip(sentences,isents)
         empty!(s.wvec)
-        for w in wids
+        for w in isents
             if GPUFEATURES #GPU
                 push!(s.wvec, wembed[:,w])
             else #CPU
@@ -828,6 +834,19 @@ function minibatch(corpus, batchsize; maxlen=typemax(Int), minlen=1, shuf=false)
     end
     if shuf; data=shuffle(data); end
     return data
+end
+
+function inc(s::StopWatch, n, step=1000)
+    s.ncurr += n
+    if s.ncurr >= s.nnext
+        tcurr = time()
+        dt = tcurr - s.tstart
+        dn = s.ncurr - s.nstart
+        s.tstart = tcurr
+        s.nstart = s.ncurr
+        s.nnext += step
+        return dn/dt
+    end
 end
 
 # when fmatrix has mixed Rec and KnetArray, vcat does not do the right thing!  AutoGrad only looks at the first 2-3 elements!
