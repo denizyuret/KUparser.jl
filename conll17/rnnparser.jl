@@ -1,3 +1,6 @@
+# TODO: make it work for cpu
+# TODO: add dropout
+
 using JLD, Knet, KUparser, BenchmarkTools, ArgParse
 using KUparser: movecosts
 using AutoGrad: getval
@@ -24,94 +27,6 @@ FEATS=["s1c","s1v","s1p","s1A","s1a","s1B","s1b",
        "n0c","n0v","n0p","n0A","n0a",
        "n1c","n1v","n1p",
        ]
-
-# omer's: model file format:
-# d = load("model.jld"); m=d["model"]; m[:cembed]=Array; wv=d["word_vocab"]; wv::Dict{String,Int}
-# cembed: Array
-# forw,back,soft,char: [ Array, Array ]
-# char_vocab: Dict{Char,Int}
-# word_vocab: Dict{String,Int}
-
-# proposed changes: use a flat structure for everything (so there is no model, "cembed" etc become direct keys)
-# combine vocab and model fields in the same file
-# write a converter that converts omer's format to this new format
-# in addition to the fields above, the following fields will be added if not found:
-# sosword,eosword,unkword: String (default: <s>,</s>,<unk>)
-# sowchar,eowchar,unkchar: Char (default: PAD=0x11, SOW=0x12, EOW=0x13)
-# postags, deprels: (default:UPOSTAG(17),UDEPREL(37))
-# postagv(17), deprelv(37), lcountv(10), rcountv(10), distancev(10): (default: rand init embeddings)
-# parser: Array(n) (default: rand init mlp weights)
-# optim: optimization parameters
-
-# load these as separate models for now, we could change this in the future
-makewmodel(d)=[d["cembed"],d["char"][1],d["char"][2],d["forw"][1],d["forw"][2],d["back"][1],d["back"][2],d["soft"][1],d["soft"][2]]
-cembed(m)=m[1]; wchar(m)=m[2]; bchar(m)=m[3];wforw(m)=m[4]; bforw(m)=m[5]; wback(m)=m[6]; bback(m)=m[7]; wsoft(m)=m[8]; bsoft(m)=m[9]
-makevocab(d)=Vocab(d["char_vocab"],Dict{String,Int}(),d["word_vocab"],d["sosword"],d["eosword"],d["unkword"],d["sowchar"],d["eowchar"],d["unkchar"],get(d,"postags",UPOSTAG),get(d,"deprels",UDEPREL))
-
-makepmodel(d,o,s)=(haskey(d,"parserv") ? makepmodel1(d) : makepmodel2(o,s))
-postagv(m)=m[1]; deprelv(m)=m[2]; lcountv(m)=m[3]; rcountv(m)=m[4]; distancev(m)=m[5]; parserv(m)=m[6]
-makepmodel1(d)=([d["postagv"],d["deprelv"],d["lcountv"],d["rcountv"],d["distancev"],d["parserv"]],
-                [d["postago"],d["deprelo"],d["lcounto"],d["rcounto"],d["distanceo"],d["parsero"]])
-function makepmodel2(o,s)
-    initk(d...) = KnetArray{FTYPE}(xavier(d...))
-    inita(d...) = Array{FTYPE}(0.1*randn(d...))
-    model = Any[]
-    for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
-        if GPUFEATURES #GPU
-            push!(model, [ initk(d) for i=1:n ])
-        else #CPU
-            push!(model, [ inita(d) for i=1:n ])
-        end
-    end
-    p = o[:arctype](s)
-    f = features([p], o[:feats], model)
-    mlpdims = (length(f),o[:hidden]...,p.nmove)
-    @msg "mlpdims=$mlpdims"
-    parser = Any[]
-    for i=2:length(mlpdims)
-        push!(parser, initk(mlpdims[i],mlpdims[i-1]))
-        push!(parser, initk(mlpdims[i],1))
-    end
-    push!(model,parser)
-    optim = initoptim(model,o[:optimization])
-    return model,optim
-end
-
-# convert omer's format to new format
-function convertfile(infile, outfile)
-    atr(x)=transpose(KnetArray(x)) # omer stores in row-major Array, we use col-major KnetArray
-    d = load(infile); m = d["model"]
-    save(outfile, "cembed", atr(m[:cembed]), "forw", map(atr,m[:forw]),
-         "back",map(atr,m[:back]), "soft",map(atr,m[:soft]), "char",map(atr,m[:char]),
-         "char_vocab",d["char_vocab"], "word_vocab",d["word_vocab"], 
-         "sosword","<s>","eosword","</s>","unkword","<unk>",
-         "sowchar",'\x12',"eowchar",'\x13',"unkchar",'\x11')
-end
-
-# save file in new format
-function savefile(file, vocab, wmodel, pmodel, optim, arctype, feats)
-    save(file,  "cembed", cembed(wmodel),
-         "char", [wchar(wmodel),bchar(wmodel)],
-         "forw", [wforw(wmodel),bforw(wmodel)],
-         "back", [wback(wmodel),bback(wmodel)],
-         "soft", [wsoft(wmodel),bsoft(wmodel)],
-
-         "char_vocab",vocab.cdict, "word_vocab",vocab.odict,
-         "sosword",vocab.sosword,"eosword",vocab.eosword,"unkword",vocab.unkword,
-         "sowchar",vocab.sowchar,"eowchar",vocab.eowchar,"unkchar",vocab.unkchar,
-         "postags",vocab.postags,"deprels",vocab.deprels,
-
-         "postagv",postagv(pmodel),"deprelv",deprelv(pmodel),
-         "lcountv",lcountv(pmodel),"rcountv",rcountv(pmodel),
-         "distancev",distancev(pmodel),"parserv",parserv(pmodel),
-
-         "postago",postagv(optim),"deprelo",deprelv(optim),
-         "lcounto",lcountv(optim),"rcounto",rcountv(optim),
-         "distanceo",distancev(optim),"parsero",parserv(optim),
-    
-         "arctype",arctype,"feats",feats,
-    )
-end
 
 function main(args="")
     # global model, text, data, tok2int, o
@@ -148,7 +63,7 @@ function main(args="")
     if o[:seed] > 0; srand(o[:seed]); end
     # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
 
-    # global vocab, corpora, wmodel, pmodel
+    global vocab, corpora, wmodel, pmodel
     @msg o[:loadfile]
     d = load(o[:loadfile])
 
@@ -178,7 +93,7 @@ function main(args="")
         las = beamtest(model=pmodel,corpus=cdev,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize])
         println((:epoch,epoch,:beam,beamsize,:las,las))
     end
-    report(0,1)
+    # report(0,1)
     report(0,o[:beamsize])
 
     # train
@@ -289,11 +204,11 @@ function beamloss(pmodel, sentences, vocab, arctype, feats, beamsize; earlystop=
     while length(beamends) > 0
         # features (vcat) are faster on cpu, mlp is faster on gpu
         fmatrix = features(parsers, feats, featmodel) # nfeat x nparser
-        if GPUFEATURES #GPU
+        if GPUFEATURES && gpu()>=0 #GPU
             @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
         else #CPU
             @assert isa(getval(fmatrix),Array{FTYPE,2})
-            fmatrix = KnetArray(fmatrix)
+            if gpu()>=0; fmatrix = KnetArray(fmatrix); end
         end
         cscores = Array(mlp(mlpmodel, fmatrix)) # candidate scores: nmove x nparser
         # @show (findmax(cscores),cscores)
@@ -456,11 +371,11 @@ function oracleloss(pmodel, sentences, vocab, arctype, feats; losses=nothing)
 
     while !all(parserdone)
         fmatrix = features(parsers, feats, featmodel)
-        if GPUFEATURES #GPU
+        if GPUFEATURES && gpu()>=0 #GPU
             @assert isa(getval(fmatrix),KnetArray{FTYPE,2})
         else #CPU
             @assert isa(getval(fmatrix),Array{FTYPE,2})
-            fmatrix = KnetArray(fmatrix)
+            if gpu()>=0; fmatrix = KnetArray(fmatrix); end
         end
         scores = mlp(mlpmodel, fmatrix)
         logprob = logp(scores,MAJOR)
@@ -750,7 +665,7 @@ function charlstm(model,data,mask)
     cembed_t(t)=(if MAJOR==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
     czero=(if MAJOR==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
     hidden = cell = czero       # TODO: cache this
-    mask = map(KnetArray, mask) # TODO: dont hardcode atype
+    if isa(weight,KnetArray); mask = map(KnetArray, mask); end
     @inbounds for t in 1:T
         (hidden,cell) = lstm(weight,bias,hidden,cell,cembed_t(t);mask=mask[t])
     end
@@ -765,7 +680,7 @@ function wordlstm(model,data,mask,embeddings) # col-major
     wembed(t)=(if MAJOR==1; embeddings[:,data[t]]; else; embeddings[data[t],:]; end)
     wzero=(if MAJOR==1; fill!(similar(bias,H,B), 0); else; fill!(similar(bias,B,H), 0); end)
     hidden = cell = wzero
-    mask = map(KnetArray, mask)           # TODO: dont hardcode atype
+    if isa(weight,KnetArray); mask = map(KnetArray, mask); end
     forw = Array(Any,T-2)       # exclude sos/eos
     @inbounds for t in 1:T-2
         (hidden,cell) = lstm(weight,bias,hidden,cell,wembed(t); mask=mask[t])
@@ -872,6 +787,133 @@ let cat_r = recorder(cat); global vcatn, hcatn
             hcat(a...)
         end
     end
+end
+
+# omer's: model file format:
+# d = load("model.jld"); m=d["model"]; m[:cembed]=Array; wv=d["word_vocab"]; wv::Dict{String,Int}
+# cembed: Array
+# forw,back,soft,char: [ Array, Array ]
+# char_vocab: Dict{Char,Int}
+# word_vocab: Dict{String,Int}
+
+# proposed changes: use a flat structure for everything (so there is no model, "cembed" etc become direct keys)
+# combine vocab and model fields in the same file
+# write a converter that converts omer's format to this new format
+# in addition to the fields above, the following fields will be added if not found:
+# sosword,eosword,unkword: String (default: <s>,</s>,<unk>)
+# sowchar,eowchar,unkchar: Char (default: PAD=0x11, SOW=0x12, EOW=0x13)
+# postags, deprels: (default:UPOSTAG(17),UDEPREL(37))
+# postagv(17), deprelv(37), lcountv(10), rcountv(10), distancev(10): (default: rand init embeddings)
+# parser: Array(n) (default: rand init mlp weights)
+# optim: optimization parameters
+
+# load these as separate models for now, we could change this in the future
+makewmodel(d)=(d1=makewmodel1(d); if gpu()>=0; map(KnetArray,d1); else; map(Array,d1); end)
+makewmodel1(d)=[d["cembed"],d["char"][1],d["char"][2],d["forw"][1],d["forw"][2],d["back"][1],d["back"][2],d["soft"][1],d["soft"][2]]
+cembed(m)=m[1]; wchar(m)=m[2]; bchar(m)=m[3];wforw(m)=m[4]; bforw(m)=m[5]; wback(m)=m[6]; bback(m)=m[7]; wsoft(m)=m[8]; bsoft(m)=m[9]
+makevocab(d)=Vocab(d["char_vocab"],Dict{String,Int}(),d["word_vocab"],d["sosword"],d["eosword"],d["unkword"],d["sowchar"],d["eowchar"],d["unkchar"],get(d,"postags",UPOSTAG),get(d,"deprels",UDEPREL))
+
+makepmodel(d,o,s)=(haskey(d,"parserv") ? makepmodel1(d) : makepmodel2(o,s))
+postagv(m)=m[1]; deprelv(m)=m[2]; lcountv(m)=m[3]; rcountv(m)=m[4]; distancev(m)=m[5]; parserv(m)=m[6]
+
+function makepmodel1(d)
+    m = ([d["postagv"],d["deprelv"],d["lcountv"],d["rcountv"],d["distancev"],d["parserv"]],
+         [d["postago"],d["deprelo"],d["lcounto"],d["rcounto"],d["distanceo"],d["parsero"]])
+    if gpu() >= 0
+        if GPUFEATURES
+            map2gpu(m)
+        else
+            m = map2cpu(m)
+            m[1][6] = map2gpu(m[1][6])
+            m[2][6] = map2gpu(m[2][6])
+            return m
+        end
+    else
+        map2cpu(m)
+    end
+end
+
+function makepmodel2(o,s)
+    initx(d...) = (if gpu>=0; KnetArray{FTYPE}(xavier(d...)); else; Array{FTYPE}(xavier(d...)); end)
+    initr(d...) = (if GPUFEATURES && gpu()>=0; KnetArray{FTYPE}(0.1*randn(d...)); else; Array{FTYPE}(0.1*randn(d...)); end)
+    model = Any[]
+    for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
+        push!(model, [ initr(d) for i=1:n ])
+    end
+    p = o[:arctype](s)
+    f = features([p], o[:feats], model)
+    mlpdims = (length(f),o[:hidden]...,p.nmove)
+    @msg "mlpdims=$mlpdims"
+    parser = Any[]
+    for i=2:length(mlpdims)
+        push!(parser, initx(mlpdims[i],mlpdims[i-1]))
+        push!(parser, initx(mlpdims[i],1))
+    end
+    push!(model,parser)
+    optim = initoptim(model,o[:optimization])
+    return model,optim
+end
+
+# convert omer's format to new format
+function convertfile(infile, outfile)
+    atr(x)=transpose(Array(x)) # omer stores in row-major Array, we use col-major Array
+    d = load(infile); m = d["model"]
+    save(outfile, "cembed", atr(m[:cembed]), "forw", map(atr,m[:forw]),
+         "back",map(atr,m[:back]), "soft",map(atr,m[:soft]), "char",map(atr,m[:char]),
+         "char_vocab",d["char_vocab"], "word_vocab",d["word_vocab"], 
+         "sosword","<s>","eosword","</s>","unkword","<unk>",
+         "sowchar",'\x12',"eowchar",'\x13',"unkchar",'\x11')
+end
+
+map2cpu(x)=(if isbits(x); x; else; map2cpu2(x); end)
+map2cpu(x::KnetArray)=Array(x)
+map2cpu(x::Tuple)=map(map2cpu,x)
+map2cpu(x::Array)=map(map2cpu,x)
+map2cpu{T<:Number}(x::Array{T})=x
+map2cpu(x::Associative)=(y=Dict();for (k,v) in x; y[k] = map2cpu(x[k]); end; y)
+map2cpu2(x)=(y=deepcopy(x); for f in fieldnames(x); setfield!(y,f,map2cpu(getfield(x,f))); end; y)
+
+map2gpu(x)=(if isbits(x); x; else; map2gpu2(x); end)
+map2gpu(x::KnetArray)=x
+map2gpu(x::Tuple)=map(map2gpu,x)
+map2gpu(x::Array)=map(map2gpu,x)
+map2gpu{T<:Number}(x::Array{T})=KnetArray(x)
+map2gpu(x::Associative)=(y=Dict();for (k,v) in x; y[k] = map2gpu(x[k]); end; y)
+map2gpu2(x)=(y=deepcopy(x); for f in fieldnames(x); setfield!(y,f,map2gpu(getfield(x,f))); end; y)
+
+# convert KnetArrays to Arrays
+function convert2cpu(infile, outfile)
+    d = load(infile)
+    jldopen(outfile, "w") do file
+        for (k,v) in d
+            write(file,k,map2cpu(v))
+        end
+    end
+end
+
+# save file in new format
+function savefile(file, vocab, wmodel, pmodel, optim, arctype, feats)
+    save(file,  "cembed", map2cpu(cembed(wmodel)),
+         "char", map2cpu([wchar(wmodel),bchar(wmodel)]),
+         "forw", map2cpu([wforw(wmodel),bforw(wmodel)]),
+         "back", map2cpu([wback(wmodel),bback(wmodel)]),
+         "soft", map2cpu([wsoft(wmodel),bsoft(wmodel)]),
+
+         "char_vocab",vocab.cdict, "word_vocab",vocab.odict,
+         "sosword",vocab.sosword,"eosword",vocab.eosword,"unkword",vocab.unkword,
+         "sowchar",vocab.sowchar,"eowchar",vocab.eowchar,"unkchar",vocab.unkchar,
+         "postags",vocab.postags,"deprels",vocab.deprels,
+
+         "postagv",map2cpu(postagv(pmodel)),"deprelv",map2cpu(deprelv(pmodel)),
+         "lcountv",map2cpu(lcountv(pmodel)),"rcountv",map2cpu(rcountv(pmodel)),
+         "distancev",map2cpu(distancev(pmodel)),"parserv",map2cpu(parserv(pmodel)),
+
+         "postago",map2cpu(postagv(optim)),"deprelo",map2cpu(deprelv(optim)),
+         "lcounto",map2cpu(lcountv(optim)),"rcounto",map2cpu(rcountv(optim)),
+         "distanceo",map2cpu(distancev(optim)),"parsero",map2cpu(parserv(optim)),
+    
+         "arctype",arctype,"feats",feats,
+    )
 end
 
 # Universal POS tags (17)
