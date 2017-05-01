@@ -47,13 +47,13 @@ function main(args="")
         ("--feats"; default="$FEATS"; help="Feature set to use")
         ("--batchsize"; arg_type=Int; default=16; help="Number of sequences to train on in parallel.")
         ("--beamsize"; arg_type=Int; default=4; help="Beam size.")
+        ("--dropout"; nargs='+'; arg_type=Float64; default=[0.0]; help="Dropout probabilities.")
         # ("--generate"; arg_type=Int; default=0; help="If non-zero generate given number of characters.")
         # ("--embed"; arg_type=Int; default=168; help="Size of the embedding vector.")
         # ("--seqlength"; arg_type=Int; default=100; help="Maximum number of steps to unroll the network for bptt. Initial epochs will use the epoch number as bptt length for faster convergence.")
         # ("--gcheck"; arg_type=Int; default=0; help="Check N random gradients.")
         # ("--atype"; default=(gpu()>=0 ? "KnetArray{Float32}" : "Array{Float32}"); help="array type: Array for cpu, KnetArray for gpu")
         # ("--fast"; action=:store_true; help="skip loss printing for faster run")
-        # ("--dropout"; arg_type=Float64; default=0.0; help="Dropout probability.")
         # ("--bestfile"; help="Save best model to file")
     end
     isa(args, AbstractString) && (args=split(args))
@@ -61,6 +61,7 @@ function main(args="")
     println(s.description)
     println("opts=",[(k,v) for (k,v) in o]...)
     if o[:seed] > 0; srand(o[:seed]); end
+    if length(o[:dropout])==1; o[:dropout]=[o[:dropout][1],o[:dropout][1]]; end
     # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
 
     global vocab, corpora, wmodel, pmodel
@@ -99,12 +100,12 @@ function main(args="")
     # train
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:otrain]
-        oracletrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize])
+        oracletrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
         report("oracle$epoch",1); # save1(@sprintf("oracle%02d.jld",epoch))
     end
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:btrain]
-        beamtrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],batchsize=1) # larger batchsizes slow down beamtrain considerably
+        beamtrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],pdrop=o[:dropout],batchsize=1) # larger batchsizes slow down beamtrain considerably
         report("beam$epoch"); # save1(@sprintf("%sbeam%02d.jld",parentmodel,epoch))
     end
 
@@ -114,7 +115,7 @@ end
 
 
 
-function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, beamsize=4, batchsize=1) # larger batchsizes slow down beamtrain considerably
+function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, beamsize=4, pdrop=(0,0), batchsize=1) # larger batchsizes slow down beamtrain considerably
     # global grads, optim, sentbatches, sentences
     # srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
@@ -131,7 +132,7 @@ function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, ar
         #DBG @sho niter+=1
         #DBG @sho length(sentences[1])
         #DBG ploss = beamloss(model, sentences, vocab, arctype, feats, beamsize)
-        grads = beamgrad(model, sentences, vocab, arctype, feats, beamsize; earlystop=true, steps=nsteps)
+        grads = beamgrad(model, sentences, vocab, arctype, feats, beamsize; earlystop=true, steps=nsteps, pdrop=pdrop)
         update!(model, grads, optim)
         #print('.')
         #DBG gc()
@@ -191,7 +192,7 @@ end
 # leave the results in sentences[i].parse, return per sentence loss
 # beamloss(_model, _model, _corpus, _vocab, ArcHybridR1, Flist.hybrid25, 10)
 # function beamloss(pmodel, cmodel, sentences, vocab, arctype, feats, beamsize; earlystop=false)
-function beamloss(pmodel, sentences, vocab, arctype, feats, beamsize; earlystop=true, steps=nothing)
+function beamloss(pmodel, sentences, vocab, arctype, feats, beamsize; earlystop=true, steps=nothing, pdrop=(0,0))
     # global parsers,fmatrix,beamends,cscores,pscores,parsers0,beamends0,totalloss,loss,pcosts,pcosts0
     # fillvecs!(cmodel, sentences, vocab)
     parsers = parsers0 = map(arctype, sentences)
@@ -210,7 +211,7 @@ function beamloss(pmodel, sentences, vocab, arctype, feats, beamsize; earlystop=
             @assert isa(getval(fmatrix),Array{FTYPE,2})
             if gpu()>=0; fmatrix = KnetArray(fmatrix); end
         end
-        cscores = Array(mlp(mlpmodel, fmatrix)) # candidate scores: nmove x nparser
+        cscores = Array(mlp(mlpmodel, fmatrix; pdrop=pdrop)) # candidate scores: nmove x nparser
         # @show (findmax(cscores),cscores)
         cscores = cscores .+ pscores' # candidate cumulative scores
         # @show (findmax(cscores),cscores)
@@ -336,7 +337,7 @@ end
 
 endofparse(p)=(p.sptr == 1 && p.wptr > p.nword)
 
-function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, batchsize=16, maxiter=typemax(Int))
+function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, batchsize=16, maxiter=typemax(Int), pdrop=(0,0))
     # global grads, optim, sentbatches, sentences
     # srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
@@ -347,7 +348,7 @@ function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, 
     losses = Any[0,0,0]
     niter = 0
     @time for sentences in sentbatches
-        grads = oraclegrad(model, sentences, vocab, arctype, feats; losses=losses)
+        grads = oraclegrad(model, sentences, vocab, arctype, feats; losses=losses, pdrop=pdrop)
         update!(model, grads, optim)
         nw = sum(map(length,sentences))
         if (speed = inc(nwords, nw)) != nothing
@@ -360,7 +361,7 @@ function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, 
 end
 
 # function oracleloss(pmodel, cmodel, sentences, vocab, arctype, feats)
-function oracleloss(pmodel, sentences, vocab, arctype, feats; losses=nothing)
+function oracleloss(pmodel, sentences, vocab, arctype, feats; losses=nothing, pdrop=(0,0))
     # global parsers,mcosts,parserdone,fmatrix,scores,logprob,totalloss
     # fillvecs!(cmodel, sentences, vocab)
     parsers = map(arctype, sentences)
@@ -377,7 +378,7 @@ function oracleloss(pmodel, sentences, vocab, arctype, feats; losses=nothing)
             @assert isa(getval(fmatrix),Array{FTYPE,2})
             if gpu()>=0; fmatrix = KnetArray(fmatrix); end
         end
-        scores = mlp(mlpmodel, fmatrix)
+        scores = mlp(mlpmodel, fmatrix; pdrop=pdrop)
         logprob = logp(scores,MAJOR)
         for (i,p) in enumerate(parsers)
             if parserdone[i]; continue; end
@@ -412,9 +413,11 @@ import Base: sortperm, ind2sub
 @zerograd sortperm(a;o...)
 @zerograd ind2sub(a,i...)
 
-function mlp(w,x)
+function mlp(w,x; pdrop=(0,0))
+    dropout(x,pdrop[1])
     for i=1:2:length(w)-2
         x = relu(w[i]*x .+ w[i+1])
+        dropout(x,pdrop[2])
     end
     return w[end-1]*x .+ w[end]
 end
@@ -877,7 +880,7 @@ map2gpu(x)=(if isbits(x); x; else; map2gpu2(x); end)
 map2gpu(x::KnetArray)=x
 map2gpu(x::Tuple)=map(map2gpu,x)
 map2gpu(x::Array)=map(map2gpu,x)
-map2gpu{T<:Number}(x::Array{T})=KnetArray(x)
+map2gpu{T<:AbstractFloat}(x::Array{T})=KnetArray(x)
 map2gpu(x::Associative)=(y=Dict();for (k,v) in x; y[k] = map2gpu(x[k]); end; y)
 map2gpu2(x)=(y=deepcopy(x); for f in fieldnames(x); setfield!(y,f,map2gpu(getfield(x,f))); end; y)
 
