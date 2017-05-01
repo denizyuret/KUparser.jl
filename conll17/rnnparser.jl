@@ -34,7 +34,8 @@ function main(args="")
     s.description="rnnparser.jl"
     s.exc_handler=ArgParse.debug_handler
     @add_arg_table s begin
-        ("--datafiles"; nargs='+'; help="If provided, use first file for training, second for dev, others for test.")
+        ("--datafiles"; nargs='+'; help="Input in conllu format. If provided, use first file for training, second for dev, others for test. If single file use both for train and dev.")
+        ("--output"; help="Output parse of dev file in conllu format to this file")
         ("--loadfile"; help="Initialize model from file")
         ("--savefile"; help="Save final model to file")
         ("--epochs"; arg_type=Int; default=1; help="Number of epochs for training.")
@@ -111,6 +112,12 @@ function main(args="")
 
     # savemodel
     if o[:savefile] != nothing; save1(o[:savefile]); end
+
+    # output dev parse: this will be ready because of report()
+    if o[:output] != nothing    # TODO: parse all data files?
+        inputfile = length(corpora) > 1 ? o[:datafiles][2] : o[:datafiles][1]
+        writeconllu(cdev, inputfile, o[:output])
+    end
 end
 
 
@@ -918,6 +925,47 @@ function savefile(file, vocab, wmodel, pmodel, optim, arctype, feats)
          "arctype",arctype,"feats",feats,
     )
 end
+
+function writeconllu(sentences, inputfile, outputfile)
+    # We only replace the head and deprel fields of the input file
+    out = open(outputfile,"w")
+    v = sentences[1].vocab
+    deprels = Array(String, length(v.deprels))
+    for (k,v) in v.deprels; deprels[v]=k; end
+    s = p = nothing
+    ns = nw = nl = 0
+    for line in eachline(inputfile)
+        nl += 1
+        if ismatch(r"^\d+\t", line)
+            # info("$nl word")
+            if s == nothing
+                s = sentences[ns+1]
+                p = s.parse
+            end
+            f = split(line, '\t')
+            nw += 1
+            if f[1] != "$nw"; error(); end
+            if f[2] != s.word[nw]; error(); end
+            f[7] = string(p.head[nw])
+            f[8] = deprels[p.deprel[nw]]
+            print(out, join(f, "\t"))
+        else
+            if line == "\n"
+                # info("$nl blank")
+                if s == nothing; error(); end
+                if nw != length(s.word); error(); end
+                ns += 1; nw = 0
+                s = p = nothing
+            else
+                # info("$nl non-word")
+            end
+            print(out, line)
+        end
+    end
+    if ns != length(sentences); error(); end
+    close(out)
+end
+
 
 # Universal POS tags (17)
 const UPOSTAG = Dict{String,PosTag}(
