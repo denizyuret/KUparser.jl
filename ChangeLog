@@ -1,3 +1,15 @@
+2017-05-01  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* TODO:
+	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop? also why slow down?
+	- dropout: run experiments
+	- cnn: try cnn word vectors
+	- finetuning: try finetuning word vectors
+	- hyperopt
+	- rnn
+	- arctype
+	- features
+
 2017-04-10  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
