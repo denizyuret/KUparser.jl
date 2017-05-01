@@ -164,39 +164,42 @@ function main(args="")
     end
     ppl = fillvecs!(wmodel,vcat(corpora...),vocab)
     @msg "perplexity=$ppl"
-    gc(); Knet.knetgc(); gc()
 
     ctrn = corpora[1]
     cdev = length(corpora) > 1 ? corpora[2] : corpora[1]
 
     @msg :initmodel
     (pmodel,optim) = makepmodel(d,o,ctrn[1])
+    save1(file)=savefile(file, vocab, wmodel, pmodel, optim, o[:arctype], o[:feats])
+    parentmodel = replace(o[:loadfile],".jld","")
+    # save1(@sprintf("%sinit.jld", parentmodel)))
 
-    function report(epoch)
-        las = beamtest(model=pmodel,corpus=cdev,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],batchsize=o[:batchsize])
-        println((:epoch,epoch,:las,las))
+    function report(epoch,beamsize=o[:beamsize])
+        las = beamtest(model=pmodel,corpus=cdev,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize])
+        println((:epoch,epoch,:beam,beamsize,:las,las))
     end
+    report(0,1)
+    report(0,o[:beamsize])
 
     # train
+    gc(); Knet.knetgc(); gc()
     for epoch=1:o[:otrain]
         oracletrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize])
-        report("oracle$epoch")
+        report("oracle$epoch",1); # save1(@sprintf("oracle%02d.jld",epoch))
     end
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:btrain]
         beamtrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],batchsize=1) # larger batchsizes slow down beamtrain considerably
-        report("beam$epoch")
+        report("beam$epoch"); # save1(@sprintf("%sbeam%02d.jld",parentmodel,epoch))
     end
 
     # savemodel
-    if o[:savefile] != nothing
-        savefile(o[:savefile], vocab, wmodel, pmodel, optim, o[:arctype], o[:feats])
-    end
+    if o[:savefile] != nothing; save1(o[:savefile]); end
 end
 
 
 
-function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=Flist.hybrid25, beamsize=4, batchsize=1) # larger batchsizes slow down beamtrain considerably
+function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, beamsize=4, batchsize=1) # larger batchsizes slow down beamtrain considerably
     # global grads, optim, sentbatches, sentences
     # srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
@@ -231,7 +234,7 @@ function beamtrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, ar
     println()
 end
 
-function beamtest(;model=_model, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=Flist.hybrid25, beamsize=4, batchsize=128) # large batchsize does not slow down beamtest
+function beamtest(;model=_model, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, beamsize=4, batchsize=128) # large batchsize does not slow down beamtest
     for s in corpus; s.parse = nothing; end
     sentbatches = minibatch(corpus,batchsize)
     for sentences in sentbatches
@@ -293,7 +296,9 @@ function beamloss(pmodel, sentences, vocab, arctype, feats, beamsize; earlystop=
             fmatrix = KnetArray(fmatrix)
         end
         cscores = Array(mlp(mlpmodel, fmatrix)) # candidate scores: nmove x nparser
+        # @show (findmax(cscores),cscores)
         cscores = cscores .+ pscores' # candidate cumulative scores
+        # @show (findmax(cscores),cscores)
         parsers,pscores,pcosts,beamends,loss = nextbeam(parsers, cscores, pcosts, beamends, beamsize; earlystop=earlystop)
         totalloss += loss
         stepcount += 1
@@ -416,7 +421,7 @@ end
 
 endofparse(p)=(p.sptr == 1 && p.wptr > p.nword)
 
-function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=Flist.hybrid25, batchsize=16, maxiter=typemax(Int))
+function oracletrain(;model=_model, optim=_optim, corpus=_corpus, vocab=_vocab, arctype=ArcHybridR1, feats=FEATS, batchsize=16, maxiter=typemax(Int))
     # global grads, optim, sentbatches, sentences
     # srand(1)
     sentbatches = minibatch(corpus,batchsize; maxlen=MAXSENT, minlen=MINSENT, shuf=true)
