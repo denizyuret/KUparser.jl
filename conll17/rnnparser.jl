@@ -47,7 +47,7 @@ function main(args="")
         ("--arctype"; default="ArcHybridR1"; help="Move set to use: ArcEager{R1,13}, ArcHybrid{R1,13}")
         ("--feats"; default="$FEATS"; help="Feature set to use")
         ("--batchsize"; arg_type=Int; default=16; help="Number of sequences to train on in parallel.")
-        ("--beamsize"; arg_type=Int; default=4; help="Beam size.")
+        ("--beamsize"; arg_type=Int; default=1; help="Beam size.")
         ("--dropout"; nargs='+'; arg_type=Float64; default=[0.0]; help="Dropout probabilities.")
         # ("--generate"; arg_type=Int; default=0; help="If non-zero generate given number of characters.")
         # ("--embed"; arg_type=Int; default=168; help="Size of the embedding vector.")
@@ -96,9 +96,10 @@ function main(args="")
         println((:epoch,epoch,:beam,beamsize,:las,las))
     end
     # report(0,1)
+    @msg :parsing
     report(0,o[:beamsize])
 
-    # train
+    # training
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:otrain]
         oracletrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
