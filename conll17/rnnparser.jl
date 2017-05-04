@@ -743,10 +743,15 @@ function loadcorpus(file,v::Vocab)
             s = Sentence(v)
         elseif (m = match(r"^\d+\t(.+?)\t.+?\t(.+?)\t.+?\t.+?\t(.+?)\t(.+?)(:.+)?\t", line)) != nothing
             #                id   word   lem  upos   xpos feat head   deprel
-            push!(s.word, m.captures[1])
-            push!(s.postag, v.postags[m.captures[2]])
-            push!(s.head, parse(Position,m.captures[3]))
-            push!(s.deprel, v.deprels[m.captures[4]])
+            word = m.captures[1]
+            postag = get(v.postags, m.captures[2], 0)
+            head = tryparse(Position, m.captures[3])
+            head = isnull(head) ? 0 : head.value
+            deprel = get(v.deprels, m.captures[4], 0)
+            push!(s.word, word)
+            push!(s.postag, postag)
+            push!(s.head, head)
+            push!(s.deprel, deprel)
         end
     end
     return corpus
