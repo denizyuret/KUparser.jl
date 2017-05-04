@@ -745,9 +745,12 @@ function loadcorpus(file,v::Vocab)
             #                id   word   lem  upos   xpos feat head   deprel
             word = m.captures[1]
             postag = get(v.postags, m.captures[2], 0)
+            if postag==0; Base.warn_once("Unknown postags"); end
             head = tryparse(Position, m.captures[3])
             head = isnull(head) ? 0 : head.value
+            if head==0; Base.warn_once("Unknown heads"); end
             deprel = get(v.deprels, m.captures[4], 0)
+            if deprel==0; Base.warn_once("Unknown deprels"); end
             push!(s.word, word)
             push!(s.postag, postag)
             push!(s.head, head)
@@ -850,7 +853,7 @@ function makepmodel1(d)
 end
 
 function makepmodel2(o,s)
-    initx(d...) = (if gpu>=0; KnetArray{FTYPE}(xavier(d...)); else; Array{FTYPE}(xavier(d...)); end)
+    initx(d...) = (if gpu()>=0; KnetArray{FTYPE}(xavier(d...)); else; Array{FTYPE}(xavier(d...)); end)
     initr(d...) = (if GPUFEATURES && gpu()>=0; KnetArray{FTYPE}(0.1*randn(d...)); else; Array{FTYPE}(0.1*randn(d...)); end)
     model = Any[]
     for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
