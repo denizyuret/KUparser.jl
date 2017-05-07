@@ -80,8 +80,10 @@ function main(args="")
         c = loadcorpus(f,vocab)
         push!(corpora,c)
     end
-    ppl = fillvecs!(wmodel,vcat(corpora...),vocab)
-    @msg "perplexity=$ppl"
+    cc = vcat(corpora...)
+    ppl = fillvecs!(wmodel,cc,vocab)
+    unk = unkrate(cc)
+    @msg "perplexity=$ppl unkrate=$(unk[1]/unk[2])"
 
     @msg :initmodel
     (pmodel,optim) = makepmodel(d,o,corpora[1][1])
@@ -679,6 +681,17 @@ function goldbatch(sentences, maxlen, wdict, unkwid, pad=unkwid)
         end
     end
     return data,mask
+end
+
+function unkrate(sentences)
+    total = known = 0
+    for s in sentences
+        for w in s.word
+            total += 1
+            known += haskey(s.vocab.odict, w)
+        end
+    end
+    return (total-known,total)
 end
 
 # Run charid arrays through the LSTM, collect last hidden state as word embedding
