@@ -759,8 +759,8 @@ function loadcorpus(file,v::Vocab)
             postag = get(v.postags, m.captures[2], 0)
             if postag==0; Base.warn_once("Unknown postags"); end
             head = tryparse(Position, m.captures[3])
-            head = isnull(head) ? 0 : head.value
-            if head==0; Base.warn_once("Unknown heads"); end
+            head = isnull(head) ? -1 : head.value
+            if head==-1; Base.warn_once("Unknown heads"); end
             deprel = get(v.deprels, m.captures[4], 0)
             if deprel==0; Base.warn_once("Unknown deprels"); end
             push!(s.word, word)
