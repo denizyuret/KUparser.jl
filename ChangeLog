@@ -1,24 +1,100 @@
+2017-05-07  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* hungarian-experiments:
+	74.91 baseline opts=(:optimization,"Adam()")(:savefile,"foo10.jld")(:loadfile,"converted/hungarian_chmodel.jld")(:dropout,[0.0])(:beamsize,1)(:feats,"String[\"s1c\",\"s1v\",\"s1p\",\"s1A\",\"s1a\",\"s1B\",\"s1b\",\"s1rL\",\"s0c\",\"s0v\",\"s0p\",\"s0A\",\"s0B\",\"s0a\",\"s0b\",\"s0d\",\"s0rL\",\"n0lL\",\"n0c\",\"n0v\",\"n0p\",\"n0A\",\"n0a\",\"n1c\",\"n1v\",\"n1p\"]")(:otrain,10)(:output,nothing)(:arctype,"ArcHybridR1")(:hidden,[4096])(:seed,-1)(:report,[1])(:btrain,0)(:batchsize,16)(:datafiles,Any["hu-ud-train.conllu","hu-ud-dev.conllu"])
+
+	* word-count: train-dev-language
+
+	1173282	159284	cs
+	870033	118427	ru_syntagrus
+	472608	10912	cs_cac
+	444617	52336	es_ancora
+	417587	56482	ca
+	382436	37151	es
+	356464	35766	fr
+	281057	35217	hi
+	270703	11908	it
+	270403	10331	la_ittb
+	269626	12348	de
+	255755	32129	pt_br
+	245330	31250	no_nynorsk
+	243887	36369	no_bokmaal
+	223881	30239	ar
+	206740	10851	pt
+	204585	25148	en
+	186467	11458	nl
+	185113	17074	ro
+	184382	13652	grc_proiel
+	169283	14533	hr
+	162621	18290	fi
+	161902	11556	ja
+	159895	22135	grc
+	147044	12363	la_proiel
+	137680	11408	he
+	127602	15724	fi_ftb
+	124336	16089	bg
+	121064	15832	fa
+	112530	14063	sl
+	108690	14581	ur
+	98608	12663	zh
+	97531	12612	id
+	81243	10550	nl_lassysmall
+	80575	12440	sk
+	80378	10332	da
+	79329	29777	gl
+	75964	11877	ru
+	72974	24095	eu
+	66645	9797	sv
+	62501	10262	pl
+	52328	11098	ko
+	50561	10013	fr_sequoia
+	50095	17102	en_lines
+	48325	16462	sv_lines
+	41212	10139	el
+	38082	10011	tr
+	37432	10100	cu
+	35024	10114	got
+	34667	10128	lv
+	28844	13807	it_partut
+	25871	12243	en_partut
+	22525	12103	et
+	20285	11514	vi
+	20166	11418	hu
+	19488	19488	sl_sst
+	18184	18184	la
+	17927	17927	fr_partut
+	16400	10381	cs_cltt
+	15436	15436	gl_treegal
+	13826	13826	ga
+	12846	12846	uk
+	1662	1662	ug
+	529	529	kk
+
 2017-05-01  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
-	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop? also why slow down?
+	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop, global normalization? also why slow down?
 	- dropout: run experiments
 	- cnn: try cnn word vectors
 	- finetuning: try finetuning word vectors
-	- hyperopt
-	- rnn
+	- hyperopt: hidden size
+	- dynamic training vs static training
 	- arctype
-	- features
+	- parser features
+	- use lcword, lemma, xpos, feats, deps, misc as features
+	- embedding dimensions
+	- ensemble
+	- separate move and label pred
+	- Should try a composition function instead of ABabL features.
+	- Should try LSTM instead of MLP to make decisions, or find a way to represent stack, attention?
 
 2017-04-10  Deniz Yuret  <dyuret@ku.edu.tr>
 
-	* TODO:
+	* DONE:
 	# KUparser:
 	- globally normalized beam training.
 	- bilstm language model for initialization providing word/context vectors.
 	- ArcHybrid (try others as well).
-	- Should try a composition function instead of ABabL features.
-	- Should try LSTM instead of MLP to make decisions, or find a way to represent stack.
 	- But first solve efficient training of BLSTMLM and minibatch/beam training the parser.
 
 	# Dozat & Manning (2017) soa in graph based ptb 94.1 (LAS).
