@@ -1,6 +1,3 @@
-# TODO: make it work for cpu
-# TODO: add dropout
-
 using JLD, Knet, KUparser, BenchmarkTools, ArgParse
 using KUparser: movecosts
 using AutoGrad: getval
@@ -35,10 +32,9 @@ function main(args="")
     s.exc_handler=ArgParse.debug_handler
     @add_arg_table s begin
         ("--datafiles"; nargs='+'; help="Input in conllu format. If provided, use first file for training, second for dev, others for test. If single file use both for train and dev.")
-        ("--output"; help="Output parse of dev file in conllu format to this file")
+        ("--output"; help="Output parse of first datafile in conllu format to this file")
         ("--loadfile"; help="Initialize model from file")
         ("--savefile"; help="Save final model to file")
-        ("--epochs"; arg_type=Int; default=1; help="Number of epochs for training.")
         ("--hidden"; nargs='+'; arg_type=Int; default=[4096]; help="Sizes of parser mlp hidden layers.")
         ("--optimization"; default="Adam()"; help="Optimization algorithm and parameters.")
         ("--seed"; arg_type=Int; default=-1; help="Random number seed.")
@@ -49,6 +45,8 @@ function main(args="")
         ("--batchsize"; arg_type=Int; default=16; help="Number of sequences to train on in parallel.")
         ("--beamsize"; arg_type=Int; default=1; help="Beam size.")
         ("--dropout"; nargs='+'; arg_type=Float64; default=[0.0]; help="Dropout probabilities.")
+        ("--report"; nargs='+'; arg_type=Int; default=[1]; help="choose which files to report las for, default all.")
+        # ("--epochs"; arg_type=Int; default=1; help="Number of epochs for training.")
         # ("--generate"; arg_type=Int; default=0; help="If non-zero generate given number of characters.")
         # ("--embed"; arg_type=Int; default=168; help="Size of the embedding vector.")
         # ("--seqlength"; arg_type=Int; default=100; help="Maximum number of steps to unroll the network for bptt. Initial epochs will use the epoch number as bptt length for faster convergence.")
@@ -63,6 +61,7 @@ function main(args="")
     println("opts=",[(k,v) for (k,v) in o]...)
     if o[:seed] > 0; srand(o[:seed]); end
     if length(o[:dropout])==1; o[:dropout]=[o[:dropout][1],o[:dropout][1]]; end
+    if length(o[:report])==1; o[:report]=ntuple(i->o[:report][1], length(o[:datafiles])); end
     # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
 
     global vocab, corpora, wmodel, pmodel
@@ -82,43 +81,56 @@ function main(args="")
     ppl = fillvecs!(wmodel,vcat(corpora...),vocab)
     @msg "perplexity=$ppl"
 
-    ctrn = corpora[1]
-    cdev = length(corpora) > 1 ? corpora[2] : corpora[1]
-
     @msg :initmodel
-    (pmodel,optim) = makepmodel(d,o,ctrn[1])
+    (pmodel,optim) = makepmodel(d,o,corpora[1][1])
     save1(file)=savefile(file, vocab, wmodel, pmodel, optim, o[:arctype], o[:feats])
     parentmodel = replace(o[:loadfile],".jld","")
     # save1(@sprintf("%sinit.jld", parentmodel)))
 
     function report(epoch,beamsize=o[:beamsize])
-        las = beamtest(model=pmodel,corpus=cdev,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize])
-        println((:epoch,epoch,:beam,beamsize,:las,las))
+        las = Any[]
+        for i=1:length(corpora)
+            if o[:report][i] != 0
+                push!(las, beamtest(model=pmodel,corpus=corpora[i],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize]))
+            end
+        end
+        println((:epoch,epoch,:beam,beamsize,:las,las...))
     end
     # report(0,1)
     @msg :parsing
     report(0,o[:beamsize])
 
     # training
+    if o[:otrain]>0; @msg :otrain; end
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:otrain]
-        oracletrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
+        oracletrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
         report("oracle$epoch",1); # save1(@sprintf("oracle%02d.jld",epoch))
     end
+
+    if o[:btrain]>0; @msg :btrain; end
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:btrain]
-        beamtrain(model=pmodel,optim=optim,corpus=ctrn,vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],pdrop=o[:dropout],batchsize=1) # larger batchsizes slow down beamtrain considerably
+        beamtrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],pdrop=o[:dropout],batchsize=1) # larger batchsizes slow down beamtrain considerably
         report("beam$epoch"); # save1(@sprintf("%sbeam%02d.jld",parentmodel,epoch))
     end
 
     # savemodel
-    if o[:savefile] != nothing; save1(o[:savefile]); end
-
-    # output dev parse: this will be ready because of report()
-    if o[:output] != nothing    # TODO: parse all data files?
-        inputfile = length(corpora) > 1 ? o[:datafiles][2] : o[:datafiles][1]
-        writeconllu(cdev, inputfile, o[:output])
+    if o[:savefile] != nothing
+        @msg o[:savefile]
+        save1(o[:savefile])
     end
+
+    # output parse for corpora[1]
+    if o[:output] != nothing    # TODO: parse all data files?
+        @msg o[:output]
+        if corpora[1][1].parse == nothing
+            @msg :parsing
+            beamtest(model=pmodel,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],batchsize=o[:batchsize])
+        end
+        writeconllu(corpora[1], o[:datafiles][1], o[:output])
+    end
+    @msg :done
 end
 
 
