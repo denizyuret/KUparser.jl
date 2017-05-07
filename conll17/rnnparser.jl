@@ -26,7 +26,7 @@ FEATS=["s1c","s1v","s1p","s1A","s1a","s1B","s1b",
        ]
 
 function main(args="")
-    # global model, text, data, tok2int, o
+    global model, text, data, tok2int, o
     s = ArgParseSettings()
     s.description="rnnparser.jl"
     s.exc_handler=ArgParse.debug_handler
@@ -40,8 +40,8 @@ function main(args="")
         ("--seed"; arg_type=Int; default=-1; help="Random number seed.")
         ("--otrain"; arg_type=Int; default=0; help="Epochs of oracle training.")
         ("--btrain"; arg_type=Int; default=0; help="Epochs of beam training.")
-        ("--arctype"; default="ArcHybridR1"; help="Move set to use: ArcEager{R1,13}, ArcHybrid{R1,13}")
-        ("--feats"; default="$FEATS"; help="Feature set to use")
+        ("--arctype"; help="Move set to use: ArcEager{R1,13}, ArcHybrid{R1,13}, default ArcHybridR1")
+        ("--feats"; help="Feature set to use, default $FEATS")
         ("--batchsize"; arg_type=Int; default=16; help="Number of sequences to train on in parallel.")
         ("--beamsize"; arg_type=Int; default=1; help="Beam size.")
         ("--dropout"; nargs='+'; arg_type=Float64; default=[0.0]; help="Dropout probabilities.")
@@ -60,7 +60,7 @@ function main(args="")
     println(s.description)
     println("opts=",[(k,v) for (k,v) in o]...)
     if o[:seed] > 0; srand(o[:seed]); end
-    if length(o[:dropout])==1; o[:dropout]=[o[:dropout][1],o[:dropout][1]]; end
+    if length(o[:dropout])==1; o[:dropout]=ntuple(i->o[:dropout][1],2); end
     if length(o[:report])==1; o[:report]=ntuple(i->o[:report][1], length(o[:datafiles])); end
     # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
 
@@ -68,8 +68,10 @@ function main(args="")
     @msg o[:loadfile]
     d = load(o[:loadfile])
 
-    o[:arctype] = get(d,"arctype",eval(parse(o[:arctype])))
-    o[:feats] = get(d,"feats",eval(parse(o[:feats])))
+    o[:arctype] = (o[:arctype] == nothing ? get(d,"arctype",ArcHybridR1) : eval(parse(o[:arctype])))
+    if haskey(d,"arctype") && o[:arctype] != d["arctype"]; error("ArcType mismatch"); end
+    o[:feats] = (o[:feats] == nothing ? get(d,"feats",FEATS) : eval(parse(o[:feats])))
+    if haskey(d,"feats") && o[:feats] != d["feats"]; error("Feats mismatch"); end
 
     vocab = makevocab(d)
     wmodel = makewmodel(d)
