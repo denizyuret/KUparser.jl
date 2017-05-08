@@ -10,7 +10,7 @@ MAXSENT=64                      # skip longer sentences during training
 MINSENT=2                       # skip shorter sentences during training
 FTYPE=Float32                   # floating point type
 GPUFEATURES=false               # whether to compute features on gpu (vcat on gpu is too slow)
-macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); end) end
+macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); flush(STDOUT); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 macro sho(_x) :(if LOGGING>0; @show $(esc(_x)); else; $(esc(_x)); end) end
 date(x)=join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' ')
@@ -31,10 +31,11 @@ function main(args="")
     s.description="rnnparser.jl"
     s.exc_handler=ArgParse.debug_handler
     @add_arg_table s begin
-        ("--datafiles"; nargs='+'; help="Input in conllu format. If provided, use first file for training, second for dev, others for test. If single file use both for train and dev.")
+        ("--datafiles"; nargs='+'; help="Input in conllu format. If provided, use first file for training, last for dev. If single file use both for train and dev.")
         ("--output"; help="Output parse of first datafile in conllu format to this file")
         ("--loadfile"; help="Initialize model from file")
         ("--savefile"; help="Save final model to file")
+        ("--bestfile"; help="Save best model to file")
         ("--hidden"; nargs='+'; arg_type=Int; default=[4096]; help="Sizes of parser mlp hidden layers.")
         ("--optimization"; default="Adam()"; help="Optimization algorithm and parameters.")
         ("--seed"; arg_type=Int; default=-1; help="Random number seed.")
@@ -46,14 +47,13 @@ function main(args="")
         ("--beamsize"; arg_type=Int; default=1; help="Beam size.")
         ("--dropout"; nargs='+'; arg_type=Float64; default=[0.0]; help="Dropout probabilities.")
         ("--report"; nargs='+'; arg_type=Int; default=[1]; help="choose which files to report las for, default all.")
+        ("--embed"; nargs='+'; arg_type=Int; help="embedding sizes for postag(17),deprel(37),counts(10).")
         # ("--epochs"; arg_type=Int; default=1; help="Number of epochs for training.")
         # ("--generate"; arg_type=Int; default=0; help="If non-zero generate given number of characters.")
-        # ("--embed"; arg_type=Int; default=168; help="Size of the embedding vector.")
         # ("--seqlength"; arg_type=Int; default=100; help="Maximum number of steps to unroll the network for bptt. Initial epochs will use the epoch number as bptt length for faster convergence.")
         # ("--gcheck"; arg_type=Int; default=0; help="Check N random gradients.")
         # ("--atype"; default=(gpu()>=0 ? "KnetArray{Float32}" : "Array{Float32}"); help="array type: Array for cpu, KnetArray for gpu")
         # ("--fast"; action=:store_true; help="skip loss printing for faster run")
-        # ("--bestfile"; help="Save best model to file")
     end
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true)
@@ -62,6 +62,7 @@ function main(args="")
     if o[:seed] > 0; srand(o[:seed]); end
     if length(o[:dropout])==1; o[:dropout]=ntuple(i->o[:dropout][1],2); end
     if length(o[:report])==1; o[:report]=ntuple(i->o[:report][1], length(o[:datafiles])); end
+    if length(o[:embed])==1; o[:embed]=ntuple(i->o[:embed][1], 3); end
     # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
 
     #global vocab, corpora, wmodel, pmodel
@@ -72,6 +73,17 @@ function main(args="")
     if haskey(d,"arctype") && o[:arctype] != d["arctype"]; error("ArcType mismatch"); end
     o[:feats] = (o[:feats] == nothing ? get(d,"feats",FEATS) : eval(parse(o[:feats])))
     if haskey(d,"feats") && o[:feats] != d["feats"]; error("Feats mismatch"); end
+    # we specify three embedding dims for postag,deprel and count/distance for empty models.
+    # the word and context embed sizes are given by chmodel dims.
+    if isempty(o[:embed]) && !haskey(d,"parserv")
+        o[:embed] = (17,37,10) # default embedding sizes
+    elseif !isempty(o[:embed]) && haskey(d,"parserv") # check compat
+        if !(length(d["postagv"][1])==o[:embed][1] &&
+             length(d["deprelv"][1])==o[:embed][2] &&
+             length(d["lcountv"][1])==length(d["rcountv"][1])==length(d["distancev"][1])==o[:embed][3])
+            error("Embed mismatch")
+        end
+    end
 
     vocab = makevocab(d)
     wmodel = makewmodel(d)
@@ -87,41 +99,48 @@ function main(args="")
 
     @msg :initmodel
     (pmodel,optim) = makepmodel(d,o,corpora[1][1])
-    save1(file)=savefile(file, vocab, wmodel, pmodel, optim, o[:arctype], o[:feats])
+    save1(file)=(@msg file; savefile(file, vocab, wmodel, pmodel, optim, o[:arctype], o[:feats]))
     parentmodel = replace(o[:loadfile],".jld","")
     # save1(@sprintf("%sinit.jld", parentmodel)))
-
+    
     function report(epoch,beamsize=o[:beamsize])
-        las = Any[]
+        las = zeros(length(corpora))
         for i=1:length(corpora)
-            if o[:report][i] != 0
-                push!(las, beamtest(model=pmodel,corpus=corpora[i],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize]))
+            if o[:report][i] != 0 || (!isempty(o[:bestfile]) && i==length(corpora))
+                las[i] = beamtest(model=pmodel,corpus=corpora[i],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize])
             end
         end
         println((:epoch,epoch,:beam,beamsize,:las,las...))
+        return las[end]
     end
-    # report(0,1)
     @msg :parsing
-    report(0,o[:beamsize])
+    bestlas = report(0,1)
 
     # training
     if o[:otrain]>0; @msg :otrain; end
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:otrain]
         oracletrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
-        report("oracle$epoch",1); # save1(@sprintf("oracle%02d.jld",epoch))
+        currlas = report("oracle$epoch",1)
+        if currlas > bestlas && !isempty(o[:bestfile])
+            bestlas = currlas
+            save1(o[:bestfile])
+        end
     end
 
     if o[:btrain]>0; @msg :btrain; end
     gc(); Knet.knetgc(); gc()
     for epoch=1:o[:btrain]
         beamtrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],pdrop=o[:dropout],batchsize=1) # larger batchsizes slow down beamtrain considerably
-        report("beam$epoch"); # save1(@sprintf("%sbeam%02d.jld",parentmodel,epoch))
+        currlas = report("beam$epoch")
+        if currlas > bestlas && !isempty(o[:bestfile])
+            bestlas = currlas
+            save1(o[:bestfile])
+        end
     end
 
     # savemodel
     if o[:savefile] != nothing
-        @msg o[:savefile]
         save1(o[:savefile])
     end
 
@@ -883,7 +902,8 @@ function makepmodel2(o,s)
     initx(d...) = (if gpu()>=0; KnetArray{FTYPE}(xavier(d...)); else; Array{FTYPE}(xavier(d...)); end)
     initr(d...) = (if GPUFEATURES && gpu()>=0; KnetArray{FTYPE}(0.1*randn(d...)); else; Array{FTYPE}(0.1*randn(d...)); end)
     model = Any[]
-    for (k,n,d) in ((:postag,17,17),(:deprel,37,37),(:lcount,10,10),(:rcount,10,10),(:distance,10,10))
+    dpostag,ddeprel,dcount = o[:embed]
+    for (k,n,d) in ((:postag,17,dpostag),(:deprel,37,ddeprel),(:lcount,10,dcount),(:rcount,10,dcount),(:distance,10,dcount))
         push!(model, [ initr(d) for i=1:n ])
     end
     p = o[:arctype](s)
