@@ -1,3 +1,89 @@
+2017-05-08  Deniz Yuret  <dyuret@ku.edu.tr>
+
+	* arctype-experiments: no improvement
+	(:arctype,"ArcHybridR1")(:feats,"FEATS")	0.756962690488702
+	(:arctype,"ArcHybrid13")(:feats,"Flist.hybrid25")	0.6942546855841654
+	(:arctype,"ArcEager13")(:feats,"Flist.eager25")	0.7165002627430374
+	(:arctype,"ArcEager13")(:feats,"Flist.zn11cpv")	0.7413732702750043
+	(:arctype,"ArcEagerR1")(:feats,"Flist.zn11cpv")	0.7355929234541951
+	(:arctype,"ArcHybridR1")(:feats,"Flist.gn13cpv")	0.7363811525661237
+	(:arctype,"ArcEagerR1")(:feats,"Flist.gn13cpv")	0.7517954107549484
+	(:arctype,"ArcEager13")(:feats,"Flist.eager27")	0.7196531791907514
+	(:arctype,"ArcHybrid13")(:feats,"Flist.hybrid25b")	0.6914520931861973
+	(:arctype,"ArcEager13")(:feats,"Flist.eager20")	0.7130846032580137
+	(:arctype,"ArcEager13")(:feats,"Flist.eager23")	0.7078297425118234
+	(:arctype,"ArcEager13")(:feats,"Flist.eager21")	0.7133473462953231
+	(:arctype,"ArcHybrid13")(:feats,"Flist.hybrid28")	0.7053774741636013
+
+	* feature-experiments: no improvement.
+	[ec2-user@ip-172-31-7-57 features]$ ./mktable.pl features1.log (without dropout)
+	mlpdims=(4224,4096,73) 	0.7520581537922578
+	mlpdims=(7125,4096,73) 	0.7431248905237344
+	mlpdims=(5191,4096,73) 	0.742862147486425
+	mlpdims=(5322,4096,73) 	0.7506568575932738
+	[ec2-user@ip-172-31-7-57 features]$ ./mktable.pl features2.log (with dropout)
+	mlpdims=(4224,4096,73) 	0.765458048695043
+	mlpdims=(7125,4096,73) 	0.7537221930285514
+	mlpdims=(5191,4096,73) 	0.7640567524960589
+	mlpdims=(5322,4096,73) 	0.765808372744789
+
+	* dropout-experiments: 0.5,0.5 seems reasonable, brings 1.8%
+	(:dropout,[0.0,0.0])	0.7520581537922578
+	(:dropout,[0.0,0.25])	0.7551234892275355
+	(:dropout,[0.0,0.5])	0.757313014538448
+	(:dropout,[0.0,0.75])	0.7532842879663689
+	(:dropout,[0.25,0.0])	0.7618672271851462
+	(:dropout,[0.25,0.25])	0.7610789980732178
+	(:dropout,[0.25,0.5])	0.7609914170607812
+	(:dropout,[0.25,0.75])	0.7587143107374321
+	(:dropout,[0.5,0.0])	0.7678227360308285
+	(:dropout,[0.5,0.25])	0.7722893676650902
+	(:dropout,[0.5,0.5])	0.7699246803293046
+	(:dropout,[0.5,0.75])	0.7679978980557015
+	(:dropout,[0.75,0.0])	0.7480294272201786
+	(:dropout,[0.75,0.25])	0.7547731651777895
+	(:dropout,[0.75,0.5])	0.7302504816955684
+	(:dropout,[0.75,0.75])	0.7317393589069889
+
+	* embedsize-experiments: (using 0.5 dropout) brings another 1.8%
+	(17,37,10),	# mlpdims=(4224,4096,73) 	0.7644946575582414
+	(128,128,16),   # mlpdims=(5432,4096,73) 	0.7826239271325977
+
+	(32,37,10),     # mlpdims=(4284,4096,73) 	0.7714135575407252
+	(64,37,10),     # mlpdims=(4412,4096,73) 	0.7772814853739709
+	(128,37,10),    # mlpdims=(4668,4096,73) 	0.7813102119460501
+	(256,37,10),    # mlpdims=(5180,4096,73) 	0.7791206866351374
+
+	(17,32,10),     # mlpdims=(4184,4096,73) 	0.7652828866701699
+	(17,64,10),     # mlpdims=(4440,4096,73) 	0.7644070765458049
+	(17,128,10),    # mlpdims=(4952,4096,73) 	0.7610789980732178
+	(17,256,10),    # mlpdims=(5976,4096,73) 	0.7609914170607812
+
+	(17,37,8),      # mlpdims=(4212,4096,73) 	0.765808372744789 
+	(17,37,16),     # mlpdims=(4260,4096,73) 	0.7588018917498687
+	(17,37,32),     # mlpdims=(4356,4096,73) 	0.7629181993343843
+	(17,37,64),     # mlpdims=(4548,4096,73) 	0.7679103170432651
+
+	TODO: trying more combos.
+
+	* hiddensize-experiments: larger hidden brings 0.75%
+	(:hidden,[1024])	0.7425994044491154
+	(:hidden,[1024,1024])	0.743562795585917
+	(:hidden,[2048])	0.7461026449465756
+	(:hidden,[2048,2048])	0.7538973550534244
+	(:hidden,[4096])	0.7525836398668768
+	(:hidden,[4096,4096])	0.7550359082150989
+	(:hidden,[8192])	0.7549483272026625
+	(:hidden,[8192,8192])	0.7597652828866702
+	(:hidden,[16384])	0.7589770537747417
+	(:hidden,[16384,16384])	out-of-memory
+
+	TODO: try with better dropout and embedsize
+
+	* dynamic-oracle-experiments:
+
+	* charlm-finetune-experiments:
+
 2017-05-07  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* hungarian-experiments:
@@ -73,20 +159,20 @@
 2017-05-01  Deniz Yuret  <dyuret@ku.edu.tr>
 
 	* TODO:
-	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop, global normalization? also why slow down?
 	- dropout: run experiments
-	- cnn: try cnn word vectors
-	- finetuning: try finetuning word vectors
-	- hyperopt: hidden size
-	- dynamic training vs static training
 	- arctype
 	- parser features
-	- use lcword, lemma, xpos, feats, deps, misc as features
 	- embedding dimensions
+	- hyperopt: hidden size
+	- finetuning: try finetuning word vectors
+	- dynamic training vs static training
+	- use lcword, lemma, xpos, feats, deps, misc as features
 	- ensemble
 	- separate move and label pred
 	- Should try a composition function instead of ABabL features.
 	- Should try LSTM instead of MLP to make decisions, or find a way to represent stack, attention?
+	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop, global normalization? also why slow down?
+	- cnn: try cnn word vectors
 
 2017-04-10  Deniz Yuret  <dyuret@ku.edu.tr>
 
