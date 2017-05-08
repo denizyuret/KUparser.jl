@@ -106,7 +106,7 @@ function main(args="")
     function report(epoch,beamsize=o[:beamsize])
         las = zeros(length(corpora))
         for i=1:length(corpora)
-            if o[:report][i] != 0 || (!isempty(o[:bestfile]) && i==length(corpora))
+            if o[:report][i] != 0 || (o[:bestfile] != nothing && i==length(corpora))
                 las[i] = beamtest(model=pmodel,corpus=corpora[i],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=beamsize,batchsize=o[:batchsize])
             end
         end
@@ -122,7 +122,7 @@ function main(args="")
     for epoch=1:o[:otrain]
         oracletrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
         currlas = report("oracle$epoch",1)
-        if currlas > bestlas && !isempty(o[:bestfile])
+        if currlas > bestlas && o[:bestfile] != nothing
             bestlas = currlas
             save1(o[:bestfile])
         end
@@ -133,7 +133,7 @@ function main(args="")
     for epoch=1:o[:btrain]
         beamtrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],beamsize=o[:beamsize],pdrop=o[:dropout],batchsize=1) # larger batchsizes slow down beamtrain considerably
         currlas = report("beam$epoch")
-        if currlas > bestlas && !isempty(o[:bestfile])
+        if currlas > bestlas && o[:bestfile] != nothing
             bestlas = currlas
             save1(o[:bestfile])
         end
