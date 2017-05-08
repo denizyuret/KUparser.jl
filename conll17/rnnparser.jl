@@ -26,7 +26,7 @@ FEATS=["s1c","s1v","s1p","s1A","s1a","s1B","s1b",
        ]
 
 function main(args="")
-    global model, text, data, tok2int, o
+    #global model, text, data, tok2int, o
     s = ArgParseSettings()
     s.description="rnnparser.jl"
     s.exc_handler=ArgParse.debug_handler
@@ -64,7 +64,7 @@ function main(args="")
     if length(o[:report])==1; o[:report]=ntuple(i->o[:report][1], length(o[:datafiles])); end
     # o[:atype] = eval(parse(o[:atype])) # using cpu for features, gpu for everything else
 
-    global vocab, corpora, wmodel, pmodel
+    #global vocab, corpora, wmodel, pmodel
     @msg o[:loadfile]
     d = load(o[:loadfile])
 
@@ -438,16 +438,16 @@ import Base: sortperm, ind2sub
 @zerograd ind2sub(a,i...)
 
 function mlp(w,x; pdrop=(0,0))
-    dropout(x,pdrop[1])
+    x = dropout(x,pdrop[1])
     for i=1:2:length(w)-2
         x = relu(w[i]*x .+ w[i+1])
-        dropout(x,pdrop[2])
+        x = dropout(x,pdrop[2])
     end
     return w[end-1]*x .+ w[end]
 end
 
 function fillvecs!(model, sentences, vocab; batchsize=128)
-    global iwords,isents,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
+    #global iwords,isents,maxword,maxsent,sow,eow,cdata,cmask,wembed,sos,eos,wdata,wmask,forw,back
     iwords,isents,maxword,maxsent = maptoint(sentences, vocab)
 
     # Get word embeddings: do this in minibatches otherwise may run out of memory
