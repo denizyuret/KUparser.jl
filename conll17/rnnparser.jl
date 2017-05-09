@@ -13,7 +13,7 @@ GPUFEATURES=false               # whether to compute features on gpu (vcat on gp
 macro msg(_x) :(if LOGGING>0; join(STDOUT,[Dates.format(now(),"HH:MM:SS"), $_x,'\n'],' '); flush(STDOUT); end) end
 macro log(_x) :(@msg($(string(_x))); $(esc(_x))) end
 macro sho(_x) :(if LOGGING>0; @show $(esc(_x)); else; $(esc(_x)); end) end
-date(x)=join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' ')
+date(x)=(join(STDOUT,[Dates.format(now(),"HH:MM:SS"), x,'\n'],' '); flush(STDOUT))
 type StopWatch; tstart; nstart; ncurr; nnext; StopWatch()=new(time(),0,0,1000); end
 
 FEATS=["s1c","s1v","s1p","s1A","s1a","s1B","s1b",
@@ -45,9 +45,9 @@ function main(args="")
         ("--feats"; help="Feature set to use, default $FEATS")
         ("--batchsize"; arg_type=Int; default=16; help="Number of sequences to train on in parallel.")
         ("--beamsize"; arg_type=Int; default=1; help="Beam size.")
-        ("--dropout"; nargs='+'; arg_type=Float64; default=[0.0]; help="Dropout probabilities.")
+        ("--dropout"; nargs='+'; arg_type=Float64; default=[0.5,0.5]; help="Dropout probabilities. default 0.5.")
         ("--report"; nargs='+'; arg_type=Int; default=[1]; help="choose which files to report las for, default all.")
-        ("--embed"; nargs='+'; arg_type=Int; help="embedding sizes for postag(17),deprel(37),counts(10).")
+        ("--embed"; nargs='+'; arg_type=Int; help="embedding sizes for postag(17),deprel(37),counts(10). default 128,32,16.")
         # ("--epochs"; arg_type=Int; default=1; help="Number of epochs for training.")
         # ("--generate"; arg_type=Int; default=0; help="If non-zero generate given number of characters.")
         # ("--seqlength"; arg_type=Int; default=100; help="Maximum number of steps to unroll the network for bptt. Initial epochs will use the epoch number as bptt length for faster convergence.")
@@ -76,7 +76,7 @@ function main(args="")
     # we specify three embedding dims for postag,deprel and count/distance for empty models.
     # the word and context embed sizes are given by chmodel dims.
     if isempty(o[:embed]) && !haskey(d,"parserv")
-        o[:embed] = (17,37,10) # default embedding sizes
+        o[:embed] = (128,32,16) # default embedding sizes
     elseif !isempty(o[:embed]) && haskey(d,"parserv") # check compat
         if !(length(d["postagv"][1])==o[:embed][1] &&
              length(d["deprelv"][1])==o[:embed][2] &&
