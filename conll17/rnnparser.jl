@@ -115,6 +115,7 @@ function main(args="")
     end
     @msg :parsing
     bestlas = report(0,1)
+    bestepoch = 0
 
     # training
     if o[:otrain]>0; @msg :otrain; end
@@ -122,9 +123,13 @@ function main(args="")
     for epoch=1:o[:otrain]
         oracletrain(model=pmodel,optim=optim,corpus=corpora[1],vocab=vocab,arctype=o[:arctype],feats=o[:feats],batchsize=o[:batchsize],pdrop=o[:dropout])
         currlas = report("oracle$epoch",1)
-        if currlas > bestlas && o[:bestfile] != nothing
+        if currlas > bestlas 
             bestlas = currlas
-            save1(o[:bestfile])
+            bestepoch = epoch
+            if o[:bestfile] != nothing; save1(o[:bestfile]); end
+        end
+        if 5 < bestepoch < epoch - 5
+            break
         end
     end
 
