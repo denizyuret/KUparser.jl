@@ -1,5 +1,21 @@
 2017-05-08  Deniz Yuret  <dyuret@ku.edu.tr>
 
+	* TODO:
+	+ dropout: run experiments
+	+ arctype
+	+ parser features
+	+ embedding dimensions
+	+ hyperopt: hidden size
+	- use lcword, lemma, xpos, feats, deps, misc as features
+	- finetuning: try finetuning word vectors
+	- dynamic training vs static training
+	- ensemble
+	- separate move and label pred
+	- Should try a composition function instead of ABabL features.
+	- Should try LSTM instead of MLP to make decisions, or find a way to represent stack, attention?
+	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop, global normalization? also why slow down?
+	- cnn: try cnn word vectors
+
 	* arctype-experiments: no improvement
 	(:arctype,"ArcHybridR1")(:feats,"FEATS")	0.756962690488702
 	(:arctype,"ArcHybrid13")(:feats,"Flist.hybrid25")	0.6942546855841654
@@ -64,9 +80,20 @@
 	(17,37,32),     # mlpdims=(4356,4096,73) 	0.7629181993343843
 	(17,37,64),     # mlpdims=(4548,4096,73) 	0.7679103170432651
 
-	TODO: trying more combos.
+        (128,16,10), 	# mlpdims=(4500,4096,73) 	0.7757926081625504
+        (128,32,10),    # mlpdims=(4628,4096,73) 	0.7806971448589946
+        (128,64,10),    # mlpdims=(4884,4096,73) 	0.7803468208092486
+        (128,128,10),   # mlpdims=(5396,4096,73) 	0.7771939043615345
+        (128,256,10),   # mlpdims=(6420,4096,73) 	0.7789455246102645
 
-	* hiddensize-experiments: larger hidden brings 0.75%
+        (128,32,8),     # mlpdims=(4616,4096,73) 	0.7771063233490979
+***     (128,32,16),    # mlpdims=(4664,4096,73) 	0.7810474689087405
+        (128,32,32),    # mlpdims=(4760,4096,73) 	0.778157295498336 
+        (128,32,64),    # mlpdims=(4952,4096,73) 	0.7775442284112805
+        (128,32,128),   # mlpdims=(5336,4096,73) 	0.77955859169732  
+
+	* hiddensize-experiments:
+	no-dropout:
 	(:hidden,[1024])	0.7425994044491154
 	(:hidden,[1024,1024])	0.743562795585917
 	(:hidden,[2048])	0.7461026449465756
@@ -77,12 +104,61 @@
 	(:hidden,[8192,8192])	0.7597652828866702
 	(:hidden,[16384])	0.7589770537747417
 	(:hidden,[16384,16384])	out-of-memory
+	with-dropout:
+	(:hidden,[1024])	0.766333858819408
+	(:hidden,[1024,1024])	0.7518829917673848
+	(:hidden,[2048])	0.7657207917323524
+	(:hidden,[2048,2048])	0.7680854790681381
+	(:hidden,[4096])	0.7695743562795586
+	(:hidden,[4096,4096])	0.7662462778069714
+	(:hidden,[8192])	0.7703625853914872
+	(:hidden,[8192,8192])	0.7598528638991067
+	(:hidden,[16384])	0.766859344894027
+	(:hidden,[16384,16384])	out-of-memory
+	with-new-embedsizes: (and 30 epochs)
+	(:hidden,[32])  	"oracle30"	0.6986337362059906
+	(:hidden,[64])  	"oracle29"	0.7458399019092661
+	(:hidden,[128]) 	"oracle29"	0.7714135575407252
+	(:hidden,[256]) 	"oracle26"	0.7856016815554387
+	(:hidden,[512]) 	"oracle30"	0.7903310562270099
+	(:hidden,[1024])	"oracle28"	0.7947976878612717
+	(:hidden,[2048])	"oracle27"	0.7935715536871606
+	(:hidden,[4096])	"oracle28"	0.7943597827990891
+	(:hidden,[8192])	"oracle28"	0.7902434752145735
+	(:hidden,[16384])	"oracle25"	0.7838500613067088
 
-	TODO: try with better dropout and embedsize
+	(:hidden,[32,32])	"oracle30"	0.571466106148187
+	(:hidden,[64,64])	"oracle26"	0.7153617095813628
+	(:hidden,[128,128])	"oracle28"	0.7618672271851462
+	(:hidden,[256,256])	"oracle28"	0.7864774916798039
+	(:hidden,[512,512])	"oracle21"	0.7849886144683833
+	(:hidden,[1024,1024])	"oracle22"	0.7907689612891925
+	(:hidden,[2048,2048])	"oracle20"	0.790856542301629
+	(:hidden,[4096,4096])	"oracle23"	0.7863023296549309
+	(:hidden,[8192,8192])	"oracle27"	0.789980732177264
 
-	* dynamic-oracle-experiments:
+	other languages:
+	vietnamese
+	(:hidden,[1024])	"oracle22"	0.6796942852179955
+	(:hidden,[2048])	"oracle21"	0.6805627931214174
+	(:hidden,[4096])	"oracle20"	0.6791731804759423
+	latvian:
+	(:hidden,[1024])	"oracle30"	0.740916271721959
+	(:hidden,[2048])	"oracle25"	0.7420023696682464
+	(:hidden,[4096])	"oracle22"	0.7354857819905213
+	russian:
+	(:hidden,[1024])	"oracle27"	0.8129157194577755
+	(:hidden,[2048])	"oracle30"	0.81384187926244
+	(:hidden,[4096])	"oracle23"	0.8132525048412899
 
-	* charlm-finetune-experiments:
+	* charlm-finetune-experiments: getting out-of-memory. need emptyvecs! may need charlm dropout.
+	finetune1.log: 0.7717@26 (compared to .7936@27) ending with out-of-memory.
+
+	* dynamic-oracle-experiments: TODO
+	dynamic1.log: .7845 (dynamic), .7824 (static), both at epoch 10, need to run more.
+	TODO: trying with hidden=8192 epochs=10; try with hidden=4092 epochs=20; speed up if works (static=560 wps, dynamic=40wps?). try to reduce kernel calls, copy. maybe all movecosts in one loop followed by setindex on knetarray and maximum on knetarray? (but we need index) Something wrong with the Array operation or its gradient? this is also why beam is so slow!!! NO: it turns out it is not the array ops, it is the type of move!!!
+
+	* extra-conllu-features: TODO
 
 2017-05-07  Deniz Yuret  <dyuret@ku.edu.tr>
 
@@ -157,22 +233,6 @@
 	529	529	kk
 
 2017-05-01  Deniz Yuret  <dyuret@ku.edu.tr>
-
-	* TODO:
-	- dropout: run experiments
-	- arctype
-	- parser features
-	- embedding dimensions
-	- hyperopt: hidden size
-	- finetuning: try finetuning word vectors
-	- dynamic training vs static training
-	- use lcword, lemma, xpos, feats, deps, misc as features
-	- ensemble
-	- separate move and label pred
-	- Should try a composition function instead of ABabL features.
-	- Should try LSTM instead of MLP to make decisions, or find a way to represent stack, attention?
-	- beam: figure out why beam training is not helping, compare with old bparser, larger beam, different loss, no earlystop, global normalization? also why slow down?
-	- cnn: try cnn word vectors
 
 2017-04-10  Deniz Yuret  <dyuret@ku.edu.tr>
 
